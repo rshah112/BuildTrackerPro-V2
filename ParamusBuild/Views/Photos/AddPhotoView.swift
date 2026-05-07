@@ -9,6 +9,7 @@ struct AddPhotoView: View {
     let photoID: UUID?
 
     @Query private var items: [BudgetLineItem]
+    @Query private var existingPhotos: [PhotoAttachment]
 
     @StateObject private var viewModel: PhotoFormViewModel
     @State private var selectedPhotoItem: PhotosPickerItem?
@@ -19,6 +20,11 @@ struct AddPhotoView: View {
         photoID = photo?.id
         let projectID = project.id
         _items = Query(filter: #Predicate<BudgetLineItem> { $0.projectID == projectID }, sort: \.costCode)
+        _existingPhotos = Query(
+            filter: #Predicate<PhotoAttachment> { $0.projectID == projectID },
+            sort: \.createdAt,
+            order: .reverse
+        )
         _viewModel = StateObject(
             wrappedValue: PhotoFormViewModel(
                 imageData: photo?.imageData,
@@ -122,10 +128,20 @@ struct AddPhotoView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(photoID == nil ? "Save" : "Update") {
+                    Button("Save") {
                         save()
                     }
                     .disabled(!viewModel.canSave)
+                }
+            }
+            .onAppear {
+                // For NEW photos, default the folder to the most recently used in this project.
+                if photoID == nil,
+                   viewModel.phaseTag == PhotoFormViewModel.defaultFolder,
+                   let recent = existingPhotos.first?.phaseTag,
+                   !recent.trimmed.isEmpty
+                {
+                    viewModel.phaseTag = recent
                 }
             }
             .onChange(of: selectedPhotoItem) { _, newItem in

@@ -9,9 +9,22 @@ struct PortfolioView: View {
     @State private var showingAddProject = false
     @State private var projectPendingDelete: ProjectDeleteCandidate?
     @State private var metricsByProjectID: [UUID: ProjectCardMetrics] = [:]
+    @State private var statusFilter: ProjectStatus?
+    @State private var priorityFilter: ProjectPriority?
 
     private var portfolioOpenTotal: Double {
         metricsByProjectID.values.reduce(0) { $0 + $1.openInvoiceTotal }
+    }
+
+    private var filteredProjects: [Project] {
+        projects.filter { project in
+            (statusFilter.map { project.status == $0 } ?? true) &&
+                (priorityFilter.map { project.priority == $0 } ?? true)
+        }
+    }
+
+    private var hasActiveFilter: Bool {
+        statusFilter != nil || priorityFilter != nil
     }
 
     var body: some View {
@@ -53,6 +66,39 @@ struct PortfolioView: View {
                     }
                 }
 
+                if !projects.isEmpty {
+                    Section {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(ProjectStatus.allCases) { status in
+                                    PortfolioFilterChip(
+                                        title: status.title,
+                                        systemImage: status.systemImage,
+                                        tint: AppTheme.projectStatusColor(status),
+                                        isSelected: statusFilter == status
+                                    ) {
+                                        statusFilter = (statusFilter == status) ? nil : status
+                                    }
+                                }
+                                Divider().frame(height: 18).padding(.horizontal, 4)
+                                ForEach(ProjectPriority.allCases.filter { $0 != .normal }) { priority in
+                                    PortfolioFilterChip(
+                                        title: priority.title,
+                                        systemImage: "flag.fill",
+                                        tint: AppTheme.projectPriorityColor(priority),
+                                        isSelected: priorityFilter == priority
+                                    ) {
+                                        priorityFilter = (priorityFilter == priority) ? nil : priority
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                        }
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 6, trailing: 0))
+                        .listRowBackground(Color.clear)
+                    }
+                }
+
                 Section("Projects") {
                     if projects.isEmpty {
                         EmptyStateView(
@@ -60,8 +106,14 @@ struct PortfolioView: View {
                             subtitle: "Create your first build to start tracking.",
                             systemImage: "house.badge.plus"
                         )
+                    } else if filteredProjects.isEmpty {
+                        EmptyStateView(
+                            title: "No matches",
+                            subtitle: "Clear filters to see all projects.",
+                            systemImage: "line.3.horizontal.decrease.circle"
+                        )
                     } else {
-                        ForEach(projects) { project in
+                        ForEach(filteredProjects) { project in
                             NavigationLink {
                                 RootTabView(project: project) { projectID in
                                     deleteProject(withID: projectID)
@@ -244,6 +296,32 @@ private struct ProjectDeleteCandidate: Identifiable {
     init(project: Project) {
         id = project.id
         name = project.name
+    }
+}
+
+private struct PortfolioFilterChip: View {
+    let title: String
+    let systemImage: String
+    let tint: Color
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: systemImage)
+                    .font(.caption2.weight(.bold))
+                Text(title)
+                    .font(AppFont.caption2)
+            }
+            .foregroundStyle(isSelected ? Color.white : tint)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule().fill(isSelected ? tint : tint.opacity(0.13))
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

@@ -70,6 +70,16 @@ struct DashboardView: View {
         }
     }
 
+    private func persistProjectChange() {
+        Haptics.lightTap()
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.safeRollback()
+            Haptics.warning()
+        }
+    }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: AppTheme.Space.xs) {
             Text("DASHBOARD")
@@ -90,17 +100,39 @@ struct DashboardView: View {
             .foregroundStyle(AppTheme.inkSecondary)
 
             HStack(spacing: 6) {
-                DashboardStatusChip(
-                    title: project.status.title,
-                    systemImage: project.status.systemImage,
-                    tint: AppTheme.projectStatusColor(project.status)
-                )
+                Menu {
+                    ForEach(ProjectStatus.allCases) { status in
+                        Button {
+                            project.status = status
+                            persistProjectChange()
+                        } label: {
+                            Label(status.title, systemImage: status.systemImage)
+                        }
+                    }
+                } label: {
+                    DashboardStatusChip(
+                        title: project.status.title,
+                        systemImage: project.status.systemImage,
+                        tint: AppTheme.projectStatusColor(project.status)
+                    )
+                }
 
-                DashboardStatusChip(
-                    title: project.priority.title,
-                    systemImage: "flag.fill",
-                    tint: AppTheme.projectPriorityColor(project.priority)
-                )
+                Menu {
+                    ForEach(ProjectPriority.allCases) { priority in
+                        Button {
+                            project.priority = priority
+                            persistProjectChange()
+                        } label: {
+                            Label(priority.title, systemImage: "flag.fill")
+                        }
+                    }
+                } label: {
+                    DashboardStatusChip(
+                        title: project.priority.title,
+                        systemImage: "flag.fill",
+                        tint: AppTheme.projectPriorityColor(project.priority)
+                    )
+                }
             }
             .padding(.top, 4)
         }
@@ -369,17 +401,45 @@ struct DashboardView: View {
                 Text("Watchlist")
                     .font(.headline.weight(.semibold))
 
-                PremiumCard {
-                    VStack(spacing: 0) {
-                        ForEach(viewModel.pinnedItems.prefix(4)) { item in
-                            NavigationLink {
-                                BudgetDetailView(item: item)
-                            } label: {
-                                DashboardBudgetWatchRow(item: item)
+                let visible = viewModel.pinnedItems.count > 4 ? viewModel.pinnedItems : Array(viewModel.pinnedItems.prefix(4))
+
+                if viewModel.pinnedItems.count > 4 {
+                    // Long lists scroll horizontally so the cap doesn't hide pinned work.
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(visible) { item in
+                                NavigationLink {
+                                    BudgetDetailView(item: item)
+                                } label: {
+                                    DashboardBudgetWatchRow(item: item)
+                                        .frame(width: 280)
+                                        .padding(12)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: AppTheme.Radius.md, style: .continuous)
+                                                .fill(AppTheme.surface)
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: AppTheme.Radius.md, style: .continuous)
+                                                .strokeBorder(AppTheme.border, lineWidth: 0.75)
+                                        )
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
-                            if item.id != viewModel.pinnedItems.prefix(4).last?.id {
-                                Divider().padding(.leading, 44)
+                        }
+                    }
+                } else {
+                    PremiumCard {
+                        VStack(spacing: 0) {
+                            ForEach(visible) { item in
+                                NavigationLink {
+                                    BudgetDetailView(item: item)
+                                } label: {
+                                    DashboardBudgetWatchRow(item: item)
+                                }
+                                .buttonStyle(.plain)
+                                if item.id != visible.last?.id {
+                                    Divider().padding(.leading, 44)
+                                }
                             }
                         }
                     }

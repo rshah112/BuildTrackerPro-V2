@@ -204,7 +204,7 @@ private struct AddVendorView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(vendorID == nil ? "Save" : "Update") { save() }
+                    Button("Save") { save() }
                         .disabled(!canSave)
                 }
             }

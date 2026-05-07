@@ -310,7 +310,7 @@ private struct AddChangeOrderView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(orderID == nil ? "Save" : "Update") { save() }
+                    Button("Save") { save() }
                         .disabled(!canSave)
                 }
             }

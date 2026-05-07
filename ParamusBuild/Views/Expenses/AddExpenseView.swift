@@ -224,7 +224,7 @@ struct AddExpenseView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(expenseID == nil ? "Save" : "Update") {
+                    Button("Save") {
                         save()
                     }
                     .disabled(!viewModel.canSave)
@@ -233,6 +233,7 @@ struct AddExpenseView: View {
             .onAppear {
                 refreshData()
                 loadExistingExpenseIfNeeded()
+                seedDefaultDateForNewExpense()
                 sanitizeBudgetSelection()
             }
             .onChange(of: selectedPhotoItem) { _, newItem in
@@ -303,6 +304,13 @@ struct AddExpenseView: View {
     private func loadExistingExpenseIfNeeded() {
         guard let expenseID, let expense = fetchExpense(withID: expenseID) else { return }
         viewModel.load(from: expense)
+    }
+
+    /// For NEW expenses, default the date to the most recent existing expense in this project
+    /// (typical workflow: logging a batch from a single jobsite day).
+    private func seedDefaultDateForNewExpense() {
+        guard expenseID == nil, let mostRecent = fetchExpenses().map(\.date).max() else { return }
+        viewModel.date = mostRecent
     }
 
     private func sanitizeBudgetSelection() {

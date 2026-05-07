@@ -219,6 +219,15 @@ struct BudgetDetailView: View {
         .navigationTitle(categoryName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    isPinned.toggle()
+                    Haptics.lightTap()
+                } label: {
+                    Image(systemName: isPinned ? "pin.fill" : "pin")
+                }
+                .accessibilityLabel(isPinned ? "Unpin item" : "Pin item")
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
                     save()
