@@ -156,14 +156,12 @@ struct BudgetDetailView: View {
                 }
 
                 ModernField("Estimated budget") {
-                    TextField("$0", value: $budget, format: .currency(code: "USD"))
-                        .keyboardType(.decimalPad)
+                    CurrencyField(value: $budget)
                         .modernTextField()
                 }
 
                 ModernField("Committed / contracted") {
-                    TextField("$0", value: $committed, format: .currency(code: "USD"))
-                        .keyboardType(.decimalPad)
+                    CurrencyField(value: $committed)
                         .modernTextField()
                 }
 

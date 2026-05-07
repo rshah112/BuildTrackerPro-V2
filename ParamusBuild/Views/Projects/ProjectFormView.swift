@@ -212,8 +212,7 @@ struct ProjectFormView: View {
             ModernFormSection(setupProfile.sectionTitle, footer: setupProfile.footer) {
                 if let purchasePriceLabel = setupProfile.purchasePriceLabel {
                     ModernField(purchasePriceLabel) {
-                        TextField("$0", value: $purchasePrice, format: .currency(code: "USD"))
-                            .keyboardType(.decimalPad)
+                        CurrencyField(value: $purchasePrice)
                             .modernTextField()
                     }
                 }
@@ -253,8 +252,7 @@ struct ProjectFormView: View {
                 footer: "The starter budget uses this project budget and template percentages. You can edit every category next."
             ) {
                 ModernField("Project budget", subtitle: "The base amount you expect to spend on the actual scope of work.") {
-                    TextField("$0", value: $constructionBudget, format: .currency(code: "USD"))
-                        .keyboardType(.decimalPad)
+                    CurrencyField(value: $constructionBudget)
                         .modernTextField()
                 }
 
@@ -262,8 +260,7 @@ struct ProjectFormView: View {
                     "Reserve / contingency",
                     subtitle: "Optional backup money kept outside the base budget for surprises or owner changes."
                 ) {
-                    TextField("$0", value: $contingencyBudget, format: .currency(code: "USD"))
-                        .keyboardType(.decimalPad)
+                    CurrencyField(value: $contingencyBudget)
                         .modernTextField()
                 }
 
@@ -983,8 +980,7 @@ private struct BudgetDraftItemRow: View {
             }
 
             HStack(spacing: 8) {
-                TextField("Amount", value: $item.amount, format: .currency(code: "USD"))
-                    .keyboardType(.decimalPad)
+                CurrencyField(value: $item.amount, prompt: "Amount")
                     .font(.caption.weight(.bold))
                     .disabled(item.isLocked)
 
@@ -1012,8 +1008,7 @@ private struct EditableAmountField: View {
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-            TextField(title, value: $draftValue, format: .currency(code: "USD"))
-                .keyboardType(.decimalPad)
+            CurrencyField(value: $draftValue, prompt: title)
                 .font(.caption.weight(.bold))
                 .disabled(isDisabled)
                 .onChange(of: draftValue) { _, newValue in

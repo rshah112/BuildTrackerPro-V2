@@ -224,7 +224,7 @@ private struct AddChangeOrderView: View {
     @Query private var expenses: [Expense]
 
     @State private var title = ""
-    @State private var amountText = ""
+    @State private var amount: Double = 0
     @State private var status: ChangeOrderStatus = .pending
     @State private var categoryName = ""
     @State private var budgetLineItemID: UUID?
@@ -240,18 +240,11 @@ private struct AddChangeOrderView: View {
         _expenses = Query(filter: #Predicate<Expense> { $0.projectID == projectID }, sort: \.date, order: .reverse)
 
         _title = State(initialValue: order?.title ?? "")
-        _amountText = State(initialValue: order.map { $0.amount == $0.amount.rounded() ? String(format: "%.0f", $0.amount) : String(
-            format: "%.2f",
-            $0.amount
-        ) } ?? "")
+        _amount = State(initialValue: order?.amount ?? 0)
         _status = State(initialValue: order?.status ?? .pending)
         _categoryName = State(initialValue: order?.categoryName ?? "")
         _budgetLineItemID = State(initialValue: order?.budgetLineItemID)
         _notes = State(initialValue: order?.notes ?? "")
-    }
-
-    private var amount: Double {
-        Double(amountText.replacingOccurrences(of: "$", with: "").replacingOccurrences(of: ",", with: "").trimmed) ?? 0
     }
 
     private var canSave: Bool {
@@ -268,8 +261,7 @@ private struct AddChangeOrderView: View {
                     }
 
                     ModernField("Amount") {
-                        TextField("$0", text: $amountText)
-                            .keyboardType(.decimalPad)
+                        CurrencyField(value: $amount)
                             .modernTextField()
                     }
 

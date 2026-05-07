@@ -60,10 +60,7 @@ struct AddExpenseView: View {
         NavigationStack {
             ModernForm {
                 ModernFormSection("Amount") {
-                    TextField("$0", text: $viewModel.amountText)
-                        .font(.system(size: 44, weight: .bold, design: .rounded))
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.leading)
+                    CurrencyField(value: $viewModel.amount, displayStyle: .hero)
                         .padding(.vertical, 8)
                 }
 
@@ -157,9 +154,11 @@ struct AddExpenseView: View {
 
                 ModernFormSection("Payment") {
                     ModernField("Amount paid") {
-                        TextField("$0", text: $viewModel.amountPaidText)
-                            .keyboardType(.decimalPad)
+                        CurrencyField(value: $viewModel.amountPaid)
                             .modernTextField()
+                            .onChange(of: viewModel.amountPaid) { _, _ in
+                                viewModel.hasExplicitAmountPaid = true
+                            }
                     }
 
                     Toggle("Paid Date", isOn: $viewModel.hasPaidDate)
@@ -249,8 +248,8 @@ struct AddExpenseView: View {
                 }
             }
             .onChange(of: viewModel.isPaid) { _, isPaid in
-                if isPaid, viewModel.amountPaidText.trimmed.isEmpty {
-                    viewModel.amountPaidText = viewModel.amountText
+                if isPaid, !viewModel.hasExplicitAmountPaid {
+                    viewModel.amountPaid = viewModel.amount
                 }
                 if !isPaid {
                     viewModel.hasPaidDate = false

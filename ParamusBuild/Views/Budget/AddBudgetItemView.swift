@@ -104,14 +104,12 @@ struct AddBudgetItemView: View {
                     footer: "Use committed only when this item already has a signed contract or known commitment."
                 ) {
                     ModernField("Estimated budget", subtitle: "The planned allowance for this line item.") {
-                        TextField("$0", value: $budget, format: .currency(code: "USD"))
-                            .keyboardType(.decimalPad)
+                        CurrencyField(value: $budget)
                             .modernTextField()
                     }
 
                     ModernField("Committed / contracted", subtitle: "Known contracted amount that is not fully paid yet.") {
-                        TextField("$0", value: $committed, format: .currency(code: "USD"))
-                            .keyboardType(.decimalPad)
+                        CurrencyField(value: $committed)
                             .modernTextField()
                     }
                 }

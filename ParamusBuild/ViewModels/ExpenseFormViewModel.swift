@@ -1,8 +1,9 @@
 import Foundation
 
 final class ExpenseFormViewModel: ObservableObject {
-    @Published var amountText = ""
-    @Published var amountPaidText = ""
+    @Published var amount: Double = 0
+    @Published var amountPaid: Double = 0
+    @Published var hasExplicitAmountPaid = false
     @Published var vendorName = ""
     @Published var invoiceNumber = ""
     @Published var date = Date()
@@ -24,8 +25,9 @@ final class ExpenseFormViewModel: ObservableObject {
     }
 
     func load(from expense: Expense) {
-        amountText = formatAmount(expense.amount)
-        amountPaidText = formatAmount(expense.amountPaid)
+        amount = expense.amount
+        amountPaid = expense.amountPaid
+        hasExplicitAmountPaid = expense.amountPaid > 0
         vendorName = expense.vendorName
         invoiceNumber = expense.invoiceNumber
         date = expense.date
@@ -49,16 +51,13 @@ final class ExpenseFormViewModel: ObservableObject {
         receiptImageData = expense.receiptImageData
     }
 
-    var amount: Double {
-        parseCurrency(amountText)
-    }
-
-    var amountPaid: Double {
-        if amountPaidText.trimmed.isEmpty {
+    /// Effective amount paid — clamped to [0, amount].
+    /// If user hasn't explicitly entered a paid amount, defaults to full amount when paid, else 0.
+    var effectiveAmountPaid: Double {
+        if !hasExplicitAmountPaid {
             return isPaid ? amount : 0
         }
-
-        return min(amount, max(0, parseCurrency(amountPaidText)))
+        return min(amount, max(0, amountPaid))
     }
 
     var canSave: Bool {
@@ -69,7 +68,7 @@ final class ExpenseFormViewModel: ObservableObject {
         Expense(
             projectID: projectID,
             amount: amount,
-            amountPaid: amountPaid,
+            amountPaid: effectiveAmountPaid,
             vendorName: vendorName.trimmed,
             invoiceNumber: invoiceNumber.trimmed,
             date: date,
@@ -89,7 +88,7 @@ final class ExpenseFormViewModel: ObservableObject {
     func apply(to expense: Expense, projectID: UUID, for item: BudgetLineItem?) {
         expense.projectID = projectID
         expense.amount = amount
-        expense.amountPaid = amountPaid
+        expense.amountPaid = effectiveAmountPaid
         expense.vendorName = vendorName.trimmed
         expense.invoiceNumber = invoiceNumber.trimmed
         expense.date = date
@@ -105,20 +104,5 @@ final class ExpenseFormViewModel: ObservableObject {
         expense.notes = notes.trimmed
         expense.isPaid = isPaid
         expense.receiptImageData = receiptImageData
-    }
-
-    private func parseCurrency(_ value: String) -> Double {
-        let cleaned = value
-            .replacingOccurrences(of: "$", with: "")
-            .replacingOccurrences(of: ",", with: "")
-        return Double(cleaned.trimmed) ?? 0
-    }
-
-    private func formatAmount(_ value: Double) -> String {
-        let rounded = (value * 100).rounded() / 100
-        if abs(rounded - rounded.rounded()) < 0.005 {
-            return String(format: "%.0f", rounded)
-        }
-        return String(format: "%.2f", rounded)
     }
 }

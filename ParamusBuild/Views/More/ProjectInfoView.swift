@@ -128,8 +128,7 @@ struct ProjectInfoView: View {
 
             ModernFormSection("Baseline") {
                 ModernField("Purchase price") {
-                    TextField("$0", value: $purchasePrice, format: .currency(code: "USD"))
-                        .keyboardType(.decimalPad)
+                    CurrencyField(value: $purchasePrice)
                         .modernTextField()
                 }
 
@@ -156,14 +155,12 @@ struct ProjectInfoView: View {
 
             ModernFormSection("Budget") {
                 ModernField("Project budget", subtitle: "The base budget for the planned scope of work.") {
-                    TextField("$0", value: $constructionBudget, format: .currency(code: "USD"))
-                        .keyboardType(.decimalPad)
+                    CurrencyField(value: $constructionBudget)
                         .modernTextField()
                 }
 
                 ModernField("Reserve / contingency", subtitle: "Optional backup money outside the base budget.") {
-                    TextField("$0", value: $contingencyBudget, format: .currency(code: "USD"))
-                        .keyboardType(.decimalPad)
+                    CurrencyField(value: $contingencyBudget)
                         .modernTextField()
                 }
 
