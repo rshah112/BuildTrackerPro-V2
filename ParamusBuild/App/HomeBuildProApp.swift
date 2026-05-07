@@ -9,6 +9,7 @@ struct HomeBuildProApp: App {
 
     init() {
         TextFieldSelectionBehavior.enableSelectAllOnFocus()
+        MediaStorageService.ensureBootstrapped()
 
         do {
             #if DEBUG

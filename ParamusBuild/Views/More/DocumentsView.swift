@@ -206,6 +206,7 @@ struct DocumentsView: View {
                 fileData: upload.fileData
             )
             modelContext.insert(document)
+            MediaStorageService.saveDocument(data: upload.fileData, project: project, document: document)
         }
 
         saveChanges(successHaptic: true)

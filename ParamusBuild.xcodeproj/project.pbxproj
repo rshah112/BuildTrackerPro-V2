@@ -54,6 +54,8 @@
 		2A0001010000000000000099 /* CurrencyField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000099 /* CurrencyField.swift */; };
 		2A000101000000000000009A /* VisionReceiptScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000009A /* VisionReceiptScanner.swift */; };
 		2A000101000000000000009B /* ReceiptCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000009B /* ReceiptCaptureView.swift */; };
+		2A000101000000000000009C /* MediaStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000009C /* MediaStorageService.swift */; };
+		2A000101000000000000009D /* ReceiptsGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000009D /* ReceiptsGalleryView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -104,6 +106,8 @@
 		2A0002010000000000000099 /* CurrencyField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyField.swift; sourceTree = "<group>"; };
 		2A000201000000000000009A /* VisionReceiptScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionReceiptScanner.swift; sourceTree = "<group>"; };
 		2A000201000000000000009B /* ReceiptCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptCaptureView.swift; sourceTree = "<group>"; };
+		2A000201000000000000009C /* MediaStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaStorageService.swift; sourceTree = "<group>"; };
+		2A000201000000000000009D /* ReceiptsGalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptsGalleryView.swift; sourceTree = "<group>"; };
 		2A00020100000000000000FF /* HomeBuildPro.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HomeBuildPro.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -174,6 +178,7 @@
 				2A000201000000000000002B /* ProjectWorkbookService.swift */,
 				2A0002010000000000000031 /* ProjectTemplateService.swift */,
 				2A000201000000000000009A /* VisionReceiptScanner.swift */,
+				2A000201000000000000009C /* MediaStorageService.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -266,6 +271,7 @@
 				2A000201000000000000001A /* PhotosView.swift */,
 				2A000201000000000000001B /* AddPhotoView.swift */,
 				2A000201000000000000001C /* PhotoViewer.swift */,
+				2A000201000000000000009D /* ReceiptsGalleryView.swift */,
 			);
 			path = Photos;
 			sourceTree = "<group>";
@@ -384,6 +390,8 @@
 				2A0001010000000000000099 /* CurrencyField.swift in Sources */,
 				2A000101000000000000009A /* VisionReceiptScanner.swift in Sources */,
 				2A000101000000000000009B /* ReceiptCaptureView.swift in Sources */,
+				2A000101000000000000009C /* MediaStorageService.swift in Sources */,
+				2A000101000000000000009D /* ReceiptsGalleryView.swift in Sources */,
 				2A0001010000000000000015 /* DashboardView.swift in Sources */,
 				2A0001010000000000000016 /* BudgetView.swift in Sources */,
 				2A0001010000000000000017 /* BudgetDetailView.swift in Sources */,
@@ -544,6 +552,8 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "Capture jobsite photos and receipts for HomeBuild Pro.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Attach photos and receipts from your library to HomeBuild Pro.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -574,6 +584,8 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "Capture jobsite photos and receipts for HomeBuild Pro.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Attach photos and receipts from your library to HomeBuild Pro.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";

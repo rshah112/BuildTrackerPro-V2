@@ -438,6 +438,7 @@ struct AddExpenseView: View {
                 return
             }
             viewModel.apply(to: expenseToEdit, projectID: project.id, for: selectedItem)
+            mirrorReceiptToDisk(for: expenseToEdit)
             BudgetMathService.recalculateActuals(
                 for: project.id,
                 items: fetchBudgetItems(),
@@ -450,6 +451,7 @@ struct AddExpenseView: View {
 
         let expense = viewModel.makeExpense(projectID: project.id, for: selectedItem)
         modelContext.insert(expense)
+        mirrorReceiptToDisk(for: expense)
         BudgetMathService.recalculateActuals(
             for: project.id,
             items: fetchBudgetItems(),
@@ -457,6 +459,11 @@ struct AddExpenseView: View {
             changeOrders: fetchChangeOrders()
         )
         saveAndDismiss()
+    }
+
+    private func mirrorReceiptToDisk(for expense: Expense) {
+        guard let data = expense.receiptImageData else { return }
+        MediaStorageService.saveReceipt(data: data, project: project, expense: expense)
     }
 
     private func refreshData() {

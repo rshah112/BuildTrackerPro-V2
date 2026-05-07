@@ -163,14 +163,22 @@ struct AddPhotoView: View {
 
     private func save() {
         do {
+            let target: PhotoAttachment
             if let photoID {
                 guard let photoToEdit = fetchPhoto(withID: photoID) else {
                     Haptics.warning()
                     return
                 }
                 applyViewModel(to: photoToEdit)
+                target = photoToEdit
             } else {
-                modelContext.insert(makePhoto())
+                let newPhoto = makePhoto()
+                modelContext.insert(newPhoto)
+                target = newPhoto
+            }
+
+            if let data = target.imageData {
+                MediaStorageService.savePhoto(data: data, project: project, photo: target)
             }
 
             try modelContext.save()

@@ -84,6 +84,7 @@ struct PhotosView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     photoHeader
+                    receiptsTile
                     libraryTabs
 
                     if libraryMode == .folders {
@@ -187,6 +188,49 @@ struct PhotosView: View {
                 }
             }
         }
+        .padding(.horizontal, AppTheme.pagePadding)
+    }
+
+    private var receiptsTile: some View {
+        NavigationLink {
+            ReceiptsGalleryView(project: project)
+        } label: {
+            HStack(spacing: AppTheme.Space.sm) {
+                Image(systemName: "doc.viewfinder")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(AppTheme.brand)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        RoundedRectangle(cornerRadius: AppTheme.Radius.sm, style: .continuous)
+                            .fill(AppTheme.brandSoft)
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Receipts & Invoices")
+                        .font(AppFont.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.ink)
+                    Text("Scanned receipts saved to Files.app")
+                        .font(AppFont.caption2)
+                        .foregroundStyle(AppTheme.inkTertiary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(AppTheme.inkTertiary)
+            }
+            .padding(AppTheme.Space.sm)
+            .background(
+                RoundedRectangle(cornerRadius: AppTheme.Radius.md, style: .continuous)
+                    .fill(AppTheme.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: AppTheme.Radius.md, style: .continuous)
+                    .strokeBorder(AppTheme.border, lineWidth: 0.75)
+            )
+        }
+        .buttonStyle(.plain)
         .padding(.horizontal, AppTheme.pagePadding)
     }
 

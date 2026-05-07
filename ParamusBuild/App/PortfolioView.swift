@@ -207,7 +207,10 @@ struct PortfolioView: View {
             photos.forEach(modelContext.delete)
             documents.forEach(modelContext.delete)
             changeOrders.forEach(modelContext.delete)
-            if let project { modelContext.delete(project) }
+            if let project {
+                MediaStorageService.removeAllMedia(for: project)
+                modelContext.delete(project)
+            }
 
             try modelContext.save()
             projectPendingDelete = nil
