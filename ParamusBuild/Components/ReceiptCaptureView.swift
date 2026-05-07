@@ -58,6 +58,10 @@ struct ReceiptCaptureView: UIViewControllerRepresentable {
                         vendorConfidence: 0,
                         date: nil,
                         dateConfidence: 0,
+                        phoneNumber: nil,
+                        address: nil,
+                        isPaid: nil,
+                        vendorTypeHint: nil,
                         imageData: optimized.jpegData(compressionQuality: 0.82)
                     )
                 }

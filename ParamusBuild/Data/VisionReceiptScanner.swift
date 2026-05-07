@@ -19,10 +19,19 @@ struct ScannedReceipt {
     let vendorConfidence: Float
     let date: Date?
     let dateConfidence: Float
+    let phoneNumber: String?
+    let address: String?
+    /// `true` if the receipt looks like a paid cash/card receipt;
+    /// `false` if it's an unpaid invoice; `nil` if undetermined.
+    let isPaid: Bool?
+    /// Best-effort hint at the kind of vendor (e.g. "Hardware & Materials",
+    /// "Plumbing", "Electrical"). Not authoritative — the user still picks the budget item.
+    let vendorTypeHint: String?
     let imageData: Data?
 
     var anyExtraction: Bool {
-        amount != nil || vendorName != nil || date != nil
+        amount != nil || vendorName != nil || date != nil ||
+            phoneNumber != nil || address != nil || isPaid != nil
     }
 }
 
@@ -67,6 +76,10 @@ enum VisionReceiptScanner {
         let (amount, amountConf) = extractAmount(from: lines)
         let (vendor, vendorConf) = extractVendor(from: lines)
         let (date, dateConf) = extractDate(from: lines)
+        let phone = extractPhone(from: lines)
+        let address = extractAddress(from: lines)
+        let isPaid = extractPaidStatus(from: lines)
+        let typeHint = vendor.flatMap { vendorTypeHint(for: $0, lines: lines) }
 
         return ScannedReceipt(
             amount: amount,
@@ -75,6 +88,10 @@ enum VisionReceiptScanner {
             vendorConfidence: vendorConf,
             date: date,
             dateConfidence: dateConf,
+            phoneNumber: phone,
+            address: address,
+            isPaid: isPaid,
+            vendorTypeHint: typeHint,
             imageData: imageData
         )
     }
@@ -182,5 +199,82 @@ enum VisionReceiptScanner {
         }
 
         return (bestDate, bestLineConfidence)
+    }
+
+    private static func extractPhone(from lines: [RecognizedLine]) -> String? {
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.phoneNumber.rawValue) else {
+            return nil
+        }
+        for line in lines {
+            let range = NSRange(line.text.startIndex..., in: line.text)
+            if let match = detector.matches(in: line.text, options: [], range: range).first,
+               let phone = match.phoneNumber, phone.count >= 7
+            {
+                return phone
+            }
+        }
+        return nil
+    }
+
+    private static func extractAddress(from lines: [RecognizedLine]) -> String? {
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.address.rawValue) else {
+            return nil
+        }
+        // Concatenate the top half of the receipt — addresses span multiple recognized lines.
+        let topText = lines
+            .filter { $0.y > 0.5 }
+            .sorted { $0.y > $1.y }
+            .map(\.text)
+            .joined(separator: ", ")
+        let range = NSRange(topText.startIndex..., in: topText)
+        guard let match = detector.matches(in: topText, options: [], range: range).first,
+              let stringRange = Range(match.range, in: topText)
+        else {
+            return nil
+        }
+        return String(topText[stringRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func extractPaidStatus(from lines: [RecognizedLine]) -> Bool? {
+        let upperText = lines.map { $0.text.uppercased() }.joined(separator: " ")
+        // Strong unpaid signals.
+        if upperText.contains("BALANCE DUE") || upperText.contains("AMOUNT DUE") ||
+            upperText.contains("PAY BY") || upperText.contains("PLEASE REMIT") ||
+            upperText.contains("INVOICE")
+        {
+            // But if it also says "PAID" near the balance, treat as paid.
+            if upperText.contains("PAID IN FULL") || upperText.contains("BALANCE PAID") {
+                return true
+            }
+            return false
+        }
+        // Strong paid signals.
+        if upperText.contains("CHANGE DUE") || upperText.contains("CASH TENDERED") ||
+            upperText.contains("PAYMENT RECEIVED") || upperText.contains("APPROVED") ||
+            upperText.contains("PAID")
+        {
+            return true
+        }
+        return nil
+    }
+
+    private static let vendorTypeMap: [(needles: [String], hint: String)] = [
+        (["HOME DEPOT", "LOWE", "MENARDS", "ACE HARDWARE", "84 LUMBER", "BUILDERS"], "Hardware & Materials"),
+        (["FERGUSON", "PLUMBING SUPPLY", "WINSUPPLY"], "Plumbing"),
+        (["GRAYBAR", "ELECTRIC SUPPLY", "ELECTRICAL"], "Electrical"),
+        (["SHERWIN", "BENJAMIN MOORE", "PAINT"], "Paint"),
+        (["FLOORING", "TILE", "STONE"], "Flooring & Tile"),
+        (["WINDOW", "GLASS"], "Windows"),
+        (["LANDSCAP", "NURSERY"], "Landscaping"),
+        (["INSPECTION"], "Inspections"),
+        (["PERMIT"], "Permits & Approvals")
+    ]
+
+    private static func vendorTypeHint(for vendor: String, lines: [RecognizedLine]) -> String? {
+        let haystack = (vendor + " " + lines.prefix(8).map(\.text).joined(separator: " ")).uppercased()
+        for entry in vendorTypeMap where entry.needles.contains(where: { haystack.contains($0) }) {
+            return entry.hint
+        }
+        return nil
     }
 }
