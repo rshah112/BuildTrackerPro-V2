@@ -1,0 +1,605 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		2A0001010000000000000001 /* HomeBuildProApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000001 /* HomeBuildProApp.swift */; };
+		2A0001010000000000000002 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000002 /* RootTabView.swift */; };
+		2A0001010000000000000003 /* Project.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000003 /* Project.swift */; };
+		2A0001010000000000000004 /* BudgetCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000004 /* BudgetCategory.swift */; };
+		2A0001010000000000000005 /* BudgetLineItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000005 /* BudgetLineItem.swift */; };
+		2A0001010000000000000006 /* Expense.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000006 /* Expense.swift */; };
+		2A0001010000000000000007 /* Vendor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000007 /* Vendor.swift */; };
+		2A0001010000000000000008 /* PhotoAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000008 /* PhotoAttachment.swift */; };
+		2A0001010000000000000009 /* ChangeOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000009 /* ChangeOrder.swift */; };
+		2A000101000000000000000A /* SeedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000000A /* SeedData.swift */; };
+		2A000101000000000000000B /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000000B /* DashboardViewModel.swift */; };
+		2A000101000000000000000C /* ExpenseFormViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000000C /* ExpenseFormViewModel.swift */; };
+		2A000101000000000000000D /* PhotoFormViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000000D /* PhotoFormViewModel.swift */; };
+		2A000101000000000000000E /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000000E /* AppTheme.swift */; };
+		2A000101000000000000000F /* PremiumCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000000F /* PremiumCard.swift */; };
+		2A0001010000000000000010 /* MetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000010 /* MetricCard.swift */; };
+		2A0001010000000000000011 /* BudgetHealthPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000011 /* BudgetHealthPill.swift */; };
+		2A0001010000000000000013 /* ImagePickers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000013 /* ImagePickers.swift */; };
+		2A0001010000000000000014 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000014 /* EmptyStateView.swift */; };
+		2A0001010000000000000015 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000015 /* DashboardView.swift */; };
+		2A0001010000000000000016 /* BudgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000016 /* BudgetView.swift */; };
+		2A0001010000000000000017 /* BudgetDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000017 /* BudgetDetailView.swift */; };
+		2A0001010000000000000018 /* ExpensesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000018 /* ExpensesView.swift */; };
+		2A0001010000000000000019 /* AddExpenseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000019 /* AddExpenseView.swift */; };
+		2A000101000000000000001A /* PhotosView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000001A /* PhotosView.swift */; };
+		2A000101000000000000001B /* AddPhotoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000001B /* AddPhotoView.swift */; };
+		2A000101000000000000001C /* PhotoViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000001C /* PhotoViewer.swift */; };
+		2A000101000000000000001D /* MoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000001D /* MoreView.swift */; };
+		2A000101000000000000001E /* VendorsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000001E /* VendorsView.swift */; };
+		2A000101000000000000001F /* ChangeOrdersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000001F /* ChangeOrdersView.swift */; };
+		2A0001010000000000000020 /* ProjectInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000020 /* ProjectInfoView.swift */; };
+		2A0001010000000000000021 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000021 /* SettingsView.swift */; };
+		2A0001010000000000000022 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000022 /* Assets.xcassets */; };
+		2A0001010000000000000023 /* ProjectDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000023 /* ProjectDocument.swift */; };
+		2A0001010000000000000024 /* PortfolioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000024 /* PortfolioView.swift */; };
+		2A0001010000000000000025 /* ProjectFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000025 /* ProjectFormView.swift */; };
+		2A0001010000000000000026 /* DocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000026 /* DocumentsView.swift */; };
+		2A0001010000000000000027 /* ExportProjectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000027 /* ExportProjectView.swift */; };
+		2A0001010000000000000028 /* ProjectExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000028 /* ProjectExportService.swift */; };
+		2A0001010000000000000029 /* AddBudgetItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000029 /* AddBudgetItemView.swift */; };
+		2A000101000000000000002A /* BudgetMathService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000002A /* BudgetMathService.swift */; };
+		2A000101000000000000002B /* ProjectWorkbookService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000002B /* ProjectWorkbookService.swift */; };
+		2A0001010000000000000031 /* ProjectTemplateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000031 /* ProjectTemplateService.swift */; };
+		2A0001010000000000000032 /* ModernForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000032 /* ModernForm.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		2A0002010000000000000001 /* HomeBuildProApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeBuildProApp.swift; sourceTree = "<group>"; };
+		2A0002010000000000000002 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
+		2A0002010000000000000003 /* Project.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Project.swift; sourceTree = "<group>"; };
+		2A0002010000000000000004 /* BudgetCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetCategory.swift; sourceTree = "<group>"; };
+		2A0002010000000000000005 /* BudgetLineItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetLineItem.swift; sourceTree = "<group>"; };
+		2A0002010000000000000006 /* Expense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Expense.swift; sourceTree = "<group>"; };
+		2A0002010000000000000007 /* Vendor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Vendor.swift; sourceTree = "<group>"; };
+		2A0002010000000000000008 /* PhotoAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoAttachment.swift; sourceTree = "<group>"; };
+		2A0002010000000000000009 /* ChangeOrder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeOrder.swift; sourceTree = "<group>"; };
+		2A000201000000000000000A /* SeedData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedData.swift; sourceTree = "<group>"; };
+		2A000201000000000000000B /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
+		2A000201000000000000000C /* ExpenseFormViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpenseFormViewModel.swift; sourceTree = "<group>"; };
+		2A000201000000000000000D /* PhotoFormViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoFormViewModel.swift; sourceTree = "<group>"; };
+		2A000201000000000000000E /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
+		2A000201000000000000000F /* PremiumCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumCard.swift; sourceTree = "<group>"; };
+		2A0002010000000000000010 /* MetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricCard.swift; sourceTree = "<group>"; };
+		2A0002010000000000000011 /* BudgetHealthPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetHealthPill.swift; sourceTree = "<group>"; };
+		2A0002010000000000000013 /* ImagePickers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePickers.swift; sourceTree = "<group>"; };
+		2A0002010000000000000014 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		2A0002010000000000000015 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		2A0002010000000000000016 /* BudgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetView.swift; sourceTree = "<group>"; };
+		2A0002010000000000000017 /* BudgetDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetDetailView.swift; sourceTree = "<group>"; };
+		2A0002010000000000000018 /* ExpensesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpensesView.swift; sourceTree = "<group>"; };
+		2A0002010000000000000019 /* AddExpenseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddExpenseView.swift; sourceTree = "<group>"; };
+		2A000201000000000000001A /* PhotosView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosView.swift; sourceTree = "<group>"; };
+		2A000201000000000000001B /* AddPhotoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddPhotoView.swift; sourceTree = "<group>"; };
+		2A000201000000000000001C /* PhotoViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoViewer.swift; sourceTree = "<group>"; };
+		2A000201000000000000001D /* MoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreView.swift; sourceTree = "<group>"; };
+		2A000201000000000000001E /* VendorsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VendorsView.swift; sourceTree = "<group>"; };
+		2A000201000000000000001F /* ChangeOrdersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeOrdersView.swift; sourceTree = "<group>"; };
+		2A0002010000000000000020 /* ProjectInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectInfoView.swift; sourceTree = "<group>"; };
+		2A0002010000000000000021 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		2A0002010000000000000022 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		2A0002010000000000000023 /* ProjectDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectDocument.swift; sourceTree = "<group>"; };
+		2A0002010000000000000024 /* PortfolioView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortfolioView.swift; sourceTree = "<group>"; };
+		2A0002010000000000000025 /* ProjectFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectFormView.swift; sourceTree = "<group>"; };
+		2A0002010000000000000026 /* DocumentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentsView.swift; sourceTree = "<group>"; };
+		2A0002010000000000000027 /* ExportProjectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportProjectView.swift; sourceTree = "<group>"; };
+		2A0002010000000000000028 /* ProjectExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectExportService.swift; sourceTree = "<group>"; };
+		2A0002010000000000000029 /* AddBudgetItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBudgetItemView.swift; sourceTree = "<group>"; };
+		2A000201000000000000002A /* BudgetMathService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetMathService.swift; sourceTree = "<group>"; };
+		2A000201000000000000002B /* ProjectWorkbookService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectWorkbookService.swift; sourceTree = "<group>"; };
+		2A0002010000000000000031 /* ProjectTemplateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTemplateService.swift; sourceTree = "<group>"; };
+		2A0002010000000000000032 /* ModernForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernForm.swift; sourceTree = "<group>"; };
+		2A00020100000000000000FF /* HomeBuildPro.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HomeBuildPro.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		2A0003010000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		2A0004010000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				2A0004010000000000000002 /* ParamusBuild */,
+				2A000401000000000000000A /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		2A0004010000000000000002 /* ParamusBuild */ = {
+			isa = PBXGroup;
+			children = (
+				2A0004010000000000000003 /* App */,
+				2A0004010000000000000004 /* Models */,
+				2A0004010000000000000005 /* Data */,
+				2A0004010000000000000006 /* ViewModels */,
+				2A0004010000000000000007 /* Components */,
+				2A0004010000000000000008 /* Views */,
+				2A0004010000000000000009 /* Resources */,
+			);
+			path = ParamusBuild;
+			sourceTree = "<group>";
+		};
+		2A0004010000000000000003 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				2A0002010000000000000001 /* HomeBuildProApp.swift */,
+				2A0002010000000000000002 /* RootTabView.swift */,
+				2A0002010000000000000024 /* PortfolioView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		2A0004010000000000000004 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				2A0002010000000000000003 /* Project.swift */,
+				2A0002010000000000000004 /* BudgetCategory.swift */,
+				2A0002010000000000000005 /* BudgetLineItem.swift */,
+				2A0002010000000000000006 /* Expense.swift */,
+				2A0002010000000000000007 /* Vendor.swift */,
+				2A0002010000000000000008 /* PhotoAttachment.swift */,
+				2A0002010000000000000009 /* ChangeOrder.swift */,
+				2A0002010000000000000023 /* ProjectDocument.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		2A0004010000000000000005 /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				2A000201000000000000000A /* SeedData.swift */,
+				2A0002010000000000000028 /* ProjectExportService.swift */,
+				2A000201000000000000002A /* BudgetMathService.swift */,
+				2A000201000000000000002B /* ProjectWorkbookService.swift */,
+				2A0002010000000000000031 /* ProjectTemplateService.swift */,
+			);
+			path = Data;
+			sourceTree = "<group>";
+		};
+		2A0004010000000000000006 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				2A000201000000000000000B /* DashboardViewModel.swift */,
+				2A000201000000000000000C /* ExpenseFormViewModel.swift */,
+				2A000201000000000000000D /* PhotoFormViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		2A0004010000000000000007 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				2A000201000000000000000E /* AppTheme.swift */,
+				2A000201000000000000000F /* PremiumCard.swift */,
+				2A0002010000000000000010 /* MetricCard.swift */,
+				2A0002010000000000000011 /* BudgetHealthPill.swift */,
+				2A0002010000000000000013 /* ImagePickers.swift */,
+				2A0002010000000000000014 /* EmptyStateView.swift */,
+				2A0002010000000000000032 /* ModernForm.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		2A0004010000000000000008 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				2A0004010000000000000011 /* Dashboard */,
+				2A0004010000000000000012 /* Budget */,
+				2A0004010000000000000013 /* Expenses */,
+				2A0004010000000000000014 /* Photos */,
+				2A0004010000000000000015 /* More */,
+				2A0004010000000000000016 /* Projects */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		2A0004010000000000000009 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				2A0002010000000000000022 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		2A000401000000000000000A /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2A00020100000000000000FF /* HomeBuildPro.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		2A0004010000000000000011 /* Dashboard */ = {
+			isa = PBXGroup;
+			children = (
+				2A0002010000000000000015 /* DashboardView.swift */,
+			);
+			path = Dashboard;
+			sourceTree = "<group>";
+		};
+		2A0004010000000000000012 /* Budget */ = {
+			isa = PBXGroup;
+			children = (
+				2A0002010000000000000016 /* BudgetView.swift */,
+				2A0002010000000000000017 /* BudgetDetailView.swift */,
+				2A0002010000000000000029 /* AddBudgetItemView.swift */,
+			);
+			path = Budget;
+			sourceTree = "<group>";
+		};
+		2A0004010000000000000013 /* Expenses */ = {
+			isa = PBXGroup;
+			children = (
+				2A0002010000000000000018 /* ExpensesView.swift */,
+				2A0002010000000000000019 /* AddExpenseView.swift */,
+			);
+			path = Expenses;
+			sourceTree = "<group>";
+		};
+		2A0004010000000000000014 /* Photos */ = {
+			isa = PBXGroup;
+			children = (
+				2A000201000000000000001A /* PhotosView.swift */,
+				2A000201000000000000001B /* AddPhotoView.swift */,
+				2A000201000000000000001C /* PhotoViewer.swift */,
+			);
+			path = Photos;
+			sourceTree = "<group>";
+		};
+		2A0004010000000000000015 /* More */ = {
+			isa = PBXGroup;
+			children = (
+				2A000201000000000000001D /* MoreView.swift */,
+				2A000201000000000000001E /* VendorsView.swift */,
+				2A000201000000000000001F /* ChangeOrdersView.swift */,
+				2A0002010000000000000020 /* ProjectInfoView.swift */,
+				2A0002010000000000000021 /* SettingsView.swift */,
+				2A0002010000000000000026 /* DocumentsView.swift */,
+				2A0002010000000000000027 /* ExportProjectView.swift */,
+			);
+			path = More;
+			sourceTree = "<group>";
+		};
+		2A0004010000000000000016 /* Projects */ = {
+			isa = PBXGroup;
+			children = (
+				2A0002010000000000000025 /* ProjectFormView.swift */,
+			);
+			path = Projects;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2A0005010000000000000001 /* ParamusBuild */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2A0009010000000000000002 /* Build configuration list for PBXNativeTarget "ParamusBuild" */;
+			buildPhases = (
+				2A0007010000000000000001 /* Sources */,
+				2A0003010000000000000001 /* Frameworks */,
+				2A0008010000000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ParamusBuild;
+			productName = ParamusBuild;
+			productReference = 2A00020100000000000000FF /* HomeBuildPro.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		2A0006010000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					2A0005010000000000000001 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+				};
+			};
+			buildConfigurationList = 2A0009010000000000000001 /* Build configuration list for PBXProject "ParamusBuild" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 2A0004010000000000000001;
+			productRefGroup = 2A000401000000000000000A /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				2A0005010000000000000001 /* ParamusBuild */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		2A0008010000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2A0001010000000000000022 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		2A0007010000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2A0001010000000000000001 /* HomeBuildProApp.swift in Sources */,
+				2A0001010000000000000002 /* RootTabView.swift in Sources */,
+				2A0001010000000000000003 /* Project.swift in Sources */,
+				2A0001010000000000000004 /* BudgetCategory.swift in Sources */,
+				2A0001010000000000000005 /* BudgetLineItem.swift in Sources */,
+				2A0001010000000000000006 /* Expense.swift in Sources */,
+				2A0001010000000000000007 /* Vendor.swift in Sources */,
+				2A0001010000000000000008 /* PhotoAttachment.swift in Sources */,
+				2A0001010000000000000009 /* ChangeOrder.swift in Sources */,
+				2A000101000000000000000A /* SeedData.swift in Sources */,
+				2A000101000000000000000B /* DashboardViewModel.swift in Sources */,
+				2A000101000000000000000C /* ExpenseFormViewModel.swift in Sources */,
+				2A000101000000000000000D /* PhotoFormViewModel.swift in Sources */,
+				2A000101000000000000000E /* AppTheme.swift in Sources */,
+				2A000101000000000000000F /* PremiumCard.swift in Sources */,
+				2A0001010000000000000010 /* MetricCard.swift in Sources */,
+				2A0001010000000000000011 /* BudgetHealthPill.swift in Sources */,
+				2A0001010000000000000013 /* ImagePickers.swift in Sources */,
+				2A0001010000000000000014 /* EmptyStateView.swift in Sources */,
+				2A0001010000000000000032 /* ModernForm.swift in Sources */,
+				2A0001010000000000000015 /* DashboardView.swift in Sources */,
+				2A0001010000000000000016 /* BudgetView.swift in Sources */,
+				2A0001010000000000000017 /* BudgetDetailView.swift in Sources */,
+				2A0001010000000000000018 /* ExpensesView.swift in Sources */,
+				2A0001010000000000000019 /* AddExpenseView.swift in Sources */,
+				2A000101000000000000001A /* PhotosView.swift in Sources */,
+				2A000101000000000000001B /* AddPhotoView.swift in Sources */,
+				2A000101000000000000001C /* PhotoViewer.swift in Sources */,
+				2A000101000000000000001D /* MoreView.swift in Sources */,
+				2A000101000000000000001E /* VendorsView.swift in Sources */,
+				2A000101000000000000001F /* ChangeOrdersView.swift in Sources */,
+				2A0001010000000000000020 /* ProjectInfoView.swift in Sources */,
+				2A0001010000000000000021 /* SettingsView.swift in Sources */,
+				2A0001010000000000000023 /* ProjectDocument.swift in Sources */,
+				2A0001010000000000000024 /* PortfolioView.swift in Sources */,
+				2A0001010000000000000025 /* ProjectFormView.swift in Sources */,
+				2A0001010000000000000026 /* DocumentsView.swift in Sources */,
+				2A0001010000000000000027 /* ExportProjectView.swift in Sources */,
+				2A0001010000000000000028 /* ProjectExportService.swift in Sources */,
+				2A0001010000000000000029 /* AddBudgetItemView.swift in Sources */,
+				2A000101000000000000002A /* BudgetMathService.swift in Sources */,
+				2A000101000000000000002B /* ProjectWorkbookService.swift in Sources */,
+				2A0001010000000000000031 /* ProjectTemplateService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		2A000A010000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		2A000A010000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		2A000A010000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Q72U936CL6;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "HomeBuild Pro";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Capture jobsite photos and receipts for HomeBuild Pro.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Attach photos and receipts from your library to HomeBuild Pro.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.raj.HomeBuildPro;
+				PRODUCT_NAME = HomeBuildPro;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		2A000A010000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Q72U936CL6;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "HomeBuild Pro";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Capture jobsite photos and receipts for HomeBuild Pro.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Attach photos and receipts from your library to HomeBuild Pro.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.raj.HomeBuildPro;
+				PRODUCT_NAME = HomeBuildPro;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		2A0009010000000000000001 /* Build configuration list for PBXProject "ParamusBuild" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2A000A010000000000000001 /* Debug */,
+				2A000A010000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		2A0009010000000000000002 /* Build configuration list for PBXNativeTarget "ParamusBuild" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2A000A010000000000000003 /* Debug */,
+				2A000A010000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 2A0006010000000000000001 /* Project object */;
+}

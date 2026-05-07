@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+*.moved-aside
+*.hmap
+
+# SwiftPM
+.build/
+.swiftpm/
+Package.resolved
+
+# Tools
+*.log
+*.tmp
+
+# Claude local
+.claude/settings.local.json
+
+# Project local
+.idea/
+*.swp
