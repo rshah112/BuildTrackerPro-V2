@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+#
+# dev-check — single sanity check for HomeBuild Pro.
+# Runs format → lint → build. Exits non-zero on first failure.
+#
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+SWIFTFORMAT="${SWIFTFORMAT:-/opt/homebrew/bin/swiftformat}"
+SWIFTLINT="${SWIFTLINT:-/opt/homebrew/bin/swiftlint}"
+
+echo "▸ swiftformat"
+"$SWIFTFORMAT" ParamusBuild --quiet
+
+echo "▸ swiftlint"
+"$SWIFTLINT" --quiet --strict
+
+echo "▸ xcodebuild (iOS Simulator)"
+xcodebuild \
+  -scheme ParamusBuild \
+  -destination 'generic/platform=iOS Simulator' \
+  -configuration Debug \
+  build 2>&1 | tail -3
+
+echo "✓ dev-check passed"

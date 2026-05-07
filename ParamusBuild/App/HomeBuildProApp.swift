@@ -16,12 +16,15 @@ struct HomeBuildProApp: App {
             #endif
             container = try Self.makeContainer()
             SeedData.ensureSeeded(in: container.mainContext)
+            // Attach undo AFTER seeding so the seed isn't on the undo stack.
+            container.mainContext.undoManager = UndoManager()
         } catch {
             #if DEBUG
                 do {
                     try Self.resetDevelopmentStore()
                     container = try Self.makeContainer()
                     SeedData.ensureSeeded(in: container.mainContext)
+                    container.mainContext.undoManager = UndoManager()
                 } catch {
                     fatalError("Could not create SwiftData container after resetting development store: \(error.localizedDescription)")
                 }
