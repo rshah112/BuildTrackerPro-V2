@@ -52,6 +52,8 @@
 		2A0001010000000000000031 /* ProjectTemplateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000031 /* ProjectTemplateService.swift */; };
 		2A0001010000000000000032 /* ModernForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000032 /* ModernForm.swift */; };
 		2A0001010000000000000099 /* CurrencyField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000099 /* CurrencyField.swift */; };
+		2A000101000000000000009A /* VisionReceiptScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000009A /* VisionReceiptScanner.swift */; };
+		2A000101000000000000009B /* ReceiptCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000009B /* ReceiptCaptureView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -100,6 +102,8 @@
 		2A0002010000000000000031 /* ProjectTemplateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTemplateService.swift; sourceTree = "<group>"; };
 		2A0002010000000000000032 /* ModernForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernForm.swift; sourceTree = "<group>"; };
 		2A0002010000000000000099 /* CurrencyField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyField.swift; sourceTree = "<group>"; };
+		2A000201000000000000009A /* VisionReceiptScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionReceiptScanner.swift; sourceTree = "<group>"; };
+		2A000201000000000000009B /* ReceiptCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptCaptureView.swift; sourceTree = "<group>"; };
 		2A00020100000000000000FF /* HomeBuildPro.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HomeBuildPro.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -169,6 +173,7 @@
 				2A000201000000000000002A /* BudgetMathService.swift */,
 				2A000201000000000000002B /* ProjectWorkbookService.swift */,
 				2A0002010000000000000031 /* ProjectTemplateService.swift */,
+				2A000201000000000000009A /* VisionReceiptScanner.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -194,6 +199,7 @@
 				2A0002010000000000000014 /* EmptyStateView.swift */,
 				2A0002010000000000000032 /* ModernForm.swift */,
 				2A0002010000000000000099 /* CurrencyField.swift */,
+				2A000201000000000000009B /* ReceiptCaptureView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -376,6 +382,8 @@
 				2A0001010000000000000014 /* EmptyStateView.swift in Sources */,
 				2A0001010000000000000032 /* ModernForm.swift in Sources */,
 				2A0001010000000000000099 /* CurrencyField.swift in Sources */,
+				2A000101000000000000009A /* VisionReceiptScanner.swift in Sources */,
+				2A000101000000000000009B /* ReceiptCaptureView.swift in Sources */,
 				2A0001010000000000000015 /* DashboardView.swift in Sources */,
 				2A0001010000000000000016 /* BudgetView.swift in Sources */,
 				2A0001010000000000000017 /* BudgetDetailView.swift in Sources */,

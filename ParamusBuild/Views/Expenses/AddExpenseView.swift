@@ -12,7 +12,9 @@ struct AddExpenseView: View {
     @State private var items: [BudgetLineItem] = []
     @State private var vendors: [Vendor] = []
     @State private var selectedPhotoItem: PhotosPickerItem?
-    @State private var showingCamera = false
+    @State private var showingScanner = false
+    @State private var lastScanSummary: String?
+    @AppStorage(AppSettingsKeys.autoFillFromScans) private var autoFillFromScans = true
 
     init(project: Project, expense: Expense? = nil) {
         self.project = project
@@ -183,6 +185,23 @@ struct AddExpenseView: View {
                 }
 
                 ModernFormSection("Receipt") {
+                    if let lastScanSummary {
+                        HStack(spacing: 8) {
+                            Image(systemName: "sparkles")
+                                .font(.caption.weight(.bold))
+                            Text(lastScanSummary)
+                                .font(AppFont.caption)
+                                .lineLimit(2)
+                        }
+                        .foregroundStyle(AppTheme.brand)
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: AppTheme.Radius.sm, style: .continuous)
+                                .fill(AppTheme.brandSoft)
+                        )
+                    }
+
                     HStack(spacing: 12) {
                         PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                             Label("Library", systemImage: "photo")
@@ -191,9 +210,9 @@ struct AddExpenseView: View {
                         .buttonStyle(.bordered)
 
                         Button {
-                            showingCamera = true
+                            showingScanner = true
                         } label: {
-                            Label("Camera", systemImage: "camera")
+                            Label("Scan Receipt", systemImage: "doc.viewfinder")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
@@ -253,15 +272,43 @@ struct AddExpenseView: View {
                     viewModel.hasPaidDate = false
                 }
             }
-            .sheet(isPresented: $showingCamera) {
-                CameraPicker { image in
-                    viewModel.receiptImageData = ImageDataProcessor.optimizedJPEGData(
-                        from: image,
-                        maxDimension: 1400,
-                        compressionQuality: 0.82
-                    )
+            .sheet(isPresented: $showingScanner) {
+                ReceiptCaptureView { result in
+                    applyScan(result)
                 }
+                .ignoresSafeArea()
             }
+        }
+    }
+
+    private func applyScan(_ scan: ScannedReceipt) {
+        if let data = scan.imageData {
+            viewModel.receiptImageData = data
+        }
+        guard autoFillFromScans, scan.anyExtraction else {
+            lastScanSummary = scan.imageData != nil ? "Receipt captured. Auto-fill is off — fill in the fields manually." : nil
+            return
+        }
+
+        var filled: [String] = []
+        if let amount = scan.amount, viewModel.amount <= 0 {
+            viewModel.amount = amount
+            filled.append("amount")
+        }
+        if let vendor = scan.vendorName, viewModel.vendorName.trimmed.isEmpty {
+            viewModel.vendorName = vendor
+            filled.append("vendor")
+        }
+        if let date = scan.date {
+            viewModel.date = date
+            filled.append("date")
+        }
+
+        if filled.isEmpty {
+            lastScanSummary = "Receipt captured but nothing new to fill in."
+        } else {
+            lastScanSummary = "Filled in \(filled.joined(separator: ", ")) from the scan. Review before saving."
+            Haptics.success()
         }
     }
 

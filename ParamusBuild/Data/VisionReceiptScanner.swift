@@ -1,0 +1,186 @@
+import Foundation
+import UIKit
+import Vision
+
+/// Best-effort extraction of vendor / amount / date from a scanned receipt image.
+///
+/// Heuristics — designed for noisy paper-receipt OCR, not high-fidelity invoices:
+/// - **Amount**: prefer the largest currency-formatted number on a line that contains
+///   "TOTAL", "BALANCE DUE", or "AMOUNT". Fall back to the largest currency number anywhere.
+/// - **Vendor**: first non-junk line near the top (junk = pure number, date, address-y,
+///   short single word). Use the recognized text's own confidence.
+/// - **Date**: NSDataDetector with `.date` type — handles every common receipt format.
+///
+/// Each field returns a confidence in [0, 1] so the form can highlight low-trust fills.
+struct ScannedReceipt {
+    let amount: Double?
+    let amountConfidence: Float
+    let vendorName: String?
+    let vendorConfidence: Float
+    let date: Date?
+    let dateConfidence: Float
+    let imageData: Data?
+
+    var anyExtraction: Bool {
+        amount != nil || vendorName != nil || date != nil
+    }
+}
+
+enum VisionReceiptScanner {
+    enum ScannerError: Error {
+        case imageEncodingFailed
+        case visionRequestFailed(Error)
+    }
+
+    static func scan(image: UIImage) async throws -> ScannedReceipt {
+        guard let cgImage = image.cgImage else {
+            throw ScannerError.imageEncodingFailed
+        }
+
+        let observations: [VNRecognizedTextObservation] = try await withCheckedThrowingContinuation { cont in
+            let request = VNRecognizeTextRequest { request, error in
+                if let error {
+                    cont.resume(throwing: ScannerError.visionRequestFailed(error))
+                    return
+                }
+                cont.resume(returning: request.results as? [VNRecognizedTextObservation] ?? [])
+            }
+            request.recognitionLevel = .accurate
+            request.usesLanguageCorrection = false
+            request.recognitionLanguages = ["en-US"]
+
+            let handler = VNImageRequestHandler(cgImage: cgImage, orientation: .up)
+            do {
+                try handler.perform([request])
+            } catch {
+                cont.resume(throwing: ScannerError.visionRequestFailed(error))
+            }
+        }
+
+        let lines: [RecognizedLine] = observations.compactMap { obs in
+            guard let candidate = obs.topCandidates(1).first else { return nil }
+            // Higher Y in normalized coordinates = top of receipt (Vision uses bottom-left origin).
+            return RecognizedLine(text: candidate.string, confidence: candidate.confidence, y: obs.boundingBox.origin.y)
+        }
+
+        let imageData = image.jpegData(compressionQuality: 0.82)
+        let (amount, amountConf) = extractAmount(from: lines)
+        let (vendor, vendorConf) = extractVendor(from: lines)
+        let (date, dateConf) = extractDate(from: lines)
+
+        return ScannedReceipt(
+            amount: amount,
+            amountConfidence: amountConf,
+            vendorName: vendor,
+            vendorConfidence: vendorConf,
+            date: date,
+            dateConfidence: dateConf,
+            imageData: imageData
+        )
+    }
+
+    // MARK: - Heuristic extractors
+
+    private struct RecognizedLine {
+        let text: String
+        let confidence: Float
+        let y: CGFloat // 0 = bottom, 1 = top in Vision normalized coords
+    }
+
+    private static let totalKeywords = ["TOTAL", "BALANCE DUE", "AMOUNT DUE", "GRAND TOTAL", "AMOUNT"]
+    private static let amountRegex: NSRegularExpression = // Pattern is fixed and known-valid; force-unwrap is safe.
+        // swiftlint:disable:next force_try
+        try! NSRegularExpression(pattern: #"(?:\$\s?)?(\d{1,3}(?:,\d{3})*(?:\.\d{2})|\d+\.\d{2})"#)
+
+    private static func extractAmount(from lines: [RecognizedLine]) -> (Double?, Float) {
+        // Prefer lines containing a TOTAL keyword.
+        let prioritized: [(line: RecognizedLine, boost: Float)] = lines.map { line in
+            let upper = line.text.uppercased()
+            let isTotal = totalKeywords.contains { upper.contains($0) }
+            // Subtotal is a false-positive trap.
+            let isSubtotal = upper.contains("SUBTOTAL") || upper.contains("SUB-TOTAL") || upper.contains("SUB TOTAL")
+            let boost: Float = (isTotal && !isSubtotal) ? 0.4 : 0
+            return (line, boost)
+        }
+
+        var best: (value: Double, confidence: Float)?
+
+        for (line, boost) in prioritized {
+            let nsrange = NSRange(line.text.startIndex..., in: line.text)
+            let matches = amountRegex.matches(in: line.text, range: nsrange)
+            for match in matches {
+                guard let range = Range(match.range(at: 1), in: line.text) else { continue }
+                let raw = line.text[range].replacingOccurrences(of: ",", with: "")
+                guard let value = Double(raw), value > 0 else { continue }
+                // Reject implausible values (>$10M).
+                guard value <= 10_000_000 else { continue }
+                let confidence = min(1, line.confidence + boost)
+                if best == nil || confidence > best!.confidence || (confidence == best!.confidence && value > best!.value) {
+                    best = (value, confidence)
+                }
+            }
+        }
+
+        return (best?.value, best?.confidence ?? 0)
+    }
+
+    private static func extractVendor(from lines: [RecognizedLine]) -> (String?, Float) {
+        // Top of receipt = highest y in Vision coords. Take the upper third.
+        let topLines = lines.filter { $0.y > 0.66 }.sorted { $0.y > $1.y }
+
+        for line in topLines {
+            let trimmed = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, looksLikeVendorName(trimmed) else { continue }
+            return (trimmed, line.confidence)
+        }
+
+        // Fallback to the most-confident non-junk line anywhere.
+        let fallback = lines
+            .filter { looksLikeVendorName($0.text.trimmingCharacters(in: .whitespacesAndNewlines)) }
+            .max { $0.confidence < $1.confidence }
+        return (fallback?.text.trimmingCharacters(in: .whitespacesAndNewlines), (fallback?.confidence ?? 0) * 0.7)
+    }
+
+    private static func looksLikeVendorName(_ text: String) -> Bool {
+        guard text.count >= 3 else { return false }
+        // Reject lines that are mostly digits/punctuation (totals, phones, dates, addresses).
+        let letters = text.unicodeScalars.filter { CharacterSet.letters.contains($0) }
+        let digits = text.unicodeScalars.filter { CharacterSet.decimalDigits.contains($0) }
+        guard letters.count >= 3 else { return false }
+        guard letters.count > digits.count else { return false }
+        // Reject obvious non-name keywords.
+        let upper = text.uppercased()
+        let blockedTokens = ["RECEIPT", "INVOICE", "ORDER", "TOTAL", "TAX", "DATE", "TIME", "STORE", "CUSTOMER"]
+        if blockedTokens.contains(where: { upper == $0 || upper.hasPrefix("\($0) ") }) { return false }
+        return true
+    }
+
+    private static func extractDate(from lines: [RecognizedLine]) -> (Date?, Float) {
+        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.date.rawValue)
+        guard let detector else { return (nil, 0) }
+
+        // Combine all recognized text and run the detector once.
+        var bestLineConfidence: Float = 0
+        var bestDate: Date?
+        let now = Date()
+        let twoYearsAgo = now.addingTimeInterval(-2 * 365 * 24 * 60 * 60)
+        let oneYearAhead = now.addingTimeInterval(365 * 24 * 60 * 60)
+
+        for line in lines {
+            let text = line.text
+            let range = NSRange(text.startIndex..., in: text)
+            let matches = detector.matches(in: text, options: [], range: range)
+            for match in matches {
+                guard let date = match.date else { continue }
+                // Reject implausible dates (>1y future or >2y past — usually OCR garbage).
+                guard date > twoYearsAgo, date < oneYearAhead else { continue }
+                if line.confidence > bestLineConfidence {
+                    bestLineConfidence = line.confidence
+                    bestDate = date
+                }
+            }
+        }
+
+        return (bestDate, bestLineConfidence)
+    }
+}

@@ -225,6 +225,7 @@ enum AppInfo {
 enum AppSettingsKeys {
     static let preferLargeControls = "preferLargeJobsiteControls"
     static let showCentsInExports = "showCentsInExports"
+    static let autoFillFromScans = "autoFillFromReceiptScans"
 }
 
 // MARK: - Text field behaviour
