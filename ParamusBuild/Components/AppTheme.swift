@@ -1,5 +1,15 @@
+import SwiftData
 import SwiftUI
 import UIKit
+
+extension ModelContext {
+    /// Roll back unsaved changes AND clear the undo stack. Use after a save() throws —
+    /// otherwise the undoManager retains references to rolled-back operations.
+    func safeRollback() {
+        rollback()
+        undoManager?.removeAllActions()
+    }
+}
 
 enum AppTheme {
     // MARK: Brand

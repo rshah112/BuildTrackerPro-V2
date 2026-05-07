@@ -64,7 +64,7 @@ struct VendorsView: View {
             modelContext.delete(vendor)
             try modelContext.save()
         } catch {
-            modelContext.rollback()
+            modelContext.safeRollback()
             Haptics.warning()
         }
     }
@@ -238,7 +238,7 @@ private struct AddVendorView: View {
             Haptics.success()
             dismiss()
         } catch {
-            modelContext.rollback()
+            modelContext.safeRollback()
             Haptics.warning()
         }
     }

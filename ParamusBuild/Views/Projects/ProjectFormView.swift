@@ -581,7 +581,7 @@ struct ProjectFormView: View {
             Haptics.success()
             dismiss()
         } catch {
-            modelContext.rollback()
+            modelContext.safeRollback()
             saveErrorMessage = error.localizedDescription
             Haptics.warning()
         }

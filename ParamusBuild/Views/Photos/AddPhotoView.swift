@@ -161,7 +161,7 @@ struct AddPhotoView: View {
             Haptics.success()
             dismiss()
         } catch {
-            modelContext.rollback()
+            modelContext.safeRollback()
             Haptics.warning()
         }
     }

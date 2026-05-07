@@ -162,7 +162,7 @@ struct PortfolioView: View {
             Haptics.success()
             refreshProjectMetrics()
         } catch {
-            modelContext.rollback()
+            modelContext.safeRollback()
             projectPendingDelete = nil
             Haptics.warning()
         }

@@ -3,7 +3,6 @@ import Foundation
 final class ExpenseFormViewModel: ObservableObject {
     @Published var amount: Double = 0
     @Published var amountPaid: Double = 0
-    @Published var hasExplicitAmountPaid = false
     @Published var vendorName = ""
     @Published var invoiceNumber = ""
     @Published var date = Date()
@@ -27,7 +26,6 @@ final class ExpenseFormViewModel: ObservableObject {
     func load(from expense: Expense) {
         amount = expense.amount
         amountPaid = expense.amountPaid
-        hasExplicitAmountPaid = expense.amountPaid > 0
         vendorName = expense.vendorName
         invoiceNumber = expense.invoiceNumber
         date = expense.date
@@ -51,13 +49,13 @@ final class ExpenseFormViewModel: ObservableObject {
         receiptImageData = expense.receiptImageData
     }
 
-    /// Effective amount paid — clamped to [0, amount].
-    /// If user hasn't explicitly entered a paid amount, defaults to full amount when paid, else 0.
+    /// Effective amount paid — clamped to [0, amount]. If user left amountPaid at 0 and isPaid is on,
+    /// treat as fully paid. Caller can opt out of auto-fill by entering a non-zero value (incl. 0.01).
     var effectiveAmountPaid: Double {
-        if !hasExplicitAmountPaid {
+        if amountPaid <= 0 {
             return isPaid ? amount : 0
         }
-        return min(amount, max(0, amountPaid))
+        return min(amount, amountPaid)
     }
 
     var canSave: Bool {

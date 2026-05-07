@@ -245,7 +245,7 @@ struct BudgetView: View {
         do {
             try modelContext.save()
         } catch {
-            modelContext.rollback()
+            modelContext.safeRollback()
             Haptics.warning()
         }
     }

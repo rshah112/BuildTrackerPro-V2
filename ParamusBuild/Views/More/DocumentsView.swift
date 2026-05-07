@@ -264,7 +264,7 @@ struct DocumentsView: View {
                 Haptics.success()
             }
         } catch {
-            modelContext.rollback()
+            modelContext.safeRollback()
             Haptics.warning()
         }
     }
@@ -791,7 +791,7 @@ private struct DocumentEditorView: View {
             Haptics.success()
             dismiss()
         } catch {
-            modelContext.rollback()
+            modelContext.safeRollback()
             saveErrorMessage = error.localizedDescription
             Haptics.warning()
         }

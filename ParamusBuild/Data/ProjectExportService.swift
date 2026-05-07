@@ -362,7 +362,12 @@ private extension Data {
 private extension String {
     var safeArchivePathComponent: String {
         let invalid = CharacterSet(charactersIn: "/\\?%*|\"<>:")
-        let cleaned = components(separatedBy: invalid).joined(separator: "-").trimmed
+        var cleaned = components(separatedBy: invalid).joined(separator: "-").trimmed
+        // Collapse runs of whitespace into single dashes for shell-safe filenames.
+        cleaned = cleaned
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: "-")
         return cleaned.isEmpty ? "Untitled" : cleaned
     }
 }

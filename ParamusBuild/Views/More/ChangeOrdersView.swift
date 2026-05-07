@@ -146,7 +146,7 @@ struct ChangeOrdersView: View {
         do {
             try modelContext.save()
         } catch {
-            modelContext.rollback()
+            modelContext.safeRollback()
             Haptics.warning()
         }
     }
@@ -363,7 +363,7 @@ private struct AddChangeOrderView: View {
             Haptics.success()
             dismiss()
         } catch {
-            modelContext.rollback()
+            modelContext.safeRollback()
             Haptics.warning()
         }
     }

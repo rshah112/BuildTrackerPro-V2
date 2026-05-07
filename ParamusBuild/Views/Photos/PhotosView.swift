@@ -265,7 +265,7 @@ struct PhotosView: View {
             modelContext.delete(photo)
             try modelContext.save()
         } catch {
-            modelContext.rollback()
+            modelContext.safeRollback()
             photoError = "Could not delete photo: \(error.localizedDescription)"
         }
     }

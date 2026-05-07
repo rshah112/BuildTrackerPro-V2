@@ -162,7 +162,7 @@ struct MoreView: View {
             try modelContext.save()
             Haptics.success()
         } catch {
-            modelContext.rollback()
+            modelContext.safeRollback()
             Haptics.warning()
         }
     }

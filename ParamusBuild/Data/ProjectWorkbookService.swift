@@ -65,6 +65,18 @@ enum ProjectWorkbookService {
         vendors: [Vendor],
         context: ModelContext
     ) throws {
+        // Real Excel files (.xlsx) use ZIP+deflate. We only support uncompressed
+        // SpreadsheetML round-trips of our own export. If the bytes look like a
+        // ZIP but we can't extract a workbook entry, surface a clear error.
+        let zipSig: [UInt8] = [0x50, 0x4B, 0x03, 0x04]
+        if data.starts(with: zipSig), WorkbookDataExtractor.workbookData(from: data) == nil {
+            throw NSError(
+                domain: "ProjectWorkbookService",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "This .xlsx isn't a HomeBuild Pro export. Real Excel files aren't supported — export from HomeBuild Pro first."]
+            )
+        }
         let workbookData = WorkbookDataExtractor.workbookData(from: data) ?? data
         let workbook = try WorkbookXMLParser.parse(data: workbookData)
         importProject(workbook["Project"] ?? [], project: project)

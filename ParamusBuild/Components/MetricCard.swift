@@ -7,6 +7,9 @@ struct MetricCard: View {
     let systemImage: String
     let tint: Color
     var trend: Trend?
+    /// Optional precise value shown on long-press for users who need the
+    /// non-abbreviated number (e.g. `$1,349,500.00` instead of `$1.3M`).
+    var exactValue: String?
 
     enum Trend {
         case up(String)
@@ -87,6 +90,11 @@ struct MetricCard: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .contextMenu {
+            if let exactValue {
+                Text(exactValue)
+            }
         }
     }
 }

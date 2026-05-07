@@ -30,7 +30,6 @@ struct CurrencyField: View {
             .keyboardType(allowsCents ? .decimalPad : .numberPad)
             .font(font)
             .monospacedDigit()
-            .multilineTextAlignment(displayStyle == .hero ? .leading : .leading)
             .focused($isFocused)
             .onAppear { syncTextFromValue() }
             .onChange(of: value) { _, _ in
@@ -90,7 +89,8 @@ struct CurrencyField: View {
         let display: String = {
             guard !stripped.isEmpty else { return "" }
             if let dot = stripped.firstIndex(of: ".") {
-                let intPart = String(stripped[..<dot])
+                let intRaw = String(stripped[..<dot])
+                let intPart = intRaw.isEmpty ? "0" : intRaw
                 let fracPart = String(stripped[stripped.index(after: dot)...])
                 return "$\(grouped(intPart)).\(fracPart)"
             } else {

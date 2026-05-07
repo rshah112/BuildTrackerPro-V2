@@ -156,9 +156,6 @@ struct AddExpenseView: View {
                     ModernField("Amount paid") {
                         CurrencyField(value: $viewModel.amountPaid)
                             .modernTextField()
-                            .onChange(of: viewModel.amountPaid) { _, _ in
-                                viewModel.hasExplicitAmountPaid = true
-                            }
                     }
 
                     Toggle("Paid Date", isOn: $viewModel.hasPaidDate)
@@ -248,7 +245,7 @@ struct AddExpenseView: View {
                 }
             }
             .onChange(of: viewModel.isPaid) { _, isPaid in
-                if isPaid, !viewModel.hasExplicitAmountPaid {
+                if isPaid, viewModel.amountPaid <= 0 {
                     viewModel.amountPaid = viewModel.amount
                 }
                 if !isPaid {
@@ -389,7 +386,7 @@ struct AddExpenseView: View {
             dismiss()
         } catch {
             Haptics.warning()
-            modelContext.rollback()
+            modelContext.safeRollback()
         }
     }
 }

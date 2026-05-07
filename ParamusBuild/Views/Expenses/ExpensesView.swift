@@ -48,12 +48,16 @@ struct ExpensesView: View {
         }
     }
 
+    private var constructionRows: [ExpenseRowSnapshot] {
+        expenseRows.filter { $0.categoryName.trimmed.caseInsensitiveCompare("Contingency") != .orderedSame }
+    }
+
     private var unpaidTotal: Double {
-        expenseRows.reduce(0) { $0 + $1.balanceDue }
+        constructionRows.reduce(0) { $0 + $1.balanceDue }
     }
 
     private var paidTotal: Double {
-        expenseRows.reduce(0) { $0 + min($1.amount, max(0, $1.amountPaid)) }
+        constructionRows.reduce(0) { $0 + min($1.amount, max(0, $1.amountPaid)) }
     }
 
     private var emptyStateTitle: String {
@@ -79,7 +83,7 @@ struct ExpensesView: View {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                         ExpenseSummaryTile(
                             title: "Logged",
-                            value: expenseRows.reduce(0) { $0 + $1.amount }.compactCurrencyString,
+                            value: constructionRows.reduce(0) { $0 + $1.amount }.compactCurrencyString,
                             tint: AppTheme.accent,
                             isSelected: selectedFilter == .all
                         ) {
@@ -172,6 +176,9 @@ struct ExpensesView: View {
             }
             .onChange(of: initialFilter) { _, newValue in
                 selectedFilter = newValue
+            }
+            .onChange(of: selectedFilter) { _, _ in
+                searchText = ""
             }
         }
     }
@@ -282,7 +289,7 @@ struct ExpensesView: View {
             try modelContext.save()
         } catch {
             Haptics.warning()
-            modelContext.rollback()
+            modelContext.safeRollback()
             refreshData(recalculate: false)
         }
     }

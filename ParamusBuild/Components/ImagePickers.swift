@@ -116,8 +116,25 @@ struct PhotoThumbnail: View {
 
     private static func decode(_ data: Data?) async -> UIImage? {
         guard let data else { return nil }
-        return await Task.detached(priority: .userInitiated) {
+        let key = NSNumber(value: data.hashValue)
+        if let cached = ThumbnailCache.shared.object(forKey: key) {
+            return cached
+        }
+        let decoded = await Task.detached(priority: .userInitiated) {
             UIImage(data: data)
         }.value
+        if let decoded {
+            ThumbnailCache.shared.setObject(decoded, forKey: key, cost: data.count)
+        }
+        return decoded
     }
+}
+
+private enum ThumbnailCache {
+    static let shared: NSCache<NSNumber, UIImage> = {
+        let cache = NSCache<NSNumber, UIImage>()
+        cache.countLimit = 80
+        cache.totalCostLimit = 64 * 1024 * 1024 // 64 MB
+        return cache
+    }()
 }

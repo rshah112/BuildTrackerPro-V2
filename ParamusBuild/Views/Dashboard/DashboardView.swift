@@ -65,7 +65,7 @@ struct DashboardView: View {
         do {
             try modelContext.save()
         } catch {
-            modelContext.rollback()
+            modelContext.safeRollback()
             Haptics.warning()
         }
     }
@@ -179,7 +179,8 @@ struct DashboardView: View {
                 value: viewModel.totalBudget.compactCurrencyString,
                 subtitle: "Construction scope",
                 systemImage: "banknote",
-                tint: AppTheme.brand
+                tint: AppTheme.brand,
+                exactValue: viewModel.totalBudget
             ) {
                 navigateToTarget(.budget())
             }
@@ -189,7 +190,8 @@ struct DashboardView: View {
                 value: viewModel.actualSpent.compactCurrencyString,
                 subtitle: "Posted expenses and paid COs",
                 systemImage: "checkmark.circle",
-                tint: AppTheme.positive
+                tint: AppTheme.positive,
+                exactValue: viewModel.actualSpent
             ) {
                 navigateToTarget(.expenses(.all))
             }
@@ -199,7 +201,8 @@ struct DashboardView: View {
                 value: viewModel.cashPaid.compactCurrencyString,
                 subtitle: "Cash out",
                 systemImage: "checkmark.seal",
-                tint: AppTheme.positive
+                tint: AppTheme.positive,
+                exactValue: viewModel.cashPaid
             ) {
                 navigateToTarget(.expenses(.paid))
             }
@@ -209,7 +212,8 @@ struct DashboardView: View {
                 value: viewModel.openInvoiceTotal.compactCurrencyString,
                 subtitle: "Unpaid balances",
                 systemImage: "clock",
-                tint: viewModel.openInvoiceTotal > 0 ? AppTheme.warning : AppTheme.brand
+                tint: viewModel.openInvoiceTotal > 0 ? AppTheme.warning : AppTheme.brand,
+                exactValue: viewModel.openInvoiceTotal
             ) {
                 navigateToTarget(.expenses(.open))
             }
@@ -221,7 +225,8 @@ struct DashboardView: View {
                     .pendingExposure > 0 ? "\(viewModel.pendingExposure.compactCurrencyString) pending exposure" :
                     "Open commitments and approved COs",
                 systemImage: "signature",
-                tint: AppTheme.info
+                tint: AppTheme.info,
+                exactValue: viewModel.committedSpend
             ) {
                 navigateToTarget(.budget())
             }
@@ -231,7 +236,8 @@ struct DashboardView: View {
                 value: viewModel.remainingBudget.compactCurrencyString,
                 subtitle: "Budget left",
                 systemImage: "chart.pie",
-                tint: viewModel.remainingBudget >= 0 ? AppTheme.positive : AppTheme.negative
+                tint: viewModel.remainingBudget >= 0 ? AppTheme.positive : AppTheme.negative,
+                exactValue: viewModel.remainingBudget
             ) {
                 navigateToTarget(.budget())
             }
@@ -241,7 +247,8 @@ struct DashboardView: View {
                 value: viewModel.contingencyRemaining.compactCurrencyString,
                 subtitle: "Reserve remaining",
                 systemImage: "shield.checkered",
-                tint: viewModel.contingencyRemaining >= 0 ? AppTheme.accent : AppTheme.negative
+                tint: viewModel.contingencyRemaining >= 0 ? AppTheme.accent : AppTheme.negative,
+                exactValue: viewModel.contingencyRemaining
             ) {
                 navigateToTarget(.budget(searchText: "Contingency"))
             }
@@ -538,6 +545,7 @@ private struct DashboardMetricButton: View {
     let subtitle: String
     let systemImage: String
     let tint: Color
+    var exactValue: Double?
     let action: () -> Void
 
     var body: some View {
@@ -547,7 +555,8 @@ private struct DashboardMetricButton: View {
                 value: value,
                 subtitle: subtitle,
                 systemImage: systemImage,
-                tint: tint
+                tint: tint,
+                exactValue: exactValue?.currencyString
             )
         }
         .buttonStyle(.plain)
