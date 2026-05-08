@@ -12,6 +12,7 @@ struct MoreView: View {
     @State private var documentCount = 0
     @State private var photoCount = 0
     @State private var taskCount = 0
+    @State private var bidPackageCount = 0
 
     init(project: Project, closeProject: @escaping () -> Void, deleteProject: @escaping (UUID) -> Void) {
         self.project = project
@@ -114,6 +115,12 @@ struct MoreView: View {
                     }
 
                     NavigationLink {
+                        BidsView(project: project)
+                    } label: {
+                        MoreRow(title: "Bids", subtitle: "\(bidPackageCount) bid packages", systemImage: "shippingbox")
+                    }
+
+                    NavigationLink {
                         RoomSummaryView(project: project)
                     } label: {
                         MoreRow(title: "By Room", subtitle: "Budget, expenses and photos by area", systemImage: "square.grid.2x2")
@@ -186,6 +193,7 @@ struct MoreView: View {
         documentCount = fetchDocumentCount()
         photoCount = fetchPhotoCount()
         taskCount = fetchTaskCount()
+        bidPackageCount = fetchBidPackageCount()
     }
 
     private func fetchDocumentCount() -> Int {
@@ -207,6 +215,14 @@ struct MoreView: View {
     private func fetchTaskCount() -> Int {
         let projectID = project.id
         let descriptor = FetchDescriptor<ProjectTask>(
+            predicate: #Predicate { $0.projectID == projectID }
+        )
+        return ((try? modelContext.fetch(descriptor)) ?? []).count
+    }
+
+    private func fetchBidPackageCount() -> Int {
+        let projectID = project.id
+        let descriptor = FetchDescriptor<BidPackage>(
             predicate: #Predicate { $0.projectID == projectID }
         )
         return ((try? modelContext.fetch(descriptor)) ?? []).count
