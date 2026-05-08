@@ -9,7 +9,8 @@ enum ProjectWorkbookService {
         documents: [ProjectDocument],
         changeOrders: [ChangeOrder],
         vendors: [Vendor],
-        photos: [PhotoAttachment]
+        photos: [PhotoAttachment],
+        allowanceSelections: [AllowanceSelection] = []
     ) -> String {
         let sheets = [
             sheet(
@@ -21,12 +22,14 @@ enum ProjectWorkbookService {
                     changeOrders: changeOrders,
                     photos: photos,
                     documents: documents,
-                    vendors: vendors
+                    vendors: vendors,
+                    allowanceSelections: allowanceSelections
                 )
             ),
             sheet(name: "Project", rows: projectRows(project)),
             sheet(name: "Budget Categories", rows: categoryRows(items)),
             sheet(name: "Budget", rows: budgetRows(items)),
+            sheet(name: "Allowances", rows: allowanceRows(items: items, selections: allowanceSelections)),
             sheet(name: "Expenses", rows: expenseRows(expenses)),
             sheet(name: "Change Orders", rows: changeOrderRows(changeOrders)),
             sheet(name: "Vendors", rows: vendorRows(vendors)),
@@ -279,12 +282,20 @@ enum ProjectWorkbookService {
         changeOrders: [ChangeOrder],
         photos: [PhotoAttachment],
         documents: [ProjectDocument],
-        vendors: [Vendor]
+        vendors: [Vendor],
+        allowanceSelections: [AllowanceSelection]
     ) -> [[Cell]] {
         let constructionItems = items.filter { !isContingency($0.categoryName) }
         let constructionExpenses = expenses.filter { !isContingency($0.categoryName) }
         let constructionChangeOrders = changeOrders.filter { !isContingency($0.categoryName) }
-        let actual = BudgetMathService.actualSpend(expenses: constructionExpenses, changeOrders: constructionChangeOrders)
+        let constructionItemIDs = Set(constructionItems.map(\.id))
+        let constructionAllowanceSelections = allowanceSelections.filter { constructionItemIDs.contains($0.lineItemID) }
+        let actual = BudgetMathService.actualSpend(
+            items: constructionItems,
+            expenses: constructionExpenses,
+            allowanceSelections: constructionAllowanceSelections,
+            changeOrders: constructionChangeOrders
+        )
         let paid = BudgetMathService.cashPaidTotal(expenses: constructionExpenses, changeOrders: constructionChangeOrders)
         let committed = BudgetMathService.committedSpend(items: constructionItems, changeOrders: constructionChangeOrders)
         let remaining = project.constructionBudget - actual - committed
@@ -297,6 +308,10 @@ enum ProjectWorkbookService {
         let contingencyRemaining = project.contingencyBudget - contingencyItems - approvedChanges
         let openInvoices = expenses.reduce(0) { $0 + $1.balanceDue }
         let pendingChanges = BudgetMathService.pendingExposure(changeOrders: constructionChangeOrders)
+        let allowanceOverage = BudgetMathService.allowanceOverage(
+            items: constructionItems,
+            allowanceSelections: constructionAllowanceSelections
+        )
 
         return [
             [.text("Metric"), .text("Value")],
@@ -316,6 +331,7 @@ enum ProjectWorkbookService {
             ],
             [.text("Open Invoices"), .currency(openInvoices)],
             [.text("Pending Change Exposure"), .currency(pendingChanges)],
+            [.text("Allowance Overage"), .currency(allowanceOverage)],
             [.text("Budget Items"), .number(Double(items.count))],
             [.text("Expenses"), .number(Double(expenses.count))],
             [.text("Photos"), .number(Double(photos.count))],
@@ -379,7 +395,9 @@ enum ProjectWorkbookService {
             .text("Notes"),
             .text("Actual"),
             .text("Remaining"),
-            .text("Variance")
+            .text("Variance"),
+            .text("Allowance?"),
+            .text("Allowance Amount")
         ]]
             + items.map {
                 let remaining = $0.remaining
@@ -393,9 +411,45 @@ enum ProjectWorkbookService {
                     .text($0.notes),
                     .currency($0.actual),
                     remaining >= 0 ? .positiveCurrency(remaining) : .negativeCurrency(remaining),
-                    .currency($0.variance)
+                    .currency($0.variance),
+                    .text($0.isAllowance ? "Yes" : "No"),
+                    .currency($0.allowanceAmount)
                 ]
             }
+    }
+
+    private static func allowanceRows(items: [BudgetLineItem], selections: [AllowanceSelection]) -> [[Cell]] {
+        let itemsByID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+        let header: [[Cell]] = [[
+            .text("Selection ID"),
+            .text("Date"),
+            .text("Cost Code"),
+            .text("Budget Item"),
+            .text("Vendor"),
+            .text("Amount"),
+            .text("Allowance Amount"),
+            .text("Line Overage"),
+            .text("Notes")
+        ]]
+
+        let rows = selections.sorted { $0.selectionDate < $1.selectionDate }.map { selection -> [Cell] in
+            let item = itemsByID[selection.lineItemID]
+            let lineActual = item.map { BudgetMathService.allowanceSelectionTotal(for: $0, selections: selections) } ?? selection.amount
+            let lineOverage = item.map { max(0, lineActual - $0.allowanceAmount) } ?? 0
+            return [
+                .text(selection.id.uuidString),
+                .date(selection.selectionDate),
+                .text(item?.costCode ?? ""),
+                .text(item?.title ?? "Unknown allowance"),
+                .text(selection.vendor),
+                .currency(selection.amount),
+                .currency(item?.allowanceAmount ?? 0),
+                lineOverage > 0 ? .negativeCurrency(lineOverage) : .currency(0),
+                .text(selection.notes)
+            ]
+        }
+
+        return header + rows
     }
 
     private static func expenseRows(_ expenses: [Expense]) -> [[Cell]] {

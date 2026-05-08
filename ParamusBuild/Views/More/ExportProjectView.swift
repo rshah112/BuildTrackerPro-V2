@@ -12,6 +12,7 @@ struct ExportProjectView: View {
     @Query private var photos: [PhotoAttachment]
     @Query private var documents: [ProjectDocument]
     @Query private var vendors: [Vendor]
+    @Query private var allowanceSelections: [AllowanceSelection]
 
     @State private var activeArchive: ExportedArchive?
     @State private var exportError: String?
@@ -25,6 +26,11 @@ struct ExportProjectView: View {
         _photos = Query(filter: #Predicate<PhotoAttachment> { $0.projectID == projectID }, sort: \.createdAt, order: .reverse)
         _documents = Query(filter: #Predicate<ProjectDocument> { $0.projectID == projectID }, sort: \.uploadedAt, order: .reverse)
         _vendors = Query(filter: #Predicate<Vendor> { $0.projectID == projectID }, sort: \.name)
+        _allowanceSelections = Query(
+            filter: #Predicate<AllowanceSelection> { $0.projectID == projectID },
+            sort: \.selectionDate,
+            order: .reverse
+        )
     }
 
     var body: some View {
@@ -64,6 +70,7 @@ struct ExportProjectView: View {
                 ExportCountRow(title: "Photos", count: photos.count, systemImage: "photo")
                 ExportCountRow(title: "Documents", count: documents.count, systemImage: "doc")
                 ExportCountRow(title: "Vendors", count: vendors.count, systemImage: "person.2")
+                ExportCountRow(title: "Allowance selections", count: allowanceSelections.count, systemImage: "square.stack.3d.up")
             }
 
             Section("What would you like to export?") {
@@ -125,7 +132,8 @@ struct ExportProjectView: View {
                 photos: photos,
                 documents: documents,
                 changeOrders: changeOrders,
-                vendors: vendors
+                vendors: vendors,
+                allowanceSelections: allowanceSelections
             )
             activeArchive = ExportedArchive(url: url)
             exportError = nil

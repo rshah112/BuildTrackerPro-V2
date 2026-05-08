@@ -93,6 +93,7 @@ enum MediaStorageService {
     ) -> URL? {
         let folder = projectFolder(project: project).appending(path: "Receipts", directoryHint: .isDirectory)
         try? fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+        removeReceipt(for: expense, project: project)
 
         let dateSlug = expense.date.fileDateString
         let vendorSlug = expense.vendorName.safeFolderComponent
@@ -122,6 +123,15 @@ enum MediaStorageService {
         }
     }
 
+    static func removeReceipt(for expense: Expense, project: Project) {
+        removeReceipt(id: expense.id, project: project)
+    }
+
+    static func removeReceipt(id: UUID, project: Project) {
+        let folder = projectFolder(project: project).appending(path: "Receipts", directoryHint: .isDirectory)
+        removeMirroredFiles(under: folder, idPrefix: String(id.uuidString.prefix(6)))
+    }
+
     // MARK: - Photos
 
     @discardableResult
@@ -135,6 +145,7 @@ enum MediaStorageService {
             .appending(path: "Photos", directoryHint: .isDirectory)
             .appending(path: folderName.isEmpty ? "Uncategorized" : folderName, directoryHint: .isDirectory)
         try? fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+        removePhoto(for: photo, project: project)
 
         let dateSlug = photo.createdAt.fileDateString
         let roomSlug = photo.roomTag.safeFolderComponent
@@ -147,6 +158,15 @@ enum MediaStorageService {
         } catch {
             return nil
         }
+    }
+
+    static func removePhoto(for photo: PhotoAttachment, project: Project) {
+        removePhoto(id: photo.id, project: project)
+    }
+
+    static func removePhoto(id: UUID, project: Project) {
+        let folder = projectFolder(project: project).appending(path: "Photos", directoryHint: .isDirectory)
+        removeMirroredFiles(under: folder, idPrefix: String(id.uuidString.prefix(6)))
     }
 
     // MARK: - Documents
@@ -162,9 +182,11 @@ enum MediaStorageService {
             .appending(path: "Documents", directoryHint: .isDirectory)
             .appending(path: kindSlug.isEmpty ? "Other" : kindSlug, directoryHint: .isDirectory)
         try? fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+        removeDocument(for: document, project: project)
 
-        let safeName = document.fileName.safeFolderComponent
-        let url = folder.appending(path: safeName.isEmpty ? "\(document.id.uuidString).bin" : safeName)
+        let safeName = document.fileName.safeFileNamePreservingExtension
+        let idPrefix = String(document.id.uuidString.prefix(6))
+        let url = folder.appending(path: safeName.isEmpty ? "\(idPrefix).bin" : safeName.appendingIDPrefix(idPrefix))
         do {
             try data.write(to: url, options: .atomic)
             return url
@@ -173,12 +195,49 @@ enum MediaStorageService {
         }
     }
 
+    static func removeDocument(for document: ProjectDocument, project: Project) {
+        removeDocument(id: document.id, kind: document.kind, fileName: document.fileName, project: project)
+    }
+
+    static func removeDocument(id: UUID, kind: ProjectDocumentKind, fileName: String, project: Project) {
+        let folder = projectFolder(project: project).appending(path: "Documents", directoryHint: .isDirectory)
+        removeMirroredFiles(under: folder, idPrefix: String(id.uuidString.prefix(6)))
+
+        let kindSlug = kind.title.safeFolderComponent
+        let legacyFolder = folder.appending(path: kindSlug.isEmpty ? "Other" : kindSlug, directoryHint: .isDirectory)
+        let legacyName = fileName.safeFileNamePreservingExtension
+        if !legacyName.isEmpty {
+            try? fileManager.removeItem(at: legacyFolder.appending(path: legacyName))
+        }
+    }
+
     // MARK: - Cleanup
 
     /// Remove the entire on-disk folder for a project. Called from PortfolioView.deleteProject.
     static func removeAllMedia(for project: Project) {
-        let folder = projectFolder(project: project)
+        removeAllMedia(at: projectFolder(project: project))
+    }
+
+    static func removeAllMedia(at folder: URL) {
         try? fileManager.removeItem(at: folder)
+    }
+
+    private static func removeMirroredFiles(under folder: URL, idPrefix: String) {
+        guard fileManager.fileExists(atPath: folder.path),
+              let enumerator = fileManager.enumerator(
+                  at: folder,
+                  includingPropertiesForKeys: [.isRegularFileKey],
+                  options: [.skipsHiddenFiles]
+              )
+        else {
+            return
+        }
+
+        for case let url as URL in enumerator {
+            let isRegularFile = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
+            guard isRegularFile, url.deletingPathExtension().lastPathComponent.hasSuffix(idPrefix) else { continue }
+            try? fileManager.removeItem(at: url)
+        }
     }
 }
 
@@ -210,5 +269,28 @@ private extension String {
             .components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
             .joined(separator: "-")
+    }
+
+    var safeFileNamePreservingExtension: String {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        let nsName = trimmed as NSString
+        let ext = nsName.pathExtension.safeFolderComponent
+        let rawBase = nsName.deletingPathExtension
+        let base = rawBase.safeFolderComponent
+
+        if base.isEmpty {
+            return ext.isEmpty ? "" : "Document.\(ext)"
+        }
+        return ext.isEmpty ? base : "\(base).\(ext)"
+    }
+
+    func appendingIDPrefix(_ idPrefix: String) -> String {
+        let nsName = self as NSString
+        let ext = nsName.pathExtension
+        let base = nsName.deletingPathExtension
+        let taggedBase = [base, idPrefix].filter { !$0.isEmpty }.joined(separator: "-")
+        return ext.isEmpty ? taggedBase : "\(taggedBase).\(ext)"
     }
 }

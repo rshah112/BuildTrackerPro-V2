@@ -57,7 +57,7 @@ struct ExpensesView: View {
     }
 
     private var paidTotal: Double {
-        constructionRows.reduce(0) { $0 + min($1.amount, max(0, $1.amountPaid)) }
+        constructionRows.reduce(0) { $0 + $1.effectiveAmountPaid }
     }
 
     private var emptyStateTitle: String {
@@ -210,8 +210,7 @@ struct ExpensesView: View {
                 expense.paidDate = Date()
             }
         } else {
-            // Preserve any prior amountPaid; only clear paidDate.
-            expense.paidDate = nil
+            // Preserve paid-field values; metrics ignore them while isPaid is false.
         }
         saveChanges()
         refreshData(recalculate: false)
@@ -223,10 +222,13 @@ struct ExpensesView: View {
             return
         }
 
+        let deletedExpenseID = expense.id
         Haptics.lightTap()
         modelContext.delete(expense)
-        saveChanges()
-        refreshData()
+        if saveChanges() {
+            MediaStorageService.removeReceipt(id: deletedExpenseID, project: project)
+            refreshData()
+        }
     }
 
     private func refreshData(recalculate: Bool = true) {
@@ -284,13 +286,16 @@ struct ExpensesView: View {
         return (try? modelContext.fetch(descriptor)) ?? []
     }
 
-    private func saveChanges() {
+    @discardableResult
+    private func saveChanges() -> Bool {
         do {
             try modelContext.save()
+            return true
         } catch {
             Haptics.warning()
             modelContext.safeRollback()
             refreshData(recalculate: false)
+            return false
         }
     }
 }
@@ -303,6 +308,7 @@ private struct ExpenseRowSnapshot: Identifiable {
     let id: UUID
     let amount: Double
     let amountPaid: Double
+    let effectiveAmountPaid: Double
     let balanceDue: Double
     let vendorName: String
     let invoiceNumber: String
@@ -317,6 +323,7 @@ private struct ExpenseRowSnapshot: Identifiable {
         id = expense.id
         amount = expense.amount
         amountPaid = expense.amountPaid
+        effectiveAmountPaid = expense.effectiveAmountPaid
         balanceDue = expense.balanceDue
         vendorName = expense.vendorName
         invoiceNumber = expense.invoiceNumber

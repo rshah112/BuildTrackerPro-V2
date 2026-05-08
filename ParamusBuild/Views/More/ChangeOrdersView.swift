@@ -214,7 +214,7 @@ private struct ChangeOrderRow: View {
     }
 }
 
-private struct AddChangeOrderView: View {
+struct AddChangeOrderView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     let project: Project
@@ -229,6 +229,8 @@ private struct AddChangeOrderView: View {
     @State private var categoryName = ""
     @State private var budgetLineItemID: UUID?
     @State private var notes = ""
+    @State private var expectedPaymentDate = Date()
+    @State private var hasExpectedPaymentDate = false
     let orderID: UUID?
 
     init(project: Project, order: ChangeOrder? = nil) {
@@ -245,6 +247,8 @@ private struct AddChangeOrderView: View {
         _categoryName = State(initialValue: order?.categoryName ?? "")
         _budgetLineItemID = State(initialValue: order?.budgetLineItemID)
         _notes = State(initialValue: order?.notes ?? "")
+        _expectedPaymentDate = State(initialValue: order?.expectedPaymentDate ?? Date())
+        _hasExpectedPaymentDate = State(initialValue: order?.expectedPaymentDate != nil)
     }
 
     private var canSave: Bool {
@@ -254,7 +258,10 @@ private struct AddChangeOrderView: View {
     var body: some View {
         NavigationStack {
             ModernForm {
-                ModernFormSection("Change") {
+                ModernFormSection(
+                    "Change",
+                    footer: "Pending change orders appear as pending exposure. Approved unpaid changes move into committed cash flow when they have an expected payment date."
+                ) {
                     ModernField("Title") {
                         TextField("Change order title", text: $title)
                             .modernTextField()
@@ -292,6 +299,17 @@ private struct AddChangeOrderView: View {
                         }
                         .pickerStyle(.menu)
                     }
+
+                    Toggle("Expected Payment", isOn: $hasExpectedPaymentDate)
+                        .font(.body.weight(.medium))
+                        .disabled(status == .paid)
+
+                    if status != .paid, hasExpectedPaymentDate {
+                        ModernField("Expected") {
+                            DatePicker("Expected", selection: $expectedPaymentDate, displayedComponents: .date)
+                                .labelsHidden()
+                        }
+                    }
                 }
 
                 ModernFormSection("Notes") {
@@ -318,6 +336,14 @@ private struct AddChangeOrderView: View {
                 if categoryName.isEmpty {
                     categoryName = categories.first?.name ?? ""
                 }
+                if status == .paid {
+                    hasExpectedPaymentDate = false
+                }
+            }
+            .onChange(of: status) { _, newStatus in
+                if newStatus == .paid {
+                    hasExpectedPaymentDate = false
+                }
             }
         }
     }
@@ -342,6 +368,7 @@ private struct AddChangeOrderView: View {
             orderToEdit.categoryName = selectedItem?.categoryName ?? categoryName
             orderToEdit.budgetLineItemID = selectedItem?.id
             orderToEdit.budgetLineItemTitle = selectedItem?.title ?? ""
+            orderToEdit.expectedPaymentDate = resolvedExpectedPaymentDate
         } else {
             let order = ChangeOrder(
                 projectID: project.id,
@@ -351,7 +378,8 @@ private struct AddChangeOrderView: View {
                 notes: notes.trimmed,
                 categoryName: selectedItem?.categoryName ?? categoryName,
                 budgetLineItemID: selectedItem?.id,
-                budgetLineItemTitle: selectedItem?.title ?? ""
+                budgetLineItemTitle: selectedItem?.title ?? "",
+                expectedPaymentDate: resolvedExpectedPaymentDate
             )
             modelContext.insert(order)
             effectiveChangeOrders.append(order)
@@ -383,5 +411,10 @@ private struct AddChangeOrderView: View {
             predicate: #Predicate { $0.id == orderID && $0.projectID == projectID }
         )
         return try? modelContext.fetch(descriptor).first
+    }
+
+    private var resolvedExpectedPaymentDate: Date? {
+        guard status != .paid, hasExpectedPaymentDate else { return nil }
+        return expectedPaymentDate
     }
 }

@@ -31,6 +31,7 @@ final class ChangeOrder {
     var budgetLineItemID: UUID?
     var budgetLineItemTitle: String
     var createdAt: Date
+    var expectedPaymentDate: Date?
 
     init(
         id: UUID = UUID(),
@@ -42,7 +43,8 @@ final class ChangeOrder {
         categoryName: String,
         budgetLineItemID: UUID? = nil,
         budgetLineItemTitle: String = "",
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        expectedPaymentDate: Date? = nil
     ) {
         self.id = id
         self.projectID = projectID
@@ -54,6 +56,7 @@ final class ChangeOrder {
         self.budgetLineItemID = budgetLineItemID
         self.budgetLineItemTitle = budgetLineItemTitle
         self.createdAt = createdAt
+        self.expectedPaymentDate = expectedPaymentDate
     }
 
     var status: ChangeOrderStatus {

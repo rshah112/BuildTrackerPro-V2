@@ -1,6 +1,7 @@
 import PhotosUI
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct AddExpenseView: View {
     @Environment(\.dismiss) private var dismiss
@@ -13,6 +14,7 @@ struct AddExpenseView: View {
     @State private var vendors: [Vendor] = []
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showingScanner = false
+    @State private var showingFileImporter = false
     @State private var lastScanSummary: String?
     @State private var lastScanTypeHint: String?
     @State private var lastScanAddress: String?
@@ -99,6 +101,13 @@ struct AddExpenseView: View {
                 }
                 .ignoresSafeArea()
             }
+            .fileImporter(
+                isPresented: $showingFileImporter,
+                allowedContentTypes: [.image],
+                allowsMultipleSelection: false
+            ) { result in
+                handleFileImport(result)
+            }
             .onChange(of: selectedPhotoItem) { _, newItem in
                 handleLibraryPick(newItem)
             }
@@ -110,25 +119,46 @@ struct AddExpenseView: View {
     private func handleLibraryPick(_ item: PhotosPickerItem?) {
         guard let item else { return }
         Task {
-            guard let data = try? await item.loadTransferable(type: Data.self),
-                  let image = UIImage(data: data) else { return }
-            let optimizedData = ImageDataProcessor.optimizedJPEGData(from: data, maxDimension: 2200, compressionQuality: 0.88) ?? data
-            let optimizedImage = UIImage(data: optimizedData) ?? image
-
-            let result: ScannedReceipt
-            do {
-                result = try await VisionReceiptScanner.scan(image: optimizedImage)
-            } catch {
-                result = ScannedReceipt(
-                    amount: nil, amountConfidence: 0,
-                    vendorName: nil, vendorConfidence: 0,
-                    date: nil, dateConfidence: 0,
-                    phoneNumber: nil, address: nil, isPaid: nil, vendorTypeHint: nil,
-                    imageData: optimizedData
-                )
-            }
-            await MainActor.run { applyScan(result) }
+            guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+            await scanReceiptImageData(data)
         }
+    }
+
+    private func handleFileImport(_ result: Result<[URL], Error>) {
+        guard case let .success(urls) = result, let url = urls.first else { return }
+        let isScoped = url.startAccessingSecurityScopedResource()
+        defer {
+            if isScoped {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        guard let data = try? Data(contentsOf: url) else { return }
+        Task {
+            await scanReceiptImageData(data)
+        }
+    }
+
+    private func scanReceiptImageData(_ data: Data) async {
+        guard let image = UIImage(data: data) else { return }
+        let optimizedData = ImageDataProcessor.optimizedJPEGData(from: data, maxDimension: 2200, compressionQuality: 0.88) ?? data
+        let optimizedImage = UIImage(data: optimizedData) ?? image
+
+        let result: ScannedReceipt
+        do {
+            result = try await VisionReceiptScanner.scan(image: optimizedImage)
+        } catch {
+            result = ScannedReceipt(
+                amount: nil, amountConfidence: 0,
+                amountPaid: nil,
+                vendorName: nil, vendorConfidence: 0,
+                date: nil, dateConfidence: 0,
+                dueDate: nil, documentReference: nil,
+                paymentMethod: nil, paymentReference: nil,
+                phoneNumber: nil, address: nil, isPaid: nil, vendorTypeHint: nil,
+                imageData: optimizedData
+            )
+        }
+        await MainActor.run { applyScan(result) }
     }
 
     private var scanHero: some View {
@@ -161,12 +191,20 @@ struct AddExpenseView: View {
                     Button {
                         showingScanner = true
                     } label: {
-                        Label("Live Scan", systemImage: "doc.viewfinder")
+                        Label("Take Photo", systemImage: "camera")
                     }
                     .buttonStyle(PrimaryButtonStyle(fullWidth: true))
 
                     PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        Label("Upload Photo", systemImage: "photo.on.rectangle")
+                        Label("Upload from Album", systemImage: "photo.on.rectangle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(SecondaryButtonStyle(fullWidth: true))
+
+                    Button {
+                        showingFileImporter = true
+                    } label: {
+                        Label("Upload from Files", systemImage: "folder")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(SecondaryButtonStyle(fullWidth: true))
@@ -291,19 +329,37 @@ struct AddExpenseView: View {
                     .font(.body.weight(.medium))
             }
 
-            ModernFormSection("Payment") {
-                ModernField("Amount paid") {
+            ModernFormSection(
+                "Payment",
+                footer: "Paid fields are saved for reference but only count toward cash-paid metrics while Paid is on. Unpaid balances feed committed cash flow; pending exposure comes from pending change orders."
+            ) {
+                ModernField("Amount paid", subtitle: viewModel.isPaid ? nil : "Inactive while this expense is unpaid.") {
                     CurrencyField(value: $viewModel.amountPaid)
                         .modernTextField()
                 }
+                .disabled(!viewModel.isPaid)
+                .opacity(viewModel.isPaid ? 1 : 0.58)
 
                 Toggle("Paid Date", isOn: $viewModel.hasPaidDate)
                     .disabled(!viewModel.isPaid)
                     .font(.body.weight(.medium))
 
-                if viewModel.isPaid, viewModel.hasPaidDate {
+                if viewModel.hasPaidDate {
                     ModernField("Paid") {
                         DatePicker("Paid", selection: $viewModel.paidDate, displayedComponents: .date)
+                            .labelsHidden()
+                    }
+                    .disabled(!viewModel.isPaid)
+                    .opacity(viewModel.isPaid ? 1 : 0.58)
+                }
+
+                Toggle("Expected Payment", isOn: $viewModel.hasExpectedPaymentDate)
+                    .disabled(viewModel.effectiveBalanceDue <= 0)
+                    .font(.body.weight(.medium))
+
+                if viewModel.effectiveBalanceDue > 0, viewModel.hasExpectedPaymentDate {
+                    ModernField("Expected") {
+                        DatePicker("Expected", selection: $viewModel.expectedPaymentDate, displayedComponents: .date)
                             .labelsHidden()
                     }
                 }
@@ -313,12 +369,16 @@ struct AddExpenseView: View {
                         .textInputAutocapitalization(.words)
                         .modernTextField()
                 }
+                .disabled(!viewModel.isPaid)
+                .opacity(viewModel.isPaid ? 1 : 0.58)
 
                 ModernField("Reference") {
                     TextField("Check #, confirmation, memo", text: $viewModel.paymentReference)
                         .textInputAutocapitalization(.characters)
                         .modernTextField()
                 }
+                .disabled(!viewModel.isPaid)
+                .opacity(viewModel.isPaid ? 1 : 0.58)
             }
 
             ModernFormSection("Receipt") {
@@ -339,20 +399,28 @@ struct AddExpenseView: View {
                     )
                 }
 
-                HStack(spacing: 12) {
+                VStack(spacing: 10) {
+                    Button {
+                        showingScanner = true
+                    } label: {
+                        Label("Take Photo", systemImage: "camera")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+
                     PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        Label("Library", systemImage: "photo")
+                        Label("Upload from Album", systemImage: "photo.on.rectangle")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
 
                     Button {
-                        showingScanner = true
+                        showingFileImporter = true
                     } label: {
-                        Label("Scan Receipt", systemImage: "doc.viewfinder")
+                        Label("Upload from Files", systemImage: "folder")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.bordered)
                 }
 
                 if viewModel.receiptImageData != nil {
@@ -374,9 +442,16 @@ struct AddExpenseView: View {
             if isPaid, viewModel.amountPaid <= 0 {
                 viewModel.amountPaid = viewModel.amount
             }
-            if !isPaid {
-                viewModel.hasPaidDate = false
-            }
+        }
+        .onChange(of: viewModel.hasDueDate) { _, hasDueDate in
+            guard hasDueDate, viewModel.effectiveBalanceDue > 0 else { return }
+            viewModel.expectedPaymentDate = viewModel.dueDate
+            viewModel.hasExpectedPaymentDate = true
+        }
+        .onChange(of: viewModel.dueDate) { _, dueDate in
+            guard viewModel.hasDueDate, viewModel.effectiveBalanceDue > 0 else { return }
+            viewModel.expectedPaymentDate = dueDate
+            viewModel.hasExpectedPaymentDate = true
         }
     }
 
@@ -410,9 +485,39 @@ struct AddExpenseView: View {
             viewModel.date = date
             filled.append("date")
         }
+        if let dueDate = scan.dueDate, !viewModel.hasDueDate {
+            viewModel.dueDate = dueDate
+            viewModel.hasDueDate = true
+            viewModel.expectedPaymentDate = dueDate
+            viewModel.hasExpectedPaymentDate = true
+            filled.append("due date")
+        }
+        if let reference = scan.documentReference, viewModel.invoiceNumber.trimmed.isEmpty {
+            viewModel.invoiceNumber = reference
+            filled.append("invoice/reference")
+        }
         if let isPaid = scan.isPaid {
             viewModel.isPaid = isPaid
             filled.append(isPaid ? "marked paid" : "marked unpaid")
+        }
+        if let amountPaid = scan.amountPaid, viewModel.amountPaid <= 0 {
+            viewModel.amountPaid = amountPaid
+            filled.append("amount paid")
+        } else if viewModel.isPaid, viewModel.amountPaid <= 0, viewModel.amount > 0 {
+            viewModel.amountPaid = viewModel.amount
+            filled.append("amount paid")
+        }
+        if let method = scan.paymentMethod, viewModel.paymentMethod.trimmed.isEmpty {
+            viewModel.paymentMethod = method
+            filled.append("payment method")
+        }
+        if let reference = scan.paymentReference, viewModel.paymentReference.trimmed.isEmpty {
+            viewModel.paymentReference = reference
+            filled.append("payment reference")
+        }
+        if viewModel.hasDueDate, viewModel.effectiveBalanceDue > 0, !viewModel.hasExpectedPaymentDate {
+            viewModel.expectedPaymentDate = viewModel.dueDate
+            viewModel.hasExpectedPaymentDate = true
         }
 
         if filled.isEmpty {
@@ -438,27 +543,29 @@ struct AddExpenseView: View {
                 return
             }
             viewModel.apply(to: expenseToEdit, projectID: project.id, for: selectedItem)
-            mirrorReceiptToDisk(for: expenseToEdit)
             BudgetMathService.recalculateActuals(
                 for: project.id,
                 items: fetchBudgetItems(),
                 expenses: fetchExpenses(),
                 changeOrders: fetchChangeOrders()
             )
-            saveAndDismiss()
+            saveAndDismiss {
+                mirrorReceiptToDisk(for: expenseToEdit)
+            }
             return
         }
 
         let expense = viewModel.makeExpense(projectID: project.id, for: selectedItem)
         modelContext.insert(expense)
-        mirrorReceiptToDisk(for: expense)
         BudgetMathService.recalculateActuals(
             for: project.id,
             items: fetchBudgetItems(),
             expenses: fetchExpenses(including: expense),
             changeOrders: fetchChangeOrders()
         )
-        saveAndDismiss()
+        saveAndDismiss {
+            mirrorReceiptToDisk(for: expense)
+        }
     }
 
     private func mirrorReceiptToDisk(for expense: Expense) {
@@ -565,9 +672,10 @@ struct AddExpenseView: View {
         vendors.append(vendor)
     }
 
-    private func saveAndDismiss() {
+    private func saveAndDismiss(afterSave: (() -> Void)? = nil) {
         do {
             try modelContext.save()
+            afterSave?()
             Haptics.success()
             dismiss()
         } catch {

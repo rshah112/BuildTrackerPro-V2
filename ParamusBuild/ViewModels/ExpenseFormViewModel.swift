@@ -8,6 +8,8 @@ final class ExpenseFormViewModel: ObservableObject {
     @Published var date = Date()
     @Published var dueDate = Date()
     @Published var hasDueDate = false
+    @Published var expectedPaymentDate = Date()
+    @Published var hasExpectedPaymentDate = false
     @Published var paidDate = Date()
     @Published var hasPaidDate = false
     @Published var paymentMethod = ""
@@ -35,6 +37,12 @@ final class ExpenseFormViewModel: ObservableObject {
             self.dueDate = dueDate
             hasDueDate = true
         }
+        expectedPaymentDate = Date()
+        hasExpectedPaymentDate = false
+        if let expectedPaymentDate = expense.expectedPaymentDate {
+            self.expectedPaymentDate = expectedPaymentDate
+            hasExpectedPaymentDate = true
+        }
         paidDate = Date()
         hasPaidDate = false
         if let paidDate = expense.paidDate {
@@ -52,10 +60,22 @@ final class ExpenseFormViewModel: ObservableObject {
     /// Effective amount paid — clamped to [0, amount]. If user left amountPaid at 0 and isPaid is on,
     /// treat as fully paid. Caller can opt out of auto-fill by entering a non-zero value (incl. 0.01).
     var effectiveAmountPaid: Double {
+        guard isPaid else { return 0 }
         if amountPaid <= 0 {
-            return isPaid ? amount : 0
+            return amount
         }
         return min(amount, amountPaid)
+    }
+
+    var effectiveBalanceDue: Double {
+        max(0, amount - effectiveAmountPaid)
+    }
+
+    private var storedAmountPaid: Double {
+        if isPaid, amountPaid <= 0 {
+            return amount
+        }
+        return min(amount, max(0, amountPaid))
     }
 
     var canSave: Bool {
@@ -66,12 +86,13 @@ final class ExpenseFormViewModel: ObservableObject {
         Expense(
             projectID: projectID,
             amount: amount,
-            amountPaid: effectiveAmountPaid,
+            amountPaid: storedAmountPaid,
             vendorName: vendorName.trimmed,
             invoiceNumber: invoiceNumber.trimmed,
             date: date,
             dueDate: hasDueDate ? dueDate : nil,
-            paidDate: isPaid ? (hasPaidDate ? paidDate : Date()) : nil,
+            expectedPaymentDate: resolvedExpectedPaymentDate,
+            paidDate: hasPaidDate ? paidDate : (isPaid ? Date() : nil),
             paymentMethod: paymentMethod.trimmed,
             paymentReference: paymentReference.trimmed,
             categoryName: item?.categoryName ?? "Unassigned",
@@ -86,12 +107,13 @@ final class ExpenseFormViewModel: ObservableObject {
     func apply(to expense: Expense, projectID: UUID, for item: BudgetLineItem?) {
         expense.projectID = projectID
         expense.amount = amount
-        expense.amountPaid = effectiveAmountPaid
+        expense.amountPaid = storedAmountPaid
         expense.vendorName = vendorName.trimmed
         expense.invoiceNumber = invoiceNumber.trimmed
         expense.date = date
         expense.dueDate = hasDueDate ? dueDate : nil
-        expense.paidDate = isPaid ? (hasPaidDate ? paidDate : expense.paidDate) : nil
+        expense.expectedPaymentDate = resolvedExpectedPaymentDate
+        expense.paidDate = hasPaidDate ? paidDate : (isPaid ? (expense.paidDate ?? Date()) : nil)
         expense.paymentMethod = paymentMethod.trimmed
         expense.paymentReference = paymentReference.trimmed
         if let item {
@@ -102,5 +124,16 @@ final class ExpenseFormViewModel: ObservableObject {
         expense.notes = notes.trimmed
         expense.isPaid = isPaid
         expense.receiptImageData = receiptImageData
+    }
+
+    private var resolvedExpectedPaymentDate: Date? {
+        guard effectiveBalanceDue > 0 else { return nil }
+        if hasExpectedPaymentDate {
+            return expectedPaymentDate
+        }
+        if hasDueDate {
+            return dueDate
+        }
+        return nil
     }
 }

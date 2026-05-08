@@ -199,6 +199,7 @@ struct PortfolioView: View {
             let documents = try fetchAllForDelete(ProjectDocument.self, projectID: projectID)
             let changeOrders = try fetchAllForDelete(ChangeOrder.self, projectID: projectID)
             let project = try fetchProject(withID: projectID)
+            let projectMediaFolder = project.map(MediaStorageService.projectFolder(project:))
 
             categories.forEach(modelContext.delete)
             items.forEach(modelContext.delete)
@@ -208,11 +209,13 @@ struct PortfolioView: View {
             documents.forEach(modelContext.delete)
             changeOrders.forEach(modelContext.delete)
             if let project {
-                MediaStorageService.removeAllMedia(for: project)
                 modelContext.delete(project)
             }
 
             try modelContext.save()
+            if let projectMediaFolder {
+                MediaStorageService.removeAllMedia(at: projectMediaFolder)
+            }
             projectPendingDelete = nil
             Haptics.success()
             refreshProjectMetrics()

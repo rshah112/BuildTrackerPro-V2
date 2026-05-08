@@ -6,6 +6,7 @@ struct DashboardViewModel {
     let expenses: [Expense]
     let photos: [PhotoAttachment]
     let changeOrders: [ChangeOrder]
+    let allowanceSelections: [AllowanceSelection]
 
     private var constructionItems: [BudgetLineItem] {
         items.filter { !Self.isContingency($0.categoryName) }
@@ -19,12 +20,22 @@ struct DashboardViewModel {
         changeOrders.filter { !Self.isContingency($0.categoryName) }
     }
 
+    private var constructionAllowanceSelections: [AllowanceSelection] {
+        let constructionItemIDs = Set(constructionItems.map(\.id))
+        return allowanceSelections.filter { constructionItemIDs.contains($0.lineItemID) }
+    }
+
     var totalBudget: Double {
         project?.constructionBudget ?? constructionItems.reduce(0) { $0 + $1.budget }
     }
 
     var actualSpent: Double {
-        BudgetMathService.actualSpend(expenses: constructionExpenses, changeOrders: constructionChangeOrders)
+        BudgetMathService.actualSpend(
+            items: constructionItems,
+            expenses: constructionExpenses,
+            allowanceSelections: constructionAllowanceSelections,
+            changeOrders: constructionChangeOrders
+        )
     }
 
     var cashPaid: Double {
@@ -37,6 +48,10 @@ struct DashboardViewModel {
 
     var openInvoiceTotal: Double {
         BudgetMathService.openInvoiceTotal(expenses: constructionExpenses)
+    }
+
+    var allowanceOverage: Double {
+        BudgetMathService.allowanceOverage(items: constructionItems, allowanceSelections: constructionAllowanceSelections)
     }
 
     var remainingBudget: Double {

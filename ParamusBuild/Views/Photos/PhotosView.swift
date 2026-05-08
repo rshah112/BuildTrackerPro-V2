@@ -306,8 +306,10 @@ struct PhotosView: View {
     private func deletePhoto(withID photoID: UUID) {
         do {
             guard let photo = fetchPhoto(withID: photoID) else { return }
+            let deletedPhotoID = photo.id
             modelContext.delete(photo)
             try modelContext.save()
+            MediaStorageService.removePhoto(id: deletedPhotoID, project: project)
         } catch {
             modelContext.safeRollback()
             photoError = "Could not delete photo: \(error.localizedDescription)"

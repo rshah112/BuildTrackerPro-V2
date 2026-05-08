@@ -1,6 +1,7 @@
 import PhotosUI
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct AddPhotoView: View {
     @Environment(\.dismiss) private var dismiss
@@ -14,6 +15,7 @@ struct AddPhotoView: View {
     @StateObject private var viewModel: PhotoFormViewModel
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showingCamera = false
+    @State private var showingFileImporter = false
 
     init(project: Project, photo: PhotoAttachment? = nil) {
         self.project = project
@@ -65,20 +67,28 @@ struct AddPhotoView: View {
                         .frame(height: 220)
                     }
 
-                    HStack(spacing: 12) {
+                    VStack(spacing: 10) {
+                        Button {
+                            showingCamera = true
+                        } label: {
+                            Label("Take Photo", systemImage: "camera")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+
                         PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                            Label("Library", systemImage: "photo")
+                            Label("Upload from Album", systemImage: "photo.on.rectangle")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
 
                         Button {
-                            showingCamera = true
+                            showingFileImporter = true
                         } label: {
-                            Label("Camera", systemImage: "camera")
+                            Label("Upload from Files", systemImage: "folder")
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.bordered)
                     }
                 }
 
@@ -147,11 +157,17 @@ struct AddPhotoView: View {
             .onChange(of: selectedPhotoItem) { _, newItem in
                 Task {
                     guard let data = try? await newItem?.loadTransferable(type: Data.self) else { return }
-                    let optimized = ImageDataProcessor.optimizedJPEGData(from: data, maxDimension: 1800, compressionQuality: 0.84)
                     await MainActor.run {
-                        viewModel.imageData = optimized ?? data
+                        setImageData(data)
                     }
                 }
+            }
+            .fileImporter(
+                isPresented: $showingFileImporter,
+                allowedContentTypes: [.image],
+                allowsMultipleSelection: false
+            ) { result in
+                handleFileImport(result)
             }
             .sheet(isPresented: $showingCamera) {
                 CameraPicker { image in
@@ -159,6 +175,22 @@ struct AddPhotoView: View {
                 }
             }
         }
+    }
+
+    private func handleFileImport(_ result: Result<[URL], Error>) {
+        guard case let .success(urls) = result, let url = urls.first else { return }
+        let isScoped = url.startAccessingSecurityScopedResource()
+        defer {
+            if isScoped {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        guard let data = try? Data(contentsOf: url) else { return }
+        setImageData(data)
+    }
+
+    private func setImageData(_ data: Data) {
+        viewModel.imageData = ImageDataProcessor.optimizedJPEGData(from: data, maxDimension: 1800, compressionQuality: 0.84) ?? data
     }
 
     private func save() {
@@ -177,11 +209,10 @@ struct AddPhotoView: View {
                 target = newPhoto
             }
 
+            try modelContext.save()
             if let data = target.imageData {
                 MediaStorageService.savePhoto(data: data, project: project, photo: target)
             }
-
-            try modelContext.save()
             Haptics.success()
             dismiss()
         } catch {

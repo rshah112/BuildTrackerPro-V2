@@ -5,11 +5,13 @@ struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
     let project: Project
     let navigateToTarget: (ProjectNavigationTarget) -> Void
+    @State private var showingProjectBrief = false
 
     @Query private var items: [BudgetLineItem]
     @Query private var expenses: [Expense]
     @Query private var photos: [PhotoAttachment]
     @Query private var changeOrders: [ChangeOrder]
+    @Query private var allowanceSelections: [AllowanceSelection]
 
     init(project: Project, navigateToTarget: @escaping (ProjectNavigationTarget) -> Void = { _ in }) {
         self.project = project
@@ -19,6 +21,11 @@ struct DashboardView: View {
         _expenses = Query(filter: #Predicate<Expense> { $0.projectID == projectID }, sort: \.date, order: .reverse)
         _photos = Query(filter: #Predicate<PhotoAttachment> { $0.projectID == projectID }, sort: \.createdAt, order: .reverse)
         _changeOrders = Query(filter: #Predicate<ChangeOrder> { $0.projectID == projectID }, sort: \.createdAt, order: .reverse)
+        _allowanceSelections = Query(
+            filter: #Predicate<AllowanceSelection> { $0.projectID == projectID },
+            sort: \.selectionDate,
+            order: .reverse
+        )
     }
 
     private var viewModel: DashboardViewModel {
@@ -27,7 +34,8 @@ struct DashboardView: View {
             items: items,
             expenses: expenses,
             photos: photos,
-            changeOrders: changeOrders
+            changeOrders: changeOrders,
+            allowanceSelections: allowanceSelections
         )
     }
 
@@ -36,10 +44,10 @@ struct DashboardView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     header
-                    projectBrief
                     quickActions
-                    metricsGrid
                     progressCard
+                    cashFlowCard
+                    metricsGrid
                     attentionCard
                     pinnedWatchlist
                     phasePulse
@@ -53,6 +61,9 @@ struct DashboardView: View {
             }
             .background(AppTheme.pageBackground)
             .navigationTitle("Dashboard")
+            .sheet(isPresented: $showingProjectBrief) {
+                ProjectBriefSheet(project: project)
+            }
             .onAppear {
                 refreshBudgetMath()
             }
@@ -60,7 +71,13 @@ struct DashboardView: View {
     }
 
     private func refreshBudgetMath() {
-        let didChange = BudgetMathService.recalculateActuals(for: project.id, items: items, expenses: expenses, changeOrders: changeOrders)
+        let didChange = BudgetMathService.recalculateActuals(
+            for: project.id,
+            items: items,
+            expenses: expenses,
+            changeOrders: changeOrders,
+            allowanceSelections: allowanceSelections
+        )
         guard didChange else { return }
         do {
             try modelContext.save()
@@ -68,6 +85,11 @@ struct DashboardView: View {
             modelContext.safeRollback()
             Haptics.warning()
         }
+    }
+
+    private var hasProjectBrief: Bool {
+        project.startDate != nil || project.targetFinishDate != nil || !project.scopeSummary.trimmed.isEmpty ||
+            (project.status == .complete && !project.warrantyNotes.trimmed.isEmpty)
     }
 
     private func persistProjectChange() {
@@ -132,6 +154,19 @@ struct DashboardView: View {
                         systemImage: "flag.fill",
                         tint: AppTheme.projectPriorityColor(project.priority)
                     )
+                }
+
+                if hasProjectBrief {
+                    Button {
+                        showingProjectBrief = true
+                    } label: {
+                        DashboardStatusChip(
+                            title: "Brief",
+                            systemImage: "doc.text",
+                            tint: AppTheme.accent
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.top, 4)
@@ -229,28 +264,6 @@ struct DashboardView: View {
             }
 
             DashboardMetricButton(
-                title: "Paid",
-                value: viewModel.cashPaid.compactCurrencyString,
-                subtitle: "Cash out",
-                systemImage: "checkmark.seal",
-                tint: AppTheme.positive,
-                exactValue: viewModel.cashPaid
-            ) {
-                navigateToTarget(.expenses(.paid))
-            }
-
-            DashboardMetricButton(
-                title: "Open Invoices",
-                value: viewModel.openInvoiceTotal.compactCurrencyString,
-                subtitle: "Unpaid balances",
-                systemImage: "clock",
-                tint: viewModel.openInvoiceTotal > 0 ? AppTheme.warning : AppTheme.brand,
-                exactValue: viewModel.openInvoiceTotal
-            ) {
-                navigateToTarget(.expenses(.open))
-            }
-
-            DashboardMetricButton(
                 title: "Committed",
                 value: viewModel.committedSpend.compactCurrencyString,
                 subtitle: viewModel
@@ -284,7 +297,6 @@ struct DashboardView: View {
             ) {
                 navigateToTarget(.budget(searchText: "Contingency"))
             }
-            .gridCellColumns(2)
         }
     }
 
@@ -328,14 +340,34 @@ struct DashboardView: View {
         .buttonStyle(.plain)
     }
 
+    private var cashFlowDays: [CashFlowDay] {
+        CashFlowService.forecast(project: project, expenses: expenses, changeOrders: changeOrders)
+    }
+
+    private var cashFlowCard: some View {
+        CashFlowCard(
+            days: cashFlowDays,
+            nextFourteenDaysDue: CashFlowService.nextFourteenDaysDueTotal(
+                project: project,
+                expenses: expenses,
+                changeOrders: changeOrders
+            ),
+            paidTotal: viewModel.cashPaid,
+            openInvoiceTotal: viewModel.openInvoiceTotal,
+            showsDisclosure: true,
+            disclosureDestination: AnyView(CashFlowDetailView(project: project))
+        )
+    }
+
     @ViewBuilder
     private var attentionCard: some View {
         let overBudgetCount = viewModel.overBudgetItems.count
         let openInvoices = viewModel.openInvoiceTotal
         let pendingChanges = viewModel.pendingExposure
+        let allowanceOverage = viewModel.allowanceOverage
         let unassignedCount = viewModel.unassignedExpenses.count
 
-        if overBudgetCount > 0 || openInvoices > 0 || pendingChanges > 0 || unassignedCount > 0 {
+        if overBudgetCount > 0 || openInvoices > 0 || pendingChanges > 0 || allowanceOverage > 0 || unassignedCount > 0 {
             PremiumCard {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
@@ -376,6 +408,17 @@ struct DashboardView: View {
                             tint: AppTheme.info
                         ) {
                             navigateToTarget(.tab(.more))
+                        }
+                    }
+
+                    if allowanceOverage > 0 {
+                        DashboardAttentionRow(
+                            title: "\(allowanceOverage.compactCurrencyString) allowance overage",
+                            subtitle: "Review selections that exceeded their allowance",
+                            systemImage: "square.stack.3d.up.fill",
+                            tint: AppTheme.negative
+                        ) {
+                            navigateToTarget(.budget())
                         }
                     }
 
@@ -623,6 +666,426 @@ private struct DashboardMetricButton: View {
     }
 }
 
+private struct CashFlowCard: View {
+    let days: [CashFlowDay]
+    let nextFourteenDaysDue: Double
+    let paidTotal: Double
+    let openInvoiceTotal: Double
+    let showsDisclosure: Bool
+    let disclosureDestination: AnyView?
+
+    private var hasFutureDebt: Bool {
+        days.contains { $0.total > 0 }
+    }
+
+    var body: some View {
+        PremiumCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Cash Flow")
+                            .font(.headline.weight(.semibold))
+                        Text("\(nextFourteenDaysDue.compactCurrencyString) due next 14 days")
+                            .font(AppFont.subheadline)
+                            .foregroundStyle(nextFourteenDaysDue > 0 ? AppTheme.warning : AppTheme.inkSecondary)
+                    }
+
+                    Spacer()
+
+                    if showsDisclosure, let disclosureDestination {
+                        NavigationLink {
+                            disclosureDestination
+                        } label: {
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(AppTheme.inkTertiary)
+                                .frame(width: 28, height: 28)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, -3)
+                    }
+                }
+
+                if hasFutureDebt {
+                    CashFlowMiniChart(days: days)
+                        .frame(height: 134)
+
+                    HStack(spacing: 8) {
+                        CashFlowMiniStat(title: "Paid", value: paidTotal.compactCurrencyString, tint: AppTheme.positive)
+                        CashFlowMiniStat(title: "Open", value: openInvoiceTotal.compactCurrencyString, tint: AppTheme.warning)
+                    }
+
+                    HStack(spacing: 12) {
+                        Label("Committed", systemImage: "rectangle.fill")
+                            .foregroundStyle(AppTheme.brand)
+                        Label("Pending exposure", systemImage: "rectangle.dashed")
+                            .foregroundStyle(AppTheme.info)
+                    }
+                    .font(AppFont.caption)
+                } else {
+                    CompactEmptyRow(title: "All clear for the next 14 days 🎯", systemImage: "checkmark.seal")
+                }
+            }
+        }
+    }
+}
+
+private struct CashFlowMiniChart: View {
+    let days: [CashFlowDay]
+    @State private var selectedDayID: Date?
+
+    private var maxValue: Double {
+        max(days.map(\.total).max() ?? 0, 1)
+    }
+
+    private var selectedDay: CashFlowDay? {
+        guard let selectedDayID else { return nil }
+        return days.first { Calendar.current.isDate($0.date, inSameDayAs: selectedDayID) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(selectedDay?.date.cashFlowDayLabel ?? "Tap a bar")
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppTheme.inkSecondary)
+                Spacer()
+                Text((selectedDay?.total ?? days.reduce(0) { $0 + $1.total }).compactCurrencyString)
+                    .font(AppFont.numeric(13, weight: .bold))
+                    .foregroundStyle(selectedDay == nil ? AppTheme.inkSecondary : AppTheme.ink)
+            }
+
+            GeometryReader { proxy in
+                HStack(alignment: .bottom, spacing: 5) {
+                    ForEach(days) { day in
+                        Button {
+                            selectedDayID = day.id
+                        } label: {
+                            VStack(spacing: 5) {
+                                Spacer(minLength: 0)
+                                VStack(spacing: 2) {
+                                    if day.pendingExposureTotal > 0 {
+                                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                            .fill(AppTheme.info.opacity(0.12))
+                                            .overlay {
+                                                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                                    .stroke(AppTheme.info, style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
+                                            }
+                                            .frame(height: barHeight(for: day.pendingExposureTotal, in: proxy.size.height))
+                                    }
+                                    if day.committedTotal > 0 {
+                                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                            .fill(AppTheme.brand)
+                                            .frame(height: barHeight(for: day.committedTotal, in: proxy.size.height))
+                                    }
+                                    if day.total == 0 {
+                                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                            .fill(AppTheme.border)
+                                            .frame(height: 3)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity)
+                                .overlay(alignment: .top) {
+                                    if selectedDayID == day.id {
+                                        Capsule()
+                                            .fill(AppTheme.ink)
+                                            .frame(width: 5, height: 5)
+                                            .offset(y: -8)
+                                    }
+                                }
+
+                                Text(day.date.tinyDayLabel)
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(AppTheme.inkTertiary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(day.date.cashFlowDayLabel), \(day.total.currencyString)")
+                    }
+                }
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private func barHeight(for value: Double, in containerHeight: CGFloat) -> CGFloat {
+        let chartHeight = max(32, containerHeight - 22)
+        return max(4, chartHeight * CGFloat(value / maxValue))
+    }
+}
+
+private struct CashFlowMiniStat: View {
+    let title: String
+    let value: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(AppFont.numeric(15, weight: .bold))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.76)
+            Text(title)
+                .font(AppFont.caption2)
+                .foregroundStyle(AppTheme.inkTertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(AppTheme.surfaceSunken, in: RoundedRectangle(cornerRadius: AppTheme.Radius.sm, style: .continuous))
+    }
+}
+
+struct CashFlowDetailView: View {
+    let project: Project
+
+    @Query private var expenses: [Expense]
+    @Query private var changeOrders: [ChangeOrder]
+    @Query private var allowanceSelections: [AllowanceSelection]
+    @State private var editorRoute: CashFlowEditorRoute?
+
+    init(project: Project) {
+        self.project = project
+        let projectID = project.id
+        _expenses = Query(filter: #Predicate<Expense> { $0.projectID == projectID }, sort: \.date, order: .reverse)
+        _changeOrders = Query(filter: #Predicate<ChangeOrder> { $0.projectID == projectID }, sort: \.createdAt, order: .reverse)
+        _allowanceSelections = Query(
+            filter: #Predicate<AllowanceSelection> { $0.projectID == projectID },
+            sort: \.selectionDate,
+            order: .reverse
+        )
+    }
+
+    private var days: [CashFlowDay] {
+        CashFlowService.forecast(project: project, expenses: expenses, changeOrders: changeOrders)
+    }
+
+    private var hasFutureDebt: Bool {
+        days.contains { !$0.payments.isEmpty }
+    }
+
+    var body: some View {
+        List {
+            Section {
+                CashFlowCard(
+                    days: days,
+                    nextFourteenDaysDue: CashFlowService.nextFourteenDaysDueTotal(
+                        project: project,
+                        expenses: expenses,
+                        changeOrders: changeOrders
+                    ),
+                    paidTotal: BudgetMathService.cashPaidTotal(expenses: expenses, changeOrders: changeOrders),
+                    openInvoiceTotal: BudgetMathService.openInvoiceTotal(expenses: expenses),
+                    showsDisclosure: false,
+                    disclosureDestination: nil
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
+            }
+
+            if hasFutureDebt {
+                ForEach(days.filter { !$0.payments.isEmpty }) { day in
+                    Section(day.date.cashFlowDayLabel) {
+                        ForEach(day.payments) { payment in
+                            Button {
+                                editorRoute = CashFlowEditorRoute(payment: payment)
+                            } label: {
+                                CashFlowPaymentRow(payment: payment)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            } else {
+                Section {
+                    EmptyStateView(
+                        title: "All clear for the next 14 days 🎯",
+                        subtitle: "Future-dated debt will appear here when invoices or change orders get expected payment dates.",
+                        systemImage: "checkmark.seal"
+                    )
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.pageBackground)
+        .navigationTitle("Cash Flow")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $editorRoute) { route in
+            switch route {
+            case let .expense(id):
+                AddExpenseView(project: project, expenseID: id)
+            case let .changeOrder(id):
+                if let order = changeOrders.first(where: { $0.id == id }) {
+                    AddChangeOrderView(project: project, order: order)
+                } else {
+                    MissingCashFlowEditorView()
+                }
+            }
+        }
+    }
+}
+
+private enum CashFlowEditorRoute: Identifiable {
+    case expense(UUID)
+    case changeOrder(UUID)
+
+    init(payment: CashFlowPayment) {
+        switch payment.kind {
+        case .expense:
+            self = .expense(payment.sourceID)
+        case .changeOrder:
+            self = .changeOrder(payment.sourceID)
+        }
+    }
+
+    var id: String {
+        switch self {
+        case let .expense(id):
+            "expense-\(id.uuidString)"
+        case let .changeOrder(id):
+            "change-\(id.uuidString)"
+        }
+    }
+}
+
+private struct CashFlowPaymentRow: View {
+    let payment: CashFlowPayment
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: payment.exposure == .pending ? "circle.dotted" : "circle.fill")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(payment.exposure == .pending ? AppTheme.info : AppTheme.brand)
+                .frame(width: 26, height: 34)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(payment.title)
+                    .font(AppFont.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.ink)
+                    .lineLimit(1)
+                Text("\(payment.subtitle) - \(payment.expectedDate.shortDateString)")
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppTheme.inkSecondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Text(payment.amount.compactCurrencyString)
+                .font(AppFont.numeric(15, weight: .bold))
+                .foregroundStyle(payment.exposure == .pending ? AppTheme.info : AppTheme.ink)
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(AppTheme.inkTertiary)
+        }
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+    }
+}
+
+private struct MissingCashFlowEditorView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            EmptyStateView(
+                title: "Entry no longer exists",
+                subtitle: "The forecast will refresh after you close this view.",
+                systemImage: "exclamationmark.triangle"
+            )
+            .padding(AppTheme.pagePadding)
+            .background(AppTheme.pageBackground)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ProjectBriefSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let project: Project
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if !project.scopeSummary.trimmed.isEmpty {
+                        PremiumCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Label("Scope", systemImage: "doc.text")
+                                    .font(.headline.weight(.semibold))
+                                    .foregroundStyle(AppTheme.ink)
+
+                                Text(project.scopeSummary.trimmed)
+                                    .font(AppFont.body)
+                                    .foregroundStyle(AppTheme.ink)
+                                    .textSelection(.enabled)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+
+                    if project.startDate != nil || project.targetFinishDate != nil {
+                        PremiumCard {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Timeline")
+                                    .font(.headline.weight(.semibold))
+
+                                if let startDate = project.startDate {
+                                    Label("Start " + startDate.shortDateString, systemImage: "play.circle")
+                                }
+                                if let targetFinishDate = project.targetFinishDate {
+                                    Label("Target " + targetFinishDate.shortDateString, systemImage: "flag.checkered")
+                                }
+                            }
+                            .font(AppFont.subheadline.weight(.semibold))
+                            .foregroundStyle(AppTheme.inkSecondary)
+                        }
+                    }
+
+                    if project.status == .complete, !project.warrantyNotes.trimmed.isEmpty {
+                        PremiumCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Label("Warranty Notes", systemImage: "wrench.adjustable")
+                                    .font(.headline.weight(.semibold))
+                                    .foregroundStyle(AppTheme.ink)
+
+                                Text(project.warrantyNotes.trimmed)
+                                    .font(AppFont.body)
+                                    .foregroundStyle(AppTheme.ink)
+                                    .textSelection(.enabled)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+                .padding(AppTheme.pagePadding)
+            }
+            .background(AppTheme.pageBackground)
+            .navigationTitle("Project Brief")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
 private struct DashboardStatusChip: View {
     let title: String
     let systemImage: String
@@ -826,5 +1289,19 @@ private struct CompactEmptyRow: View {
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 8)
+    }
+}
+
+private extension Date {
+    var tinyDayLabel: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M/d"
+        return formatter.string(from: self)
+    }
+
+    var cashFlowDayLabel: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE, MMM d"
+        return formatter.string(from: self)
     }
 }

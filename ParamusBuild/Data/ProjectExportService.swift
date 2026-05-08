@@ -47,7 +47,8 @@ enum ProjectExportService {
         photos: [PhotoAttachment],
         documents: [ProjectDocument],
         changeOrders: [ChangeOrder],
-        vendors: [Vendor]
+        vendors: [Vendor],
+        allowanceSelections: [AllowanceSelection] = []
     ) throws -> URL {
         let timestamp = ExportNaming.timestamp()
         let archiveBaseName = ExportNaming.archiveBaseName(project: project, scope: scope, timestamp: timestamp)
@@ -63,7 +64,8 @@ enum ProjectExportService {
                 photos: photos,
                 documents: documents,
                 changeOrders: changeOrders,
-                vendors: vendors
+                vendors: vendors,
+                allowanceSelections: allowanceSelections
             )
         }
 
@@ -112,7 +114,8 @@ enum ProjectExportService {
                 photos: photos,
                 documents: documents,
                 changeOrders: changeOrders,
-                vendors: vendors
+                vendors: vendors,
+                allowanceSelections: allowanceSelections
             )
         )
 
@@ -132,7 +135,8 @@ enum ProjectExportService {
         photos: [PhotoAttachment],
         documents: [ProjectDocument],
         changeOrders: [ChangeOrder],
-        vendors: [Vendor]
+        vendors: [Vendor],
+        allowanceSelections: [AllowanceSelection]
     ) {
         let workbook = ProjectWorkbookService.makeWorkbook(
             project: project,
@@ -141,7 +145,8 @@ enum ProjectExportService {
             documents: documents,
             changeOrders: changeOrders,
             vendors: vendors,
-            photos: photos
+            photos: photos,
+            allowanceSelections: allowanceSelections
         )
         let fileName = "\(project.name.safeArchivePathComponent)-Data-\(timestamp).xls"
         zip.addTextFile(path: "Data/\(fileName)", text: workbook)
@@ -170,7 +175,8 @@ enum ProjectExportService {
         photos: [PhotoAttachment],
         documents: [ProjectDocument],
         changeOrders: [ChangeOrder],
-        vendors: [Vendor]
+        vendors: [Vendor],
+        allowanceSelections: [AllowanceSelection]
     ) -> String {
         """
         HomeBuild Pro Export
@@ -188,6 +194,7 @@ enum ProjectExportService {
         Documents: \(documents.count)
         Vendors: \(vendors.count)
         Change Orders: \(changeOrders.count)
+        Allowance Selections: \(allowanceSelections.count)
 
         Data exports include one Excel workbook with separate sheets.
         Photo exports are organized by photo folder/category.

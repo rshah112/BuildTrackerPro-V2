@@ -10,6 +10,7 @@ struct BudgetView: View {
     @Query private var items: [BudgetLineItem]
     @Query private var expenses: [Expense]
     @Query private var photos: [PhotoAttachment]
+    @Query private var allowanceSelections: [AllowanceSelection]
 
     @State private var searchText = ""
     @State private var expandedCategories = Set<String>()
@@ -25,6 +26,11 @@ struct BudgetView: View {
         _items = Query(filter: #Predicate<BudgetLineItem> { $0.projectID == projectID }, sort: \.costCode)
         _expenses = Query(filter: #Predicate<Expense> { $0.projectID == projectID }, sort: \.date, order: .reverse)
         _photos = Query(filter: #Predicate<PhotoAttachment> { $0.projectID == projectID }, sort: \.createdAt, order: .reverse)
+        _allowanceSelections = Query(
+            filter: #Predicate<AllowanceSelection> { $0.projectID == projectID },
+            sort: \.selectionDate,
+            order: .reverse
+        )
     }
 
     private var filteredItems: [BudgetLineItem] {
@@ -153,7 +159,8 @@ struct BudgetView: View {
                     for: project.id,
                     items: items,
                     expenses: expenses,
-                    changeOrders: fetchChangeOrders()
+                    changeOrders: fetchChangeOrders(),
+                    allowanceSelections: allowanceSelections
                 ) {
                     saveChanges()
                 }
@@ -213,10 +220,11 @@ struct BudgetView: View {
         let linkedExpenses = expenses.filter { $0.budgetLineItemID == item.id }.count
         let linkedPhotos = photos.filter { $0.budgetLineItemID == item.id }.count
         let linkedChangeOrders = changeOrders.filter { $0.budgetLineItemID == item.id }.count
-        let linkedCount = linkedExpenses + linkedPhotos + linkedChangeOrders
+        let linkedSelections = allowanceSelections.filter { $0.lineItemID == item.id }.count
+        let linkedCount = linkedExpenses + linkedPhotos + linkedChangeOrders + linkedSelections
 
         guard linkedCount == 0 else {
-            deleteBlockedMessage = "This item is linked to \(linkedExpenses) expenses, \(linkedPhotos) photos, and \(linkedChangeOrders) change orders. Reassign or delete those records first so project totals stay accurate."
+            deleteBlockedMessage = "This item is linked to \(linkedExpenses) expenses, \(linkedPhotos) photos, \(linkedChangeOrders) change orders, and \(linkedSelections) allowance selections. Reassign or delete those records first so project totals stay accurate."
             return
         }
 

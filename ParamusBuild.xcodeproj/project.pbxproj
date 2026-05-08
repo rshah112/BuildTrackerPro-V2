@@ -13,6 +13,7 @@
 		2A0001010000000000000004 /* BudgetCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000004 /* BudgetCategory.swift */; };
 		2A0001010000000000000005 /* BudgetLineItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000005 /* BudgetLineItem.swift */; };
 		2A0001010000000000000006 /* Expense.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000006 /* Expense.swift */; };
+		2A00010100000000000000A0 /* AllowanceSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000A0 /* AllowanceSelection.swift */; };
 		2A0001010000000000000007 /* Vendor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000007 /* Vendor.swift */; };
 		2A0001010000000000000008 /* PhotoAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000008 /* PhotoAttachment.swift */; };
 		2A0001010000000000000009 /* ChangeOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000009 /* ChangeOrder.swift */; };
@@ -56,6 +57,7 @@
 		2A000101000000000000009B /* ReceiptCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000009B /* ReceiptCaptureView.swift */; };
 		2A000101000000000000009C /* MediaStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000009C /* MediaStorageService.swift */; };
 		2A000101000000000000009D /* ReceiptsGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000009D /* ReceiptsGalleryView.swift */; };
+		2A000101000000000000009E /* CashFlowService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000201000000000000009E /* CashFlowService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -65,6 +67,7 @@
 		2A0002010000000000000004 /* BudgetCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetCategory.swift; sourceTree = "<group>"; };
 		2A0002010000000000000005 /* BudgetLineItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetLineItem.swift; sourceTree = "<group>"; };
 		2A0002010000000000000006 /* Expense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Expense.swift; sourceTree = "<group>"; };
+		2A00020100000000000000A0 /* AllowanceSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllowanceSelection.swift; sourceTree = "<group>"; };
 		2A0002010000000000000007 /* Vendor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Vendor.swift; sourceTree = "<group>"; };
 		2A0002010000000000000008 /* PhotoAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoAttachment.swift; sourceTree = "<group>"; };
 		2A0002010000000000000009 /* ChangeOrder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeOrder.swift; sourceTree = "<group>"; };
@@ -108,6 +111,7 @@
 		2A000201000000000000009B /* ReceiptCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptCaptureView.swift; sourceTree = "<group>"; };
 		2A000201000000000000009C /* MediaStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaStorageService.swift; sourceTree = "<group>"; };
 		2A000201000000000000009D /* ReceiptsGalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptsGalleryView.swift; sourceTree = "<group>"; };
+		2A000201000000000000009E /* CashFlowService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CashFlowService.swift; sourceTree = "<group>"; };
 		2A00020100000000000000FF /* HomeBuildPro.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HomeBuildPro.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -161,6 +165,7 @@
 				2A0002010000000000000004 /* BudgetCategory.swift */,
 				2A0002010000000000000005 /* BudgetLineItem.swift */,
 				2A0002010000000000000006 /* Expense.swift */,
+				2A00020100000000000000A0 /* AllowanceSelection.swift */,
 				2A0002010000000000000007 /* Vendor.swift */,
 				2A0002010000000000000008 /* PhotoAttachment.swift */,
 				2A0002010000000000000009 /* ChangeOrder.swift */,
@@ -179,6 +184,7 @@
 				2A0002010000000000000031 /* ProjectTemplateService.swift */,
 				2A000201000000000000009A /* VisionReceiptScanner.swift */,
 				2A000201000000000000009C /* MediaStorageService.swift */,
+				2A000201000000000000009E /* CashFlowService.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -373,6 +379,7 @@
 				2A0001010000000000000004 /* BudgetCategory.swift in Sources */,
 				2A0001010000000000000005 /* BudgetLineItem.swift in Sources */,
 				2A0001010000000000000006 /* Expense.swift in Sources */,
+				2A00010100000000000000A0 /* AllowanceSelection.swift in Sources */,
 				2A0001010000000000000007 /* Vendor.swift in Sources */,
 				2A0001010000000000000008 /* PhotoAttachment.swift in Sources */,
 				2A0001010000000000000009 /* ChangeOrder.swift in Sources */,
@@ -392,6 +399,7 @@
 				2A000101000000000000009B /* ReceiptCaptureView.swift in Sources */,
 				2A000101000000000000009C /* MediaStorageService.swift in Sources */,
 				2A000101000000000000009D /* ReceiptsGalleryView.swift in Sources */,
+				2A000101000000000000009E /* CashFlowService.swift in Sources */,
 				2A0001010000000000000015 /* DashboardView.swift in Sources */,
 				2A0001010000000000000016 /* BudgetView.swift in Sources */,
 				2A0001010000000000000017 /* BudgetDetailView.swift in Sources */,

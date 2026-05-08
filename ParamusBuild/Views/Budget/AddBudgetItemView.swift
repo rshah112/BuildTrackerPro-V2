@@ -15,6 +15,7 @@ struct AddBudgetItemView: View {
     @State private var newCategoryName = ""
     @State private var budget = 0.0
     @State private var committed = 0.0
+    @State private var isAllowance = false
     @State private var notes = ""
     @State private var saveErrorMessage: String?
 
@@ -101,16 +102,22 @@ struct AddBudgetItemView: View {
 
                 ModernFormSection(
                     "Budget",
-                    footer: "Use committed only when this item already has a signed contract or known commitment."
+                    footer: isAllowance ?
+                        "Allowance items stay quiet until selections are recorded. Committed contract math is ignored for this line." : "Use committed only when this item already has a signed contract or known commitment."
                 ) {
                     ModernField("Estimated budget", subtitle: "The planned allowance for this line item.") {
                         CurrencyField(value: $budget)
                             .modernTextField()
                     }
 
+                    Toggle("Allowance", isOn: $isAllowance)
+                        .font(.body.weight(.medium))
+
                     ModernField("Committed / contracted", subtitle: "Known contracted amount that is not fully paid yet.") {
                         CurrencyField(value: $committed)
                             .modernTextField()
+                            .disabled(isAllowance)
+                            .opacity(isAllowance ? 0.45 : 1)
                     }
                 }
 
@@ -186,8 +193,10 @@ struct AddBudgetItemView: View {
             title: title.trimmed,
             categoryName: categoryName,
             budget: budget,
-            committed: committed,
-            notes: notes.trimmed
+            committed: isAllowance ? 0 : committed,
+            notes: notes.trimmed,
+            isAllowance: isAllowance,
+            allowanceAmount: isAllowance ? budget : 0
         )
         modelContext.insert(item)
         do {

@@ -1,3 +1,4 @@
+import PhotosUI
 import QuickLook
 import SwiftData
 import SwiftUI
@@ -13,6 +14,10 @@ struct DocumentsView: View {
     @State private var selectedKindFilter: ProjectDocumentKind?
     @State private var selectedStatusFilter: DocumentStatusFilter = .all
     @State private var showingImporter = false
+    @State private var showingUploadSourceDialog = false
+    @State private var importKindOverride: ProjectDocumentKind?
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var showingCamera = false
     @State private var showingUploadReview = false
     @State private var showingDocumentEditor = false
     @State private var documentIDToEdit: UUID?
@@ -49,7 +54,9 @@ struct DocumentsView: View {
                         documents: documents,
                         selectedKind: $selectedKindFilter,
                         selectedStatus: $selectedStatusFilter
-                    )
+                    ) { kind in
+                        beginUpload(kind: kind)
+                    }
                 }
 
                 if filteredDocuments.isEmpty {
@@ -98,8 +105,25 @@ struct DocumentsView: View {
         }
         .background(AppTheme.pageBackground)
         .navigationTitle("Documents")
-        .primaryFloatingAction(title: "Files", systemImage: "doc.badge.plus") {
-            showingImporter = true
+        .primaryFloatingAction(title: "Upload", systemImage: "doc.badge.plus") {
+            beginUpload(kind: selectedKindFilter)
+        }
+        .confirmationDialog("Upload", isPresented: $showingUploadSourceDialog, titleVisibility: .visible) {
+            Button {
+                showingCamera = true
+            } label: {
+                Label("Take Photo", systemImage: "camera")
+            }
+
+            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                Label("Upload from Album", systemImage: "photo.on.rectangle")
+            }
+
+            Button {
+                showingImporter = true
+            } label: {
+                Label("Upload from Files", systemImage: "folder")
+            }
         }
         .fileImporter(
             isPresented: $showingImporter,
@@ -107,6 +131,14 @@ struct DocumentsView: View {
             allowsMultipleSelection: true
         ) { result in
             importFiles(result)
+        }
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            handleAlbumPick(newItem)
+        }
+        .sheet(isPresented: $showingCamera) {
+            CameraPicker { image in
+                importImage(image)
+            }
         }
         .sheet(isPresented: $showingUploadReview, onDismiss: {
             if !pendingUploads.isEmpty {
@@ -121,7 +153,7 @@ struct DocumentsView: View {
             documentIDToEdit = nil
         }) {
             if let documentIDToEdit, let document = fetchDocument(withID: documentIDToEdit) {
-                DocumentEditorView(document: document, items: items)
+                DocumentEditorView(project: project, document: document, items: items)
             }
         }
         .sheet(item: $documentToPreview) { preview in
@@ -161,7 +193,44 @@ struct DocumentsView: View {
         selectedStatusFilter == .all || selectedStatusFilter == .required || selectedStatusFilter == .missing
     }
 
+    private func beginUpload(kind: ProjectDocumentKind?) {
+        importKindOverride = kind
+        showingUploadSourceDialog = true
+    }
+
+    private func handleAlbumPick(_ item: PhotosPickerItem?) {
+        guard let item else { return }
+        Task {
+            guard let data = try? await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data) else { return }
+            await MainActor.run {
+                importImage(image)
+            }
+        }
+    }
+
+    private func importImage(_ image: UIImage) {
+        let kind = importKindOverride ?? selectedKindFilter ?? .other
+        let data = ImageDataProcessor.optimizedJPEGData(from: image, maxDimension: 2200, compressionQuality: 0.88) ?? image
+            .jpegData(compressionQuality: 0.88)
+        guard let data else { return }
+        pendingUploads = [
+            PendingDocumentUpload(
+                originalFileName: "\(kind.uploadFileStem)-photo.jpg",
+                displayName: "",
+                kind: kind,
+                status: .received,
+                budgetLineItemID: nil,
+                notes: "",
+                fileData: data
+            )
+        ]
+        importKindOverride = nil
+        showingUploadReview = true
+    }
+
     private func importFiles(_ result: Result<[URL], Error>) {
+        defer { importKindOverride = nil }
         guard case let .success(urls) = result else { return }
 
         var uploads: [PendingDocumentUpload] = []
@@ -179,7 +248,7 @@ struct DocumentsView: View {
                 PendingDocumentUpload(
                     originalFileName: url.lastPathComponent,
                     displayName: "",
-                    kind: selectedKindFilter ?? inferredKind(from: url.lastPathComponent),
+                    kind: importKindOverride ?? selectedKindFilter ?? inferredKind(from: url.lastPathComponent),
                     status: .received,
                     budgetLineItemID: nil,
                     notes: "",
@@ -194,6 +263,7 @@ struct DocumentsView: View {
     }
 
     private func saveUploads(_ uploads: [PendingDocumentUpload]) {
+        var mirroredDocuments: [(document: ProjectDocument, data: Data)] = []
         for upload in uploads {
             let document = ProjectDocument(
                 projectID: project.id,
@@ -206,10 +276,14 @@ struct DocumentsView: View {
                 fileData: upload.fileData
             )
             modelContext.insert(document)
-            MediaStorageService.saveDocument(data: upload.fileData, project: project, document: document)
+            mirroredDocuments.append((document, upload.fileData))
         }
 
-        saveChanges(successHaptic: true)
+        if saveChanges(successHaptic: true) {
+            for (document, data) in mirroredDocuments {
+                MediaStorageService.saveDocument(data: data, project: project, document: document)
+            }
+        }
         pendingUploads.removeAll()
         showingUploadReview = false
     }
@@ -246,8 +320,18 @@ struct DocumentsView: View {
 
     private func deleteDocument(withID documentID: UUID) {
         guard let document = fetchDocument(withID: documentID) else { return }
+        let deletedDocumentID = document.id
+        let deletedDocumentKind = document.kind
+        let deletedDocumentFileName = document.fileName
         modelContext.delete(document)
-        saveChanges(successHaptic: false)
+        if saveChanges(successHaptic: false) {
+            MediaStorageService.removeDocument(
+                id: deletedDocumentID,
+                kind: deletedDocumentKind,
+                fileName: deletedDocumentFileName,
+                project: project
+            )
+        }
     }
 
     private func fetchDocument(withID documentID: UUID) -> ProjectDocument? {
@@ -258,15 +342,18 @@ struct DocumentsView: View {
         return try? modelContext.fetch(descriptor).first
     }
 
-    private func saveChanges(successHaptic: Bool) {
+    @discardableResult
+    private func saveChanges(successHaptic: Bool) -> Bool {
         do {
             try modelContext.save()
             if successHaptic {
                 Haptics.success()
             }
+            return true
         } catch {
             modelContext.safeRollback()
             Haptics.warning()
+            return false
         }
     }
 }
@@ -449,6 +536,7 @@ private struct RequiredDocumentsCard: View {
     let documents: [ProjectDocument]
     @Binding var selectedKind: ProjectDocumentKind?
     @Binding var selectedStatus: DocumentStatusFilter
+    let onUpload: (ProjectDocumentKind) -> Void
 
     var body: some View {
         PremiumCard {
@@ -466,7 +554,8 @@ private struct RequiredDocumentsCard: View {
                     Button {
                         Haptics.lightTap()
                         selectedKind = kind
-                        selectedStatus = isReceived(kind) ? .received : .missing
+                        selectedStatus = .required
+                        onUpload(kind)
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: isReceived(kind) ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
@@ -478,9 +567,9 @@ private struct RequiredDocumentsCard: View {
 
                             Spacer()
 
-                            Text(isReceived(kind) ? "Uploaded" : "Missing")
+                            Text(isReceived(kind) ? "Add another" : "Upload")
                                 .font(.caption.weight(.bold))
-                                .foregroundStyle(isReceived(kind) ? AppTheme.positive : AppTheme.negative)
+                                .foregroundStyle(isReceived(kind) ? AppTheme.accent : AppTheme.negative)
                         }
                         .padding(.vertical, 2)
                     }
@@ -672,10 +761,25 @@ private struct DocumentRow: View {
     }
 }
 
+private extension ProjectDocumentKind {
+    var uploadFileStem: String {
+        switch self {
+        case .survey: "survey"
+        case .approvals: "permit"
+        case .plans: "plans"
+        case .inspections: "inspection"
+        case .contractsInsurance: "contract"
+        case .receiptsWarranties: "receipt"
+        case .other: "document"
+        }
+    }
+}
+
 private struct DocumentEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
+    let project: Project
     let documentID: UUID
     let projectID: UUID
     let items: [BudgetLineItem]
@@ -687,7 +791,8 @@ private struct DocumentEditorView: View {
     @State private var notes: String
     @State private var saveErrorMessage: String?
 
-    init(document: ProjectDocument, items: [BudgetLineItem]) {
+    init(project: Project, document: ProjectDocument, items: [BudgetLineItem]) {
+        self.project = project
         documentID = document.id
         projectID = document.projectID
         self.items = items
@@ -789,6 +894,9 @@ private struct DocumentEditorView: View {
 
         do {
             try modelContext.save()
+            if let data = document.fileData {
+                MediaStorageService.saveDocument(data: data, project: project, document: document)
+            }
             Haptics.success()
             dismiss()
         } catch {

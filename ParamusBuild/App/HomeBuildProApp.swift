@@ -54,7 +54,8 @@ struct HomeBuildProApp: App {
             Vendor.self,
             PhotoAttachment.self,
             ChangeOrder.self,
-            ProjectDocument.self
+            ProjectDocument.self,
+            AllowanceSelection.self
         ])
     }
 
@@ -64,7 +65,7 @@ struct HomeBuildProApp: App {
     }
 
     #if DEBUG
-        private static let developmentStoreVersion = "2026-05-07-homebuild-pro-rename"
+        private static let developmentStoreVersion = "2026-05-07-phase-5-allowances-migration-2"
 
         private static var applicationSupportURL: URL {
             FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)

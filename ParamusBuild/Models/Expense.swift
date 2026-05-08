@@ -11,6 +11,7 @@ final class Expense {
     var invoiceNumber: String = ""
     var date: Date
     var dueDate: Date?
+    var expectedPaymentDate: Date?
     var paidDate: Date?
     var paymentMethod: String = ""
     var paymentReference: String = ""
@@ -30,6 +31,7 @@ final class Expense {
         invoiceNumber: String = "",
         date: Date = .now,
         dueDate: Date? = nil,
+        expectedPaymentDate: Date? = nil,
         paidDate: Date? = nil,
         paymentMethod: String = "",
         paymentReference: String = "",
@@ -48,6 +50,7 @@ final class Expense {
         self.invoiceNumber = invoiceNumber
         self.date = date
         self.dueDate = dueDate
+        self.expectedPaymentDate = expectedPaymentDate
         self.paidDate = paidDate
         self.paymentMethod = paymentMethod
         self.paymentReference = paymentReference
@@ -60,6 +63,11 @@ final class Expense {
     }
 
     var balanceDue: Double {
-        max(0, amount - amountPaid)
+        max(0, amount - effectiveAmountPaid)
+    }
+
+    var effectiveAmountPaid: Double {
+        guard isPaid else { return 0 }
+        return min(amount, max(0, amountPaid))
     }
 }
