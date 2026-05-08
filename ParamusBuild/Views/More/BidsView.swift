@@ -89,7 +89,6 @@ struct BidsView: View {
                     .accessibilityLabel("Add Bid Package")
             }
         }
-        .primaryFloatingAction(title: "Bid Package", systemImage: "plus") { showingAddPackage = true }
         .sheet(isPresented: $showingAddPackage) { AddBidPackageView(project: project) }
         .sheet(item: $packageToEdit) { package in AddBidPackageView(project: project, package: package) }
         .alert("Bid Error", isPresented: errorBinding) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "") }
@@ -124,11 +123,8 @@ struct BidsView: View {
             }
             .padding(.vertical, 5)
         }
-        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+        .contextMenu {
             Button { packageToEdit = package } label: { Label("Edit", systemImage: "pencil") }
-                .tint(AppTheme.accent)
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) { delete(package) } label: { Label("Delete", systemImage: "trash") }
         }
     }
@@ -251,7 +247,6 @@ private struct BidPackageDetailView: View {
                     .accessibilityLabel("Add Bid")
             }
         }
-        .primaryFloatingAction(title: "Bid", systemImage: "plus") { showingAddBid = true }
         .sheet(isPresented: $showingAddBid) { AddBidView(project: project, package: package) }
         .sheet(item: $bidToEdit) { bid in AddBidView(project: project, package: package, bid: bid) }
         .confirmationDialog("Award Bid", isPresented: $showingAwardActions, titleVisibility: .visible) {
@@ -295,11 +290,8 @@ private struct BidPackageDetailView: View {
             .padding(.vertical, 5)
         }
         .buttonStyle(.plain)
-        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+        .contextMenu {
             Button { bidToAward = bid; showingAwardActions = true } label: { Label("Award", systemImage: "checkmark.seal") }
-                .tint(AppTheme.positive)
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) { delete(bid) } label: { Label("Delete", systemImage: "trash") }
         }
     }

@@ -45,7 +45,7 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 12) {
                     header
                     quickActions
                     progressCard
@@ -107,14 +107,11 @@ struct DashboardView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: AppTheme.Space.xs) {
-            Text("DASHBOARD")
-                .font(AppFont.eyebrow)
-                .tracking(1.2)
-                .foregroundStyle(AppTheme.brand)
-
             Text(project.name)
-                .font(AppFont.largeTitle)
+                .font(.title2.weight(.bold))
                 .foregroundStyle(AppTheme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
 
             HStack(spacing: 6) {
                 Image(systemName: "mappin.and.ellipse")
@@ -172,10 +169,10 @@ struct DashboardView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.top, 4)
+            .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, AppTheme.Space.xs)
+        .padding(.top, 4)
     }
 
     @ViewBuilder
@@ -314,8 +311,8 @@ struct DashboardView: View {
             navigateToTarget(.budget())
         } label: {
             PremiumCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("Budget Progress")
                                 .font(.headline.weight(.semibold))
@@ -335,7 +332,7 @@ struct DashboardView: View {
                         tint: viewModel.budgetProgress > 1 ? AppTheme.negative : AppTheme.brand
                     )
 
-                    HStack {
+                    HStack(spacing: 8) {
                         Label("Invoiced \(viewModel.actualSpent.compactCurrencyString)", systemImage: "circle.fill")
                             .foregroundStyle(AppTheme.positive)
                         Spacer()
@@ -418,10 +415,9 @@ struct DashboardView: View {
                             title: "\(pendingChanges.compactCurrencyString) pending changes",
                             subtitle: "Approve, reject, or keep tracking exposure",
                             systemImage: "arrow.triangle.2.circlepath",
-                            tint: AppTheme.info
-                        ) {
-                            navigateToTarget(.tab(.more))
-                        }
+                            tint: AppTheme.info,
+                            destination: AnyView(ChangeOrdersView(project: project))
+                        )
                     }
 
                     if allowanceOverage > 0 {
@@ -440,10 +436,9 @@ struct DashboardView: View {
                             title: "\(overdueTaskCount) overdue \(overdueTaskCount == 1 ? "task" : "tasks")",
                             subtitle: "Review open punch list items past due",
                             systemImage: "checklist",
-                            tint: AppTheme.negative
-                        ) {
-                            navigateToTarget(.tab(.more))
-                        }
+                            tint: AppTheme.negative,
+                            destination: AnyView(TasksView(project: project))
+                        )
                     }
 
                     if unassignedCount > 0 {
@@ -704,7 +699,7 @@ private struct CashFlowCard: View {
 
     var body: some View {
         PremiumCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Cash Flow")
@@ -732,7 +727,7 @@ private struct CashFlowCard: View {
 
                 if hasFutureDebt {
                     CashFlowMiniChart(days: days)
-                        .frame(height: 134)
+                        .frame(height: 104)
 
                     HStack(spacing: 8) {
                         CashFlowMiniStat(title: "Paid", value: paidTotal.compactCurrencyString, tint: AppTheme.positive)
@@ -1164,27 +1159,25 @@ private struct DashboardActionLabel: View {
     let systemImage: String
 
     var body: some View {
-        HStack(spacing: 10) {
+        VStack(spacing: 6) {
             Image(systemName: systemImage)
-                .font(.headline.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AppTheme.brand)
-                .frame(width: 32, height: 32)
+                .frame(width: 28, height: 28)
                 .background(
                     RoundedRectangle(cornerRadius: AppTheme.Radius.sm, style: .continuous)
                         .fill(AppTheme.brandSoft)
                 )
 
             Text(title)
-                .font(AppFont.subheadline.weight(.semibold))
+                .font(AppFont.caption.weight(.bold))
                 .foregroundStyle(AppTheme.ink)
-
-            Spacer(minLength: 0)
-
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(AppTheme.inkTertiary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
-        .padding(AppTheme.Space.sm)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 6)
         .background(
             RoundedRectangle(cornerRadius: AppTheme.Radius.md, style: .continuous)
                 .fill(AppTheme.surface)
@@ -1237,36 +1230,80 @@ private struct DashboardAttentionRow: View {
     let subtitle: String
     let systemImage: String
     let tint: Color
-    let action: () -> Void
+    let destination: AnyView?
+    let action: (() -> Void)?
+
+    init(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        tint: Color,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.systemImage = systemImage
+        self.tint = tint
+        destination = nil
+        self.action = action
+    }
+
+    init(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        tint: Color,
+        destination: AnyView
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.systemImage = systemImage
+        self.tint = tint
+        self.destination = destination
+        action = nil
+    }
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: systemImage)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(tint)
-                    .frame(width: 30, height: 30)
-                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
+        if let destination {
+            NavigationLink {
+                destination
+            } label: {
+                content
             }
-            .padding(.vertical, 2)
+            .buttonStyle(.plain)
+        } else {
+            Button(action: action ?? {}) {
+                content
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+    }
+
+    private var content: some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(tint)
+                .frame(width: 30, height: 30)
+                .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
     }
 }
 

@@ -196,13 +196,6 @@ struct PortfolioView: View {
         .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button(role: .destructive) {
-                projectPendingDelete = ProjectDeleteCandidate(project: project)
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
         .contextMenu {
             Button(role: .destructive) {
                 projectPendingDelete = ProjectDeleteCandidate(project: project)

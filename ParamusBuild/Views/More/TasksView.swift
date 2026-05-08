@@ -91,7 +91,6 @@ struct TasksView: View {
                 .accessibilityLabel("Add Task")
             }
         }
-        .primaryFloatingAction(title: "Task", systemImage: "plus") { showingAddTask = true }
         .sheet(isPresented: $showingAddTask) { AddTaskView(project: project) }
         .sheet(item: $taskToEdit) { task in AddTaskView(project: project, task: task) }
         .fullScreenCover(isPresented: $showingWalkthrough) { TaskWalkthroughView(project: project) }
@@ -143,7 +142,9 @@ struct TasksView: View {
             }
             .buttonStyle(.plain)
         }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+        .contextMenu {
+            Button { taskToEdit = task } label: { Label("Edit", systemImage: "pencil") }
+            Button { cycleStatus(for: task) } label: { Label("Advance Status", systemImage: task.status.systemImage) }
             Button(role: .destructive) { delete(task) } label: { Label("Delete", systemImage: "trash") }
         }
     }

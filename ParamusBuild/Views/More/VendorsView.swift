@@ -28,7 +28,14 @@ struct VendorsView: View {
                             vendorIDToEdit = vendor.id
                             showingEditVendor = true
                         }
-                        .swipeActions {
+                        .contextMenu {
+                            Button {
+                                vendorIDToEdit = vendor.id
+                                showingEditVendor = true
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+
                             Button(role: .destructive) {
                                 deleteVendor(withID: vendor.id)
                             } label: {

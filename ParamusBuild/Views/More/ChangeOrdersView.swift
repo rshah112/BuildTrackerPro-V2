@@ -62,7 +62,13 @@ struct ChangeOrdersView: View {
                             .onTapGesture {
                                 editChangeOrder(withID: row.id)
                             }
-                            .swipeActions {
+                            .contextMenu {
+                                Button {
+                                    editChangeOrder(withID: row.id)
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+
                                 Button(role: .destructive) {
                                     deleteChangeOrder(withID: row.id)
                                 } label: {

@@ -224,21 +224,12 @@ struct BudgetView: View {
                     } label: {
                         BudgetLineRow(item: item, roomName: displayRoom(for: item))
                     }
-                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    .contextMenu {
                         Button {
                             Haptics.lightTap()
                             setPinned(!item.isPinned, forItemID: item.id)
                         } label: {
                             Label(item.isPinned ? "Unpin" : "Pin", systemImage: item.isPinned ? "pin.slash" : "pin")
-                        }
-                        .tint(.blue)
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            Haptics.lightTap()
-                            deleteItem(withID: item.id)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
                         }
 
                         Button {
@@ -247,7 +238,13 @@ struct BudgetView: View {
                         } label: {
                             Label("Review", systemImage: "flag")
                         }
-                        .tint(AppTheme.warning)
+
+                        Button(role: .destructive) {
+                            Haptics.lightTap()
+                            deleteItem(withID: item.id)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 }
             }

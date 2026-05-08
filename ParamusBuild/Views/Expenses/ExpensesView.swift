@@ -132,16 +132,20 @@ struct ExpensesView: View {
                                 .onTapGesture {
                                     editExpense(withID: row.id)
                                 }
-                                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                .contextMenu {
+                                    Button {
+                                        editExpense(withID: row.id)
+                                    } label: {
+                                        Label("Edit", systemImage: "pencil")
+                                    }
+
                                     Button {
                                         Haptics.lightTap()
                                         queuePaidChange(!row.isPaid, forExpenseID: row.id)
                                     } label: {
                                         Label(row.isPaid ? "Unpaid" : "Paid", systemImage: row.isPaid ? "clock" : "checkmark.circle")
                                     }
-                                    .tint(row.isPaid ? AppTheme.warning : AppTheme.positive)
-                                }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+
                                     Button(role: .destructive) {
                                         deleteExpense(withID: row.id)
                                     } label: {
