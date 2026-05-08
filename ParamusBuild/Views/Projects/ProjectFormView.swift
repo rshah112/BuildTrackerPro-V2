@@ -17,6 +17,7 @@ struct ProjectFormView: View {
     @State private var targetFinishDate = Date()
     @State private var scopeSummary = ""
     @State private var purchasePrice = 0.0
+    @State private var squareFootage = 0.0
     @State private var lotDimensions = ""
     @State private var proposedBuildDimensions = ""
     @State private var stories = 2
@@ -213,6 +214,14 @@ struct ProjectFormView: View {
                 if let purchasePriceLabel = setupProfile.purchasePriceLabel {
                     ModernField(purchasePriceLabel) {
                         CurrencyField(value: $purchasePrice)
+                            .modernTextField()
+                    }
+                }
+
+                if setupProfile.proposedDimensionsLabel != nil {
+                    ModernField("Square footage") {
+                        TextField("0", value: $squareFootage, format: .number.precision(.fractionLength(0)))
+                            .keyboardType(.decimalPad)
                             .modernTextField()
                     }
                 }
@@ -543,6 +552,7 @@ struct ProjectFormView: View {
             priority: priority,
             templateType: selectedTemplateType,
             purchasePrice: setupProfile.purchasePriceLabel == nil ? 0 : purchasePrice,
+            squareFootage: squareFootage > 0 ? squareFootage : nil,
             lotDimensions: setupProfile.lotDimensionsLabel == nil ? "" : lotDimensions.trimmed,
             proposedBuildDimensions: setupProfile.proposedDimensionsLabel == nil ? "" : proposedBuildDimensions.trimmed,
             footprint: proposedBuildDimensions.trimmed,

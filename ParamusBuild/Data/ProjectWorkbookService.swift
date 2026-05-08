@@ -112,6 +112,7 @@ enum ProjectWorkbookService {
             case "Scope Summary": project.scopeSummary = value
             case "Warranty / Follow-Up": project.warrantyNotes = value
             case "Purchase Price": project.purchasePrice = Double(value) ?? project.purchasePrice
+            case "Square Footage": project.squareFootage = Double(value)
             case "Lot Dimensions": project.lotDimensions = value
             case "Proposed Build Dimensions":
                 project.proposedBuildDimensions = value
@@ -357,6 +358,7 @@ enum ProjectWorkbookService {
             [.text("Scope Summary"), .text(project.scopeSummary)],
             [.text("Warranty / Follow-Up"), .text(project.warrantyNotes)],
             [.text("Purchase Price"), .currency(project.purchasePrice)],
+            [.text("Square Footage"), project.squareFootage.map { .number($0) } ?? .text("")],
             [.text("Lot Dimensions"), .text(project.lotDimensions)],
             [.text("Proposed Build Dimensions"), .text(project.proposedBuildDimensions)],
             [.text("Stories"), .number(Double(project.stories))],

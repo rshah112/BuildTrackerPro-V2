@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2A00010100000000000000A9 /* PortfolioInsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000A9 /* PortfolioInsightsView.swift */; };
+		2A00010100000000000000A8 /* InsightsPDFService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000A8 /* InsightsPDFService.swift */; };
 		2A00010100000000000000A7 /* BidsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000A7 /* BidsView.swift */; };
 		2A00010100000000000000A6 /* Bid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000A6 /* Bid.swift */; };
 		2A00010100000000000000A5 /* BidPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000A5 /* BidPackage.swift */; };
@@ -68,6 +70,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		2A00020100000000000000A9 /* PortfolioInsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortfolioInsightsView.swift; sourceTree = "<group>"; };
+		2A00020100000000000000A8 /* InsightsPDFService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsPDFService.swift; sourceTree = "<group>"; };
 		2A00020100000000000000A7 /* BidsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BidsView.swift; sourceTree = "<group>"; };
 		2A00020100000000000000A6 /* Bid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bid.swift; sourceTree = "<group>"; };
 		2A00020100000000000000A5 /* BidPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BidPackage.swift; sourceTree = "<group>"; };
@@ -203,6 +207,7 @@
 				2A000201000000000000009C /* MediaStorageService.swift */,
 				2A000201000000000000009E /* CashFlowService.swift */,
 				2A00020100000000000000A3 /* RoomCatalog.swift */,
+				2A00020100000000000000A8 /* InsightsPDFService.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -242,6 +247,7 @@
 				2A0004010000000000000014 /* Photos */,
 				2A0004010000000000000015 /* More */,
 				2A0004010000000000000016 /* Projects */,
+				2A00020100000000000000A9 /* PortfolioInsightsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -439,6 +445,8 @@
 				2A00010100000000000000A2 /* TasksView.swift in Sources */,
 				2A00010100000000000000A4 /* RoomSummaryView.swift in Sources */,
 				2A00010100000000000000A7 /* BidsView.swift in Sources */,
+				2A00010100000000000000A9 /* PortfolioInsightsView.swift in Sources */,
+				2A00010100000000000000A8 /* InsightsPDFService.swift in Sources */,
 				2A0001010000000000000020 /* ProjectInfoView.swift in Sources */,
 				2A0001010000000000000021 /* SettingsView.swift in Sources */,
 				2A0001010000000000000023 /* ProjectDocument.swift in Sources */,

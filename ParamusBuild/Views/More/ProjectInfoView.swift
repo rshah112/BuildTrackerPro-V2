@@ -20,6 +20,7 @@ struct ProjectInfoView: View {
     @State private var scopeSummary: String
     @State private var warrantyNotes: String
     @State private var purchasePrice: Double
+    @State private var squareFootage: Double
     @State private var lotDimensions: String
     @State private var proposedBuildDimensions: String
     @State private var footprint: String
@@ -44,6 +45,7 @@ struct ProjectInfoView: View {
         _scopeSummary = State(initialValue: project.scopeSummary)
         _warrantyNotes = State(initialValue: project.warrantyNotes)
         _purchasePrice = State(initialValue: project.purchasePrice)
+        _squareFootage = State(initialValue: project.squareFootage ?? 0)
         _lotDimensions = State(initialValue: project.lotDimensions)
         _proposedBuildDimensions = State(initialValue: project.proposedBuildDimensions)
         _footprint = State(initialValue: project.footprint)
@@ -129,6 +131,12 @@ struct ProjectInfoView: View {
             ModernFormSection("Baseline") {
                 ModernField("Purchase price") {
                     CurrencyField(value: $purchasePrice)
+                        .modernTextField()
+                }
+
+                ModernField("Square footage") {
+                    TextField("0", value: $squareFootage, format: .number.precision(.fractionLength(0)))
+                        .keyboardType(.decimalPad)
                         .modernTextField()
                 }
 
@@ -218,6 +226,7 @@ struct ProjectInfoView: View {
         project.scopeSummary = scopeSummary.trimmed
         project.warrantyNotes = warrantyNotes.trimmed
         project.purchasePrice = max(0, purchasePrice)
+        project.squareFootage = squareFootage > 0 ? squareFootage : nil
         project.lotDimensions = lotDimensions.trimmed
         project.proposedBuildDimensions = proposedBuildDimensions.trimmed
         project.footprint = proposedBuildDimensions.trimmed.isEmpty ? footprint.trimmed : proposedBuildDimensions.trimmed

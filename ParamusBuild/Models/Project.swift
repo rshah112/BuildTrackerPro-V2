@@ -59,6 +59,7 @@ final class Project {
     var priorityRawValue: String = ProjectPriority.normal.rawValue
     var templateTypeRawValue: String = ProjectTemplateType.custom.rawValue
     var purchasePrice: Double = 0
+    var squareFootage: Double?
     var lotDimensions: String = ""
     var proposedBuildDimensions: String = ""
     var footprint: String
@@ -80,6 +81,7 @@ final class Project {
         priority: ProjectPriority = .normal,
         templateType: ProjectTemplateType = .custom,
         purchasePrice: Double = 0,
+        squareFootage: Double? = nil,
         lotDimensions: String = "",
         proposedBuildDimensions: String = "",
         footprint: String,
@@ -100,6 +102,7 @@ final class Project {
         priorityRawValue = priority.rawValue
         templateTypeRawValue = templateType.rawValue
         self.purchasePrice = purchasePrice
+        self.squareFootage = squareFootage
         self.lotDimensions = lotDimensions
         self.proposedBuildDimensions = proposedBuildDimensions
         self.footprint = footprint

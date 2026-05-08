@@ -11,6 +11,7 @@ struct PortfolioView: View {
     @State private var metricsByProjectID: [UUID: ProjectCardMetrics] = [:]
     @State private var statusFilter: ProjectStatus?
     @State private var priorityFilter: ProjectPriority?
+    @State private var showingInsights = false
 
     private var portfolioOpenTotal: Double {
         metricsByProjectID.values.reduce(0) { $0 + $1.openInvoiceTotal }
@@ -29,153 +30,186 @@ struct PortfolioView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    VStack(alignment: .leading, spacing: AppTheme.Space.xs) {
-                        Text("PORTFOLIO")
-                            .font(AppFont.eyebrow)
-                            .tracking(1.2)
-                            .foregroundStyle(AppTheme.brand)
+            portfolioList
+        }
+    }
 
-                        Text("HomeBuild Pro")
-                            .font(AppFont.largeTitle)
-                            .foregroundStyle(AppTheme.ink)
+    private var portfolioList: AnyView {
+        AnyView(List {
+            portfolioHeaderSection
 
-                        Text("Track every dollar, photo and document across your builds.")
-                            .font(AppFont.subheadline)
-                            .foregroundStyle(AppTheme.inkSecondary)
-                    }
-                    .padding(.vertical, AppTheme.Space.xs)
-                }
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+            if !projects.isEmpty {
+                portfolioSummarySection
+                portfolioFiltersSection
+            }
 
-                if !projects.isEmpty {
-                    Section {
-                        HStack(spacing: 10) {
-                            PortfolioSummaryTile(title: "Projects", value: "\(projects.count)", systemImage: "house")
-                            PortfolioSummaryTile(
-                                title: "Budget",
-                                value: projects.reduce(0) { $0 + $1.constructionBudget }.compactCurrencyString,
-                                systemImage: "banknote"
-                            )
-                            PortfolioSummaryTile(title: "Open", value: portfolioOpenTotal.compactCurrencyString, systemImage: "clock")
-                        }
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
-                        .listRowBackground(Color.clear)
-                    }
+            projectsSection
+        }
+        .listStyle(.insetGrouped)
+        .environment(\.defaultMinListRowHeight, 0)
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.pageBackground)
+        .navigationTitle("Projects")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showingInsights = true } label: {
+                    Image(systemName: "chart.xyaxis.line")
                 }
-
-                if !projects.isEmpty {
-                    Section {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(ProjectStatus.allCases) { status in
-                                    PortfolioFilterChip(
-                                        title: status.title,
-                                        systemImage: status.systemImage,
-                                        tint: AppTheme.projectStatusColor(status),
-                                        isSelected: statusFilter == status
-                                    ) {
-                                        statusFilter = (statusFilter == status) ? nil : status
-                                    }
-                                }
-                                Divider().frame(height: 18).padding(.horizontal, 4)
-                                ForEach(ProjectPriority.allCases.filter { $0 != .normal }) { priority in
-                                    PortfolioFilterChip(
-                                        title: priority.title,
-                                        systemImage: "flag.fill",
-                                        tint: AppTheme.projectPriorityColor(priority),
-                                        isSelected: priorityFilter == priority
-                                    ) {
-                                        priorityFilter = (priorityFilter == priority) ? nil : priority
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                        }
-                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 6, trailing: 0))
-                        .listRowBackground(Color.clear)
-                    }
-                }
-
-                Section("Projects") {
-                    if projects.isEmpty {
-                        EmptyStateView(
-                            title: "No projects",
-                            subtitle: "Create your first build to start tracking.",
-                            systemImage: "house.badge.plus"
-                        )
-                    } else if filteredProjects.isEmpty {
-                        EmptyStateView(
-                            title: "No matches",
-                            subtitle: "Clear filters to see all projects.",
-                            systemImage: "line.3.horizontal.decrease.circle"
-                        )
-                    } else {
-                        ForEach(filteredProjects) { project in
-                            NavigationLink {
-                                RootTabView(project: project) { projectID in
-                                    deleteProject(withID: projectID)
-                                }
-                                .navigationBarBackButtonHidden(true)
-                            } label: {
-                                ProjectCardRow(
-                                    project: project,
-                                    metrics: metricsByProjectID[project.id, default: .empty]
-                                )
-                            }
-                            .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    projectPendingDelete = ProjectDeleteCandidate(project: project)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    projectPendingDelete = ProjectDeleteCandidate(project: project)
-                                } label: {
-                                    Label("Delete Project", systemImage: "trash")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            .listStyle(.insetGrouped)
-            .environment(\.defaultMinListRowHeight, 0)
-            .scrollContentBackground(.hidden)
-            .background(AppTheme.pageBackground)
-            .navigationTitle("Projects")
-            .onAppear {
-                refreshProjectMetrics()
-            }
-            .onChange(of: projects.map(\.id)) { _, _ in
-                refreshProjectMetrics()
-            }
-            .primaryFloatingAction(title: "Project") {
-                showingAddProject = true
-            }
-            .sheet(isPresented: $showingAddProject, onDismiss: refreshProjectMetrics) {
-                ProjectFormView()
-            }
-            .alert("Delete Project?", isPresented: deleteAlertBinding, presenting: projectPendingDelete) { project in
-                Button("Delete", role: .destructive) {
-                    deleteProject(withID: project.id)
-                }
-                Button("Cancel", role: .cancel) {
-                    projectPendingDelete = nil
-                }
-            } message: { project in
-                Text(
-                    "This permanently removes \(project.name), including its budget, expenses, photos, documents, vendors and change orders."
-                )
+                .accessibilityLabel("Portfolio Insights")
+                .disabled(projects.isEmpty)
             }
         }
+        .sheet(isPresented: $showingInsights) {
+            PortfolioInsightsView()
+        }
+        .onAppear {
+            refreshProjectMetrics()
+        }
+        .onChange(of: projects.map(\.id)) { _, _ in
+            refreshProjectMetrics()
+        }
+        .primaryFloatingAction(title: "Project") {
+            showingAddProject = true
+        }
+        .sheet(isPresented: $showingAddProject, onDismiss: refreshProjectMetrics) {
+            ProjectFormView()
+        }
+        .alert("Delete Project?", isPresented: deleteAlertBinding, presenting: projectPendingDelete) { project in
+            Button("Delete", role: .destructive) {
+                deleteProject(withID: project.id)
+            }
+            Button("Cancel", role: .cancel) {
+                projectPendingDelete = nil
+            }
+        } message: { project in
+            Text(
+                "This permanently removes \(project.name), including its budget, expenses, photos, documents, vendors and change orders."
+            )
+        })
+    }
+
+    private var portfolioHeaderSection: AnyView {
+        AnyView(Section {
+            VStack(alignment: .leading, spacing: AppTheme.Space.xs) {
+                Text("PORTFOLIO")
+                    .font(AppFont.eyebrow)
+                    .tracking(1.2)
+                    .foregroundStyle(AppTheme.brand)
+
+                Text("HomeBuild Pro")
+                    .font(AppFont.largeTitle)
+                    .foregroundStyle(AppTheme.ink)
+
+                Text("Track every dollar, photo and document across your builds.")
+                    .font(AppFont.subheadline)
+                    .foregroundStyle(AppTheme.inkSecondary)
+            }
+            .padding(.vertical, AppTheme.Space.xs)
+        }
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden))
+    }
+
+    private var portfolioSummarySection: AnyView {
+        AnyView(Section {
+            HStack(spacing: 10) {
+                PortfolioSummaryTile(title: "Projects", value: "\(projects.count)", systemImage: "house")
+                PortfolioSummaryTile(
+                    title: "Budget",
+                    value: projects.reduce(0) { $0 + $1.constructionBudget }.compactCurrencyString,
+                    systemImage: "banknote"
+                )
+                PortfolioSummaryTile(title: "Open", value: portfolioOpenTotal.compactCurrencyString, systemImage: "clock")
+            }
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+            .listRowBackground(Color.clear)
+        })
+    }
+
+    private var portfolioFiltersSection: AnyView {
+        AnyView(Section {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(ProjectStatus.allCases) { status in
+                        PortfolioFilterChip(
+                            title: status.title,
+                            systemImage: status.systemImage,
+                            tint: AppTheme.projectStatusColor(status),
+                            isSelected: statusFilter == status
+                        ) {
+                            statusFilter = (statusFilter == status) ? nil : status
+                        }
+                    }
+                    Divider().frame(height: 18).padding(.horizontal, 4)
+                    ForEach(ProjectPriority.allCases.filter { $0 != .normal }) { priority in
+                        PortfolioFilterChip(
+                            title: priority.title,
+                            systemImage: "flag.fill",
+                            tint: AppTheme.projectPriorityColor(priority),
+                            isSelected: priorityFilter == priority
+                        ) {
+                            priorityFilter = (priorityFilter == priority) ? nil : priority
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 6, trailing: 0))
+            .listRowBackground(Color.clear)
+        })
+    }
+
+    private var projectsSection: AnyView {
+        AnyView(Section("Projects") {
+            if projects.isEmpty {
+                EmptyStateView(
+                    title: "No projects",
+                    subtitle: "Create your first build to start tracking.",
+                    systemImage: "house.badge.plus"
+                )
+            } else if filteredProjects.isEmpty {
+                EmptyStateView(
+                    title: "No matches",
+                    subtitle: "Clear filters to see all projects.",
+                    systemImage: "line.3.horizontal.decrease.circle"
+                )
+            } else {
+                ForEach(filteredProjects) { project in
+                    projectRow(project)
+                }
+            }
+        })
+    }
+
+    private func projectRow(_ project: Project) -> AnyView {
+        AnyView(NavigationLink {
+            RootTabView(project: project) { projectID in
+                deleteProject(withID: projectID)
+            }
+            .navigationBarBackButtonHidden(true)
+        } label: {
+            ProjectCardRow(
+                project: project,
+                metrics: metricsByProjectID[project.id, default: .empty]
+            )
+        }
+        .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                projectPendingDelete = ProjectDeleteCandidate(project: project)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .contextMenu {
+            Button(role: .destructive) {
+                projectPendingDelete = ProjectDeleteCandidate(project: project)
+            } label: {
+                Label("Delete Project", systemImage: "trash")
+            }
+        })
     }
 
     private var deleteAlertBinding: Binding<Bool> {
@@ -197,7 +231,11 @@ struct PortfolioView: View {
             let vendors = try fetchAllForDelete(Vendor.self, projectID: projectID)
             let photos = try fetchAllForDelete(PhotoAttachment.self, projectID: projectID)
             let documents = try fetchAllForDelete(ProjectDocument.self, projectID: projectID)
+            let allowanceSelections = try fetchAllForDelete(AllowanceSelection.self, projectID: projectID)
+            let tasks = try fetchAllForDelete(ProjectTask.self, projectID: projectID)
             let changeOrders = try fetchAllForDelete(ChangeOrder.self, projectID: projectID)
+            let bidPackages = try fetchAllForDelete(BidPackage.self, projectID: projectID)
+            let bids = try fetchAllForDelete(Bid.self, projectID: projectID)
             let project = try fetchProject(withID: projectID)
             let projectMediaFolder = project.map(MediaStorageService.projectFolder(project:))
 
@@ -207,7 +245,11 @@ struct PortfolioView: View {
             vendors.forEach(modelContext.delete)
             photos.forEach(modelContext.delete)
             documents.forEach(modelContext.delete)
+            allowanceSelections.forEach(modelContext.delete)
+            tasks.forEach(modelContext.delete)
             changeOrders.forEach(modelContext.delete)
+            bidPackages.forEach(modelContext.delete)
+            bids.forEach(modelContext.delete)
             if let project {
                 modelContext.delete(project)
             }

@@ -464,6 +464,10 @@ extension Vendor: ProjectScoped {}
 extension PhotoAttachment: ProjectScoped {}
 extension ChangeOrder: ProjectScoped {}
 extension ProjectDocument: ProjectScoped {}
+extension AllowanceSelection: ProjectScoped {}
+extension ProjectTask: ProjectScoped {}
+extension BidPackage: ProjectScoped {}
+extension Bid: ProjectScoped {}
 
 private struct CategorySeed {
     let name: String
