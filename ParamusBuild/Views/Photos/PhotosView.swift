@@ -20,6 +20,7 @@ struct PhotosView: View {
     @State private var showingEditPhoto = false
     @State private var selectedPhoto: PhotoAttachment?
     @State private var photoIDToEdit: UUID?
+    @State private var taskPhotoID: UUID?
     @State private var newestFirst = true
     @State private var selectedFolder = "All"
     @State private var libraryMode: PhotoLibraryMode = .folders
@@ -153,6 +154,9 @@ struct PhotosView: View {
                 if let photoIDToEdit, let photoToEdit = fetchPhoto(withID: photoIDToEdit) {
                     AddPhotoView(project: project, photo: photoToEdit)
                 }
+            }
+            .sheet(item: taskPhotoBinding) { photoID in
+                AddTaskView(project: project, seedPhotoID: photoID.id)
             }
             .fullScreenCover(item: $selectedPhoto) { photo in
                 PhotoViewer(photo: photo)
@@ -293,6 +297,12 @@ struct PhotosView: View {
                             Label("Edit", systemImage: "pencil")
                         }
 
+                        Button {
+                            taskPhotoID = photo.id
+                        } label: {
+                            Label("Create Task", systemImage: "checklist")
+                        }
+
                         Button(role: .destructive) {
                             deletePhoto(withID: photo.id)
                         } label: {
@@ -301,6 +311,13 @@ struct PhotosView: View {
                     }
             }
         }
+    }
+
+    private var taskPhotoBinding: Binding<TaskPhotoSeed?> {
+        Binding(
+            get: { taskPhotoID.map(TaskPhotoSeed.init(id:)) },
+            set: { seed in taskPhotoID = seed?.id }
+        )
     }
 
     private func deletePhoto(withID photoID: UUID) {
@@ -323,6 +340,10 @@ struct PhotosView: View {
         )
         return try? modelContext.fetch(descriptor).first
     }
+}
+
+private struct TaskPhotoSeed: Identifiable {
+    let id: UUID
 }
 
 private struct PhotoGridTile: View {

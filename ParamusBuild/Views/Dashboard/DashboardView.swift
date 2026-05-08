@@ -12,6 +12,7 @@ struct DashboardView: View {
     @Query private var photos: [PhotoAttachment]
     @Query private var changeOrders: [ChangeOrder]
     @Query private var allowanceSelections: [AllowanceSelection]
+    @Query private var tasks: [ProjectTask]
 
     init(project: Project, navigateToTarget: @escaping (ProjectNavigationTarget) -> Void = { _ in }) {
         self.project = project
@@ -26,6 +27,7 @@ struct DashboardView: View {
             sort: \.selectionDate,
             order: .reverse
         )
+        _tasks = Query(filter: #Predicate<ProjectTask> { $0.projectID == projectID }, sort: \.createdAt, order: .reverse)
     }
 
     private var viewModel: DashboardViewModel {
@@ -35,7 +37,8 @@ struct DashboardView: View {
             expenses: expenses,
             photos: photos,
             changeOrders: changeOrders,
-            allowanceSelections: allowanceSelections
+            allowanceSelections: allowanceSelections,
+            tasks: tasks
         )
     }
 
@@ -224,7 +227,7 @@ struct DashboardView: View {
     }
 
     private var quickActions: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
             NavigationLink {
                 DocumentsView(project: project)
             } label: {
@@ -235,6 +238,12 @@ struct DashboardView: View {
                 ChangeOrdersView(project: project)
             } label: {
                 DashboardActionLabel(title: "Changes", systemImage: "arrow.triangle.2.circlepath")
+            }
+
+            NavigationLink {
+                TasksView(project: project)
+            } label: {
+                DashboardActionLabel(title: "Tasks", systemImage: "checklist")
             }
         }
     }
@@ -365,9 +374,13 @@ struct DashboardView: View {
         let openInvoices = viewModel.openInvoiceTotal
         let pendingChanges = viewModel.pendingExposure
         let allowanceOverage = viewModel.allowanceOverage
+        let overdueTaskCount = viewModel.overdueTasks.count
         let unassignedCount = viewModel.unassignedExpenses.count
 
-        if overBudgetCount > 0 || openInvoices > 0 || pendingChanges > 0 || allowanceOverage > 0 || unassignedCount > 0 {
+        if overBudgetCount > 0 || openInvoices > 0 || pendingChanges > 0 || allowanceOverage > 0 || overdueTaskCount > 0 ||
+            unassignedCount >
+            0
+        {
             PremiumCard {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
@@ -419,6 +432,17 @@ struct DashboardView: View {
                             tint: AppTheme.negative
                         ) {
                             navigateToTarget(.budget())
+                        }
+                    }
+
+                    if overdueTaskCount > 0 {
+                        DashboardAttentionRow(
+                            title: "\(overdueTaskCount) overdue \(overdueTaskCount == 1 ? "task" : "tasks")",
+                            subtitle: "Review open punch list items past due",
+                            systemImage: "checklist",
+                            tint: AppTheme.negative
+                        ) {
+                            navigateToTarget(.tab(.more))
                         }
                     }
 

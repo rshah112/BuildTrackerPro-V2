@@ -14,6 +14,8 @@
 		2A0001010000000000000005 /* BudgetLineItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000005 /* BudgetLineItem.swift */; };
 		2A0001010000000000000006 /* Expense.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000006 /* Expense.swift */; };
 		2A00010100000000000000A0 /* AllowanceSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000A0 /* AllowanceSelection.swift */; };
+		2A00010100000000000000A1 /* ProjectTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000A1 /* ProjectTask.swift */; };
+		2A00010100000000000000A2 /* TasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000A2 /* TasksView.swift */; };
 		2A0001010000000000000007 /* Vendor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000007 /* Vendor.swift */; };
 		2A0001010000000000000008 /* PhotoAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000008 /* PhotoAttachment.swift */; };
 		2A0001010000000000000009 /* ChangeOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0002010000000000000009 /* ChangeOrder.swift */; };
@@ -68,6 +70,8 @@
 		2A0002010000000000000005 /* BudgetLineItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetLineItem.swift; sourceTree = "<group>"; };
 		2A0002010000000000000006 /* Expense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Expense.swift; sourceTree = "<group>"; };
 		2A00020100000000000000A0 /* AllowanceSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllowanceSelection.swift; sourceTree = "<group>"; };
+		2A00020100000000000000A1 /* ProjectTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTask.swift; sourceTree = "<group>"; };
+		2A00020100000000000000A2 /* TasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksView.swift; sourceTree = "<group>"; };
 		2A0002010000000000000007 /* Vendor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Vendor.swift; sourceTree = "<group>"; };
 		2A0002010000000000000008 /* PhotoAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoAttachment.swift; sourceTree = "<group>"; };
 		2A0002010000000000000009 /* ChangeOrder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeOrder.swift; sourceTree = "<group>"; };
@@ -166,6 +170,7 @@
 				2A0002010000000000000005 /* BudgetLineItem.swift */,
 				2A0002010000000000000006 /* Expense.swift */,
 				2A00020100000000000000A0 /* AllowanceSelection.swift */,
+				2A00020100000000000000A1 /* ProjectTask.swift */,
 				2A0002010000000000000007 /* Vendor.swift */,
 				2A0002010000000000000008 /* PhotoAttachment.swift */,
 				2A0002010000000000000009 /* ChangeOrder.swift */,
@@ -288,6 +293,7 @@
 				2A000201000000000000001D /* MoreView.swift */,
 				2A000201000000000000001E /* VendorsView.swift */,
 				2A000201000000000000001F /* ChangeOrdersView.swift */,
+				2A00020100000000000000A2 /* TasksView.swift */,
 				2A0002010000000000000020 /* ProjectInfoView.swift */,
 				2A0002010000000000000021 /* SettingsView.swift */,
 				2A0002010000000000000026 /* DocumentsView.swift */,
@@ -380,6 +386,7 @@
 				2A0001010000000000000005 /* BudgetLineItem.swift in Sources */,
 				2A0001010000000000000006 /* Expense.swift in Sources */,
 				2A00010100000000000000A0 /* AllowanceSelection.swift in Sources */,
+				2A00010100000000000000A1 /* ProjectTask.swift in Sources */,
 				2A0001010000000000000007 /* Vendor.swift in Sources */,
 				2A0001010000000000000008 /* PhotoAttachment.swift in Sources */,
 				2A0001010000000000000009 /* ChangeOrder.swift in Sources */,
@@ -411,6 +418,7 @@
 				2A000101000000000000001D /* MoreView.swift in Sources */,
 				2A000101000000000000001E /* VendorsView.swift in Sources */,
 				2A000101000000000000001F /* ChangeOrdersView.swift in Sources */,
+				2A00010100000000000000A2 /* TasksView.swift in Sources */,
 				2A0001010000000000000020 /* ProjectInfoView.swift in Sources */,
 				2A0001010000000000000021 /* SettingsView.swift in Sources */,
 				2A0001010000000000000023 /* ProjectDocument.swift in Sources */,

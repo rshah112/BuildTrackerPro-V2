@@ -7,6 +7,7 @@ struct DashboardViewModel {
     let photos: [PhotoAttachment]
     let changeOrders: [ChangeOrder]
     let allowanceSelections: [AllowanceSelection]
+    let tasks: [ProjectTask]
 
     private var constructionItems: [BudgetLineItem] {
         items.filter { !Self.isContingency($0.categoryName) }
@@ -106,6 +107,10 @@ struct DashboardViewModel {
 
     var pendingExposure: Double {
         BudgetMathService.pendingExposure(changeOrders: constructionChangeOrders)
+    }
+
+    var overdueTasks: [ProjectTask] {
+        tasks.filter(\.isOverdue)
     }
 
     var unassignedExpenses: [Expense] {

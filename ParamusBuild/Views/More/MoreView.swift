@@ -11,6 +11,7 @@ struct MoreView: View {
     @State private var showingDeleteAlert = false
     @State private var documentCount = 0
     @State private var photoCount = 0
+    @State private var taskCount = 0
 
     init(project: Project, closeProject: @escaping () -> Void, deleteProject: @escaping (UUID) -> Void) {
         self.project = project
@@ -107,6 +108,12 @@ struct MoreView: View {
                     }
 
                     NavigationLink {
+                        TasksView(project: project)
+                    } label: {
+                        MoreRow(title: "Tasks", subtitle: "\(taskCount) punch list items", systemImage: "checklist")
+                    }
+
+                    NavigationLink {
                         SettingsView()
                     } label: {
                         MoreRow(title: "Settings", subtitle: "Display and jobsite preferences", systemImage: "gearshape")
@@ -118,6 +125,8 @@ struct MoreView: View {
                         Label("\(photoCount) photos", systemImage: "photo")
                         Spacer()
                         Label("\(documentCount) documents", systemImage: "doc")
+                        Spacer()
+                        Label("\(taskCount) tasks", systemImage: "checklist")
                     }
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -170,6 +179,7 @@ struct MoreView: View {
     private func refreshCounts() {
         documentCount = fetchDocumentCount()
         photoCount = fetchPhotoCount()
+        taskCount = fetchTaskCount()
     }
 
     private func fetchDocumentCount() -> Int {
@@ -183,6 +193,14 @@ struct MoreView: View {
     private func fetchPhotoCount() -> Int {
         let projectID = project.id
         let descriptor = FetchDescriptor<PhotoAttachment>(
+            predicate: #Predicate { $0.projectID == projectID }
+        )
+        return ((try? modelContext.fetch(descriptor)) ?? []).count
+    }
+
+    private func fetchTaskCount() -> Int {
+        let projectID = project.id
+        let descriptor = FetchDescriptor<ProjectTask>(
             predicate: #Predicate { $0.projectID == projectID }
         )
         return ((try? modelContext.fetch(descriptor)) ?? []).count
