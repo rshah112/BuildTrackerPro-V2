@@ -71,8 +71,13 @@ struct BudgetDetailView: View {
         projectItems.first(where: { $0.id == itemID })
     }
 
+    private var linkedExpenseActual: Double {
+        linkedExpenses.reduce(0) { $0 + $1.amount }
+    }
+
     private var allowanceActual: Double {
-        allowanceSelections.reduce(0) { $0 + $1.amount }
+        let selectionActual = allowanceSelections.reduce(0) { $0 + $1.amount }
+        return allowanceSelections.isEmpty ? linkedExpenseActual : selectionActual
     }
 
     private var actual: Double {
@@ -390,12 +395,13 @@ struct BudgetDetailView: View {
         item.isPinned = isPinned
         item.isAllowance = isAllowance
         item.allowanceAmount = isAllowance ? max(0, allowanceAmount) : 0
+        let effectiveSelections = isAllowance ? seedSelectionsFromLinkedExpensesIfNeeded() : allowanceSelections
         BudgetMathService.recalculateActuals(
             for: projectID,
             items: projectItems,
             expenses: expenses,
             changeOrders: [],
-            allowanceSelections: allowanceSelections
+            allowanceSelections: effectiveSelections
         )
 
         do {
@@ -407,6 +413,39 @@ struct BudgetDetailView: View {
             saveErrorMessage = error.localizedDescription
             Haptics.warning()
         }
+    }
+
+    private func seedSelectionsFromLinkedExpensesIfNeeded() -> [AllowanceSelection] {
+        guard allowanceSelections.isEmpty, !linkedExpenses.isEmpty else { return allowanceSelections }
+
+        let seededSelections = linkedExpenses.map { expense in
+            AllowanceSelection(
+                projectID: projectID,
+                lineItemID: itemID,
+                selectionDate: expense.date,
+                vendor: expense.vendorName,
+                amount: expense.amount,
+                notes: convertedSelectionNotes(for: expense),
+                photoData: expense.receiptImageData
+            )
+        }
+
+        for selection in seededSelections {
+            modelContext.insert(selection)
+        }
+
+        return seededSelections
+    }
+
+    private func convertedSelectionNotes(for expense: Expense) -> String {
+        var parts = ["Converted from linked expense"]
+        if !expense.invoiceNumber.trimmed.isEmpty {
+            parts.append("Invoice #\(expense.invoiceNumber.trimmed)")
+        }
+        if !expense.notes.trimmed.isEmpty {
+            parts.append(expense.notes.trimmed)
+        }
+        return parts.joined(separator: " - ")
     }
 
     private func save(selection: AllowanceSelection) {

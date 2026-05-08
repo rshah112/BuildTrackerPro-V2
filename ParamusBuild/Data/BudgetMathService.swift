@@ -25,12 +25,13 @@ enum BudgetMathService {
         }
 
         for expense in expenses where expense.projectID == projectID {
-            guard let item = resolveItem(for: expense, in: projectItems), !item.isAllowance else { continue }
+            guard let item = resolveItem(for: expense, in: projectItems) else { continue }
             actualByItemID[item.id, default: 0] += expense.amount
         }
 
         for item in projectItems {
-            let calculatedActual = item.isAllowance
+            let hasSelections = selectionActualByItemID[item.id] != nil
+            let calculatedActual = item.isAllowance && hasSelections
                 ? selectionActualByItemID[item.id, default: 0]
                 : actualByItemID[item.id, default: 0]
             if item.actual != calculatedActual {
@@ -55,8 +56,12 @@ enum BudgetMathService {
         changeOrders: [ChangeOrder]
     ) -> Double {
         let allowanceItemIDs = Set(items.filter(\.isAllowance).map(\.id))
-        let nonAllowanceExpenses = expenses.reduce(0) { total, expense in
-            if let itemID = expense.budgetLineItemID, allowanceItemIDs.contains(itemID) {
+        let allowanceItemIDsWithSelections = Set(allowanceSelections.map(\.lineItemID))
+        let expenseTotal = expenses.reduce(0) { total, expense in
+            if let itemID = expense.budgetLineItemID,
+               allowanceItemIDs.contains(itemID),
+               allowanceItemIDsWithSelections.contains(itemID)
+            {
                 return total
             }
             return total + expense.amount
@@ -64,7 +69,7 @@ enum BudgetMathService {
         let allowanceActuals = allowanceSelections.reduce(0) { total, selection in
             allowanceItemIDs.contains(selection.lineItemID) ? total + selection.amount : total
         }
-        return nonAllowanceExpenses + allowanceActuals
+        return expenseTotal + allowanceActuals
     }
 
     /// Open commitments + approved-but-not-yet-paid change orders.
@@ -93,9 +98,16 @@ enum BudgetMathService {
             .reduce(0) { $0 + $1.amount }
     }
 
-    static func allowanceOverage(items: [BudgetLineItem], allowanceSelections: [AllowanceSelection]) -> Double {
+    static func allowanceOverage(
+        items: [BudgetLineItem],
+        allowanceSelections: [AllowanceSelection],
+        expenses: [Expense] = []
+    ) -> Double {
         items.filter(\.isAllowance).reduce(0) { total, item in
-            let actual = allowanceSelectionTotal(for: item, selections: allowanceSelections)
+            let itemSelections = allowanceSelections.filter { $0.projectID == item.projectID && $0.lineItemID == item.id }
+            let actual = itemSelections.isEmpty
+                ? expenses.filter { $0.projectID == item.projectID && $0.budgetLineItemID == item.id }.reduce(0) { $0 + $1.amount }
+                : itemSelections.reduce(0) { $0 + $1.amount }
             return total + max(0, actual - item.allowanceAmount)
         }
     }

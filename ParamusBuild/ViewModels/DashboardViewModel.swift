@@ -51,7 +51,11 @@ struct DashboardViewModel {
     }
 
     var allowanceOverage: Double {
-        BudgetMathService.allowanceOverage(items: constructionItems, allowanceSelections: constructionAllowanceSelections)
+        BudgetMathService.allowanceOverage(
+            items: constructionItems,
+            allowanceSelections: constructionAllowanceSelections,
+            expenses: constructionExpenses
+        )
     }
 
     var remainingBudget: Double {
