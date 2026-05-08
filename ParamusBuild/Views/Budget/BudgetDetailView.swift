@@ -13,11 +13,13 @@ struct BudgetDetailView: View {
     @Query private var expenses: [Expense]
     @Query private var photos: [PhotoAttachment]
     @Query private var projectItems: [BudgetLineItem]
+    @Query private var projects: [Project]
     @Query private var allowanceSelections: [AllowanceSelection]
 
     @State private var costCode: String
     @State private var title: String
     @State private var categoryName: String
+    @State private var roomTag: String
     @State private var budget: Double
     @State private var committed: Double
     @State private var notes: String
@@ -43,6 +45,7 @@ struct BudgetDetailView: View {
             order: .reverse
         )
         _projectItems = Query(filter: #Predicate<BudgetLineItem> { $0.projectID == projectID }, sort: \.costCode)
+        _projects = Query(filter: #Predicate<Project> { $0.id == projectID })
         _allowanceSelections = Query(
             filter: #Predicate<AllowanceSelection> { $0.projectID == projectID && $0.lineItemID == itemID },
             sort: \.selectionDate,
@@ -51,6 +54,7 @@ struct BudgetDetailView: View {
         _costCode = State(initialValue: item.costCode)
         _title = State(initialValue: item.title)
         _categoryName = State(initialValue: item.categoryName)
+        _roomTag = State(initialValue: item.roomTag)
         _budget = State(initialValue: item.budget)
         _committed = State(initialValue: item.committed)
         _notes = State(initialValue: item.notes)
@@ -69,6 +73,25 @@ struct BudgetDetailView: View {
 
     private var currentItem: BudgetLineItem? {
         projectItems.first(where: { $0.id == itemID })
+    }
+
+    private var currentProject: Project? {
+        projects.first
+    }
+
+    private var roomOptions: [String] {
+        currentProject.map(RoomCatalog.rooms) ?? [RoomCatalog.general]
+    }
+
+    private var resolvedRoomTag: String {
+        let override = roomTag.trimmed
+        if !override.isEmpty {
+            return override
+        }
+        if let currentProject {
+            return RoomCatalog.inferredRoom(title: title, category: categoryName, project: currentProject)
+        }
+        return RoomCatalog.general
     }
 
     private var linkedExpenseActual: Double {
@@ -193,6 +216,16 @@ struct BudgetDetailView: View {
                     TextField("Line item title", text: $title)
                         .textInputAutocapitalization(.words)
                         .modernTextField()
+                }
+
+                ModernField("Room / Area") {
+                    Picker("Room / Area", selection: $roomTag) {
+                        Text("Infer automatically").tag("")
+                        ForEach(roomOptions, id: \.self) { room in
+                            Text(room).tag(room)
+                        }
+                    }
+                    .pickerStyle(.menu)
                 }
 
                 Toggle("Allowance", isOn: $isAllowance)
@@ -389,6 +422,7 @@ struct BudgetDetailView: View {
 
         item.costCode = costCode.trimmed
         item.title = title.trimmed
+        item.roomTag = resolvedRoomTag
         item.budget = max(0, budget)
         item.committed = max(0, committed)
         item.notes = notes.trimmed

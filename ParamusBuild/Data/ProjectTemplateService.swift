@@ -136,6 +136,11 @@ enum ProjectTemplateService {
                         costCode: item.costCode.trimmed,
                         title: item.title.trimmed.isEmpty ? "Budget Item" : item.title.trimmed,
                         categoryName: category.name.trimmed.isEmpty ? "Category \(categoryIndex + 1)" : category.name.trimmed,
+                        roomTag: RoomCatalog.inferredRoom(
+                            title: item.title.trimmed,
+                            category: category.name.trimmed,
+                            project: project
+                        ),
                         budget: item.amount,
                         notes: item.notes.trimmed,
                         isPinned: item.isLocked

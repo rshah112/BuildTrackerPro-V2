@@ -541,6 +541,7 @@ struct ProjectFormView: View {
             address: address.trimmed,
             status: status,
             priority: priority,
+            templateType: selectedTemplateType,
             purchasePrice: setupProfile.purchasePriceLabel == nil ? 0 : purchasePrice,
             lotDimensions: setupProfile.lotDimensionsLabel == nil ? "" : lotDimensions.trimmed,
             proposedBuildDimensions: setupProfile.proposedDimensionsLabel == nil ? "" : proposedBuildDimensions.trimmed,
@@ -569,6 +570,7 @@ struct ProjectFormView: View {
                 costCode: "9001",
                 title: "Contingency Reserve",
                 categoryName: "Contingency",
+                roomTag: RoomCatalog.general,
                 budget: contingencyBudget,
                 isPinned: true
             )

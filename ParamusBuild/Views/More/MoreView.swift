@@ -114,6 +114,12 @@ struct MoreView: View {
                     }
 
                     NavigationLink {
+                        RoomSummaryView(project: project)
+                    } label: {
+                        MoreRow(title: "By Room", subtitle: "Budget, expenses and photos by area", systemImage: "square.grid.2x2")
+                    }
+
+                    NavigationLink {
                         SettingsView()
                     } label: {
                         MoreRow(title: "Settings", subtitle: "Display and jobsite preferences", systemImage: "gearshape")

@@ -438,6 +438,9 @@ struct AddExpenseView: View {
                 }
             }
         }
+        .onChange(of: viewModel.budgetLineItemID) { _, _ in
+            inheritRoomFromSelectedItemIfNeeded()
+        }
         .onChange(of: viewModel.isPaid) { _, isPaid in
             if isPaid, viewModel.amountPaid <= 0 {
                 viewModel.amountPaid = viewModel.amount
@@ -594,10 +597,17 @@ struct AddExpenseView: View {
         if let selectedID = viewModel.budgetLineItemID,
            items.contains(where: { $0.id == selectedID })
         {
+            inheritRoomFromSelectedItemIfNeeded()
             return
         }
 
         viewModel.budgetLineItemID = items.first?.id
+        inheritRoomFromSelectedItemIfNeeded()
+    }
+
+    private func inheritRoomFromSelectedItemIfNeeded() {
+        guard let selectedItem else { return }
+        viewModel.roomTag = selectedItem.roomTag
     }
 
     private func fetchBudgetItems() -> [BudgetLineItem] {

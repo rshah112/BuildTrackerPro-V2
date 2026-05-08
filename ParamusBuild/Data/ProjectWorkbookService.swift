@@ -106,6 +106,7 @@ enum ProjectWorkbookService {
             case "Address": project.address = value
             case "Status": project.status = parseProjectStatus(value) ?? project.status
             case "Priority": project.priority = parseProjectPriority(value) ?? project.priority
+            case "Project Type": project.templateType = ProjectTemplateType(rawValue: value) ?? project.templateType
             case "Start Date": project.startDate = parseDate(value)
             case "Target Finish": project.targetFinishDate = parseDate(value)
             case "Scope Summary": project.scopeSummary = value
@@ -145,6 +146,7 @@ enum ProjectWorkbookService {
             item.budget = Double(row[4]) ?? item.budget
             item.committed = Double(row[5]) ?? item.committed
             item.notes = row.count > 6 ? row[6] : item.notes
+            item.roomTag = row[safe: 12] ?? item.roomTag
         }
     }
 
@@ -183,6 +185,7 @@ enum ProjectWorkbookService {
             expense.paymentMethod = row[safe: 11] ?? expense.paymentMethod
             expense.paymentReference = row[safe: 12] ?? expense.paymentReference
             expense.notes = row[safe: 13] ?? expense.notes
+            expense.roomTag = row[safe: 16] ?? expense.roomTag
 
             if let paidFlag = parseBool(row[safe: 14] ?? "") {
                 expense.isPaid = paidFlag
@@ -348,6 +351,7 @@ enum ProjectWorkbookService {
             [.text("Address"), .text(project.address)],
             [.text("Status"), .text(project.status.title)],
             [.text("Priority"), .text(project.priority.title)],
+            [.text("Project Type"), .text(project.templateType.rawValue)],
             [.text("Start Date"), .optionalDate(project.startDate)],
             [.text("Target Finish"), .optionalDate(project.targetFinishDate)],
             [.text("Scope Summary"), .text(project.scopeSummary)],
@@ -397,7 +401,8 @@ enum ProjectWorkbookService {
             .text("Remaining"),
             .text("Variance"),
             .text("Allowance?"),
-            .text("Allowance Amount")
+            .text("Allowance Amount"),
+            .text("Room")
         ]]
             + items.map {
                 let remaining = $0.remaining
@@ -413,7 +418,8 @@ enum ProjectWorkbookService {
                     remaining >= 0 ? .positiveCurrency(remaining) : .negativeCurrency(remaining),
                     .currency($0.variance),
                     .text($0.isAllowance ? "Yes" : "No"),
-                    .currency($0.allowanceAmount)
+                    .currency($0.allowanceAmount),
+                    .text($0.roomTag)
                 ]
             }
     }
@@ -469,7 +475,8 @@ enum ProjectWorkbookService {
             .text("Payment Reference"),
             .text("Notes"),
             .text("Paid?"),
-            .text("Balance Due")
+            .text("Balance Due"),
+            .text("Room")
         ]]
             + expenses.map { [
                 .text($0.id.uuidString),
@@ -487,7 +494,8 @@ enum ProjectWorkbookService {
                 .text($0.paymentReference),
                 .text($0.notes),
                 .text($0.isPaid ? "Yes" : "No"),
-                .currency($0.balanceDue)
+                .currency($0.balanceDue),
+                .text($0.roomTag)
             ] }
     }
 

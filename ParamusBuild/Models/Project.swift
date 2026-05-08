@@ -57,6 +57,7 @@ final class Project {
     var address: String
     var statusRawValue: String = ProjectStatus.planning.rawValue
     var priorityRawValue: String = ProjectPriority.normal.rawValue
+    var templateTypeRawValue: String = ProjectTemplateType.custom.rawValue
     var purchasePrice: Double = 0
     var lotDimensions: String = ""
     var proposedBuildDimensions: String = ""
@@ -77,6 +78,7 @@ final class Project {
         address: String,
         status: ProjectStatus = .planning,
         priority: ProjectPriority = .normal,
+        templateType: ProjectTemplateType = .custom,
         purchasePrice: Double = 0,
         lotDimensions: String = "",
         proposedBuildDimensions: String = "",
@@ -96,6 +98,7 @@ final class Project {
         self.address = address
         statusRawValue = status.rawValue
         priorityRawValue = priority.rawValue
+        templateTypeRawValue = templateType.rawValue
         self.purchasePrice = purchasePrice
         self.lotDimensions = lotDimensions
         self.proposedBuildDimensions = proposedBuildDimensions
@@ -119,5 +122,10 @@ final class Project {
     var priority: ProjectPriority {
         get { ProjectPriority(rawValue: priorityRawValue) ?? .normal }
         set { priorityRawValue = newValue.rawValue }
+    }
+
+    var templateType: ProjectTemplateType {
+        get { ProjectTemplateType(rawValue: templateTypeRawValue) ?? .custom }
+        set { templateTypeRawValue = newValue.rawValue }
     }
 }

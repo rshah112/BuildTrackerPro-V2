@@ -15,6 +15,7 @@ final class ExpenseFormViewModel: ObservableObject {
     @Published var paymentMethod = ""
     @Published var paymentReference = ""
     @Published var budgetLineItemID: UUID?
+    @Published var roomTag = ""
     @Published var notes = ""
     @Published var isPaid = true
     @Published var receiptImageData: Data?
@@ -52,6 +53,7 @@ final class ExpenseFormViewModel: ObservableObject {
         paymentMethod = expense.paymentMethod
         paymentReference = expense.paymentReference
         budgetLineItemID = expense.budgetLineItemID
+        roomTag = expense.roomTag
         notes = expense.notes
         isPaid = expense.isPaid
         receiptImageData = expense.receiptImageData
@@ -96,6 +98,7 @@ final class ExpenseFormViewModel: ObservableObject {
             paymentMethod: paymentMethod.trimmed,
             paymentReference: paymentReference.trimmed,
             categoryName: item?.categoryName ?? "Unassigned",
+            roomTag: resolvedRoomTag(for: item),
             budgetLineItemID: item?.id,
             budgetLineItemTitle: item?.title ?? "",
             notes: notes.trimmed,
@@ -118,12 +121,19 @@ final class ExpenseFormViewModel: ObservableObject {
         expense.paymentReference = paymentReference.trimmed
         if let item {
             expense.categoryName = item.categoryName
+            expense.roomTag = resolvedRoomTag(for: item)
             expense.budgetLineItemID = item.id
             expense.budgetLineItemTitle = item.title
         }
         expense.notes = notes.trimmed
         expense.isPaid = isPaid
         expense.receiptImageData = receiptImageData
+    }
+
+    private func resolvedRoomTag(for item: BudgetLineItem?) -> String {
+        let override = roomTag.trimmed
+        if !override.isEmpty { return override }
+        return item?.roomTag.trimmed.isEmpty == false ? item?.roomTag ?? "" : ""
     }
 
     private var resolvedExpectedPaymentDate: Date? {

@@ -13,6 +13,7 @@ struct AddBudgetItemView: View {
     @State private var title = ""
     @State private var selectedCategoryID: UUID?
     @State private var newCategoryName = ""
+    @State private var roomTag = ""
     @State private var budget = 0.0
     @State private var committed = 0.0
     @State private var isAllowance = false
@@ -37,6 +38,18 @@ struct AddBudgetItemView: View {
             return newName
         }
         return selectedCategory?.name ?? ""
+    }
+
+    private var resolvedRoomTag: String {
+        let override = roomTag.trimmed
+        if !override.isEmpty {
+            return override
+        }
+        return RoomCatalog.inferredRoom(title: title, category: resolvedCategoryName, project: project)
+    }
+
+    private var roomOptions: [String] {
+        RoomCatalog.rooms(for: project)
     }
 
     private var canSave: Bool {
@@ -98,6 +111,25 @@ struct AddBudgetItemView: View {
                             .textInputAutocapitalization(.words)
                             .modernTextField()
                     }
+                }
+
+                ModernFormSection(
+                    "Room / Area",
+                    footer: "Usually inferred from the item and this project's type. Override only when this cost belongs somewhere specific."
+                ) {
+                    ModernField("Room / Area") {
+                        Picker("Room / Area", selection: $roomTag) {
+                            Text("Infer automatically").tag("")
+                            ForEach(roomOptions, id: \.self) { room in
+                                Text(room).tag(room)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+
+                    Label("Will file under \(resolvedRoomTag)", systemImage: "square.grid.2x2")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
                 }
 
                 ModernFormSection(
@@ -192,6 +224,7 @@ struct AddBudgetItemView: View {
             costCode: costCode.trimmed,
             title: title.trimmed,
             categoryName: categoryName,
+            roomTag: resolvedRoomTag,
             budget: budget,
             committed: isAllowance ? 0 : committed,
             notes: notes.trimmed,

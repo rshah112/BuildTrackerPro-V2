@@ -14,6 +14,7 @@ final class BudgetLineItem {
     var costCode: String
     var title: String
     var categoryName: String
+    var roomTag: String = ""
     var budget: Double
     var actual: Double
     var committed: Double
@@ -29,6 +30,7 @@ final class BudgetLineItem {
         costCode: String,
         title: String,
         categoryName: String,
+        roomTag: String = "",
         budget: Double,
         actual: Double = 0,
         committed: Double = 0,
@@ -43,6 +45,7 @@ final class BudgetLineItem {
         self.costCode = costCode
         self.title = title
         self.categoryName = categoryName
+        self.roomTag = roomTag
         self.budget = budget
         self.actual = actual
         self.committed = committed

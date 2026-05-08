@@ -66,7 +66,7 @@ struct HomeBuildProApp: App {
     }
 
     #if DEBUG
-        private static let developmentStoreVersion = "2026-05-07-phase-6-tasks-migration-3"
+        private static let developmentStoreVersion = "2026-05-07-phase-7-rooms-migration-4"
 
         private static var applicationSupportURL: URL {
             FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)

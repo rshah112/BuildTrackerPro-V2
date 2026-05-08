@@ -1,6 +1,15 @@
 import SwiftData
 import SwiftUI
 
+private enum BudgetGroupingMode: String, CaseIterable, Identifiable {
+    case phase = "By Phase"
+    case room = "By Room"
+
+    var id: String {
+        rawValue
+    }
+}
+
 struct BudgetView: View {
     @Environment(\.modelContext) private var modelContext
     let project: Project
@@ -14,6 +23,7 @@ struct BudgetView: View {
 
     @State private var searchText = ""
     @State private var expandedCategories = Set<String>()
+    @State private var groupingMode: BudgetGroupingMode = .phase
     @State private var showingAddItem = false
     @State private var deleteBlockedMessage: String?
 
@@ -39,12 +49,29 @@ struct BudgetView: View {
         return items.filter {
             $0.title.localizedLowercase.contains(query) ||
                 $0.costCode.localizedLowercase.contains(query) ||
-                $0.categoryName.localizedLowercase.contains(query)
+                $0.categoryName.localizedLowercase.contains(query) ||
+                displayRoom(for: $0).localizedLowercase.contains(query)
         }
     }
 
     private var groupedItems: [String: [BudgetLineItem]] {
         Dictionary(grouping: filteredItems, by: \.categoryName)
+    }
+
+    private var groupedRoomItems: [String: [BudgetLineItem]] {
+        Dictionary(grouping: filteredItems) { item in
+            displayRoom(for: item)
+        }
+    }
+
+    private var visibleRooms: [String] {
+        let allowedRooms = RoomCatalog.rooms(for: project)
+        let usedRooms = Set(filteredItems.map(displayRoom(for:)))
+        let allowedUsedRooms = allowedRooms.filter { usedRooms.contains($0) }
+        let extraRooms = usedRooms
+            .filter { !allowedRooms.contains($0) }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        return allowedUsedRooms + extraRooms
     }
 
     private var constructionItems: [BudgetLineItem] {
@@ -84,56 +111,49 @@ struct BudgetView: View {
                     .listRowBackground(Color.clear)
                 }
 
-                ForEach(categories) { category in
-                    let categoryItems = groupedItems[category.name, default: []]
+                Section {
+                    Picker("Budget grouping", selection: $groupingMode) {
+                        ForEach(BudgetGroupingMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
 
-                    if !categoryItems.isEmpty {
-                        Section {
-                            if expandedCategories.contains(category.name) {
-                                ForEach(categoryItems) { item in
-                                    NavigationLink {
-                                        BudgetDetailView(item: item)
-                                    } label: {
-                                        BudgetLineRow(item: item)
-                                    }
-                                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                        Button {
-                                            Haptics.lightTap()
-                                            setPinned(!item.isPinned, forItemID: item.id)
-                                        } label: {
-                                            Label(item.isPinned ? "Unpin" : "Pin", systemImage: item.isPinned ? "pin.slash" : "pin")
-                                        }
-                                        .tint(.blue)
-                                    }
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                        Button(role: .destructive) {
-                                            Haptics.lightTap()
-                                            deleteItem(withID: item.id)
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
-                                        }
+                if groupingMode == .phase {
+                    ForEach(categories) { category in
+                        let categoryItems = groupedItems[category.name, default: []]
 
-                                        Button {
-                                            Haptics.lightTap()
-                                            flagForReview(itemID: item.id)
-                                        } label: {
-                                            Label("Review", systemImage: "flag")
-                                        }
-                                        .tint(AppTheme.warning)
-                                    }
-                                }
+                        if !categoryItems.isEmpty {
+                            budgetSection(
+                                title: category.name,
+                                systemImage: category.systemImage,
+                                items: categoryItems
+                            ) {
+                                BudgetCategoryHeader(
+                                    category: category,
+                                    items: categoryItems,
+                                    isExpanded: expandedCategories.contains(category.name)
+                                )
                             }
-                        } header: {
-                            BudgetCategoryHeader(
-                                category: category,
-                                items: categoryItems,
-                                isExpanded: expandedCategories.contains(category.name)
-                            )
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                withAnimation(.smooth(duration: 0.24)) {
-                                    toggle(category.name)
-                                }
+                        }
+                    }
+                } else {
+                    ForEach(visibleRooms, id: \.self) { room in
+                        let roomItems = groupedRoomItems[room, default: []]
+
+                        if !roomItems.isEmpty {
+                            budgetSection(
+                                title: room,
+                                systemImage: "square.grid.2x2",
+                                items: roomItems
+                            ) {
+                                BudgetRoomHeader(
+                                    name: room,
+                                    items: roomItems,
+                                    photoCount: photoCount(forRoom: room),
+                                    isExpanded: expandedCategories.contains(room)
+                                )
                             }
                         }
                     }
@@ -168,6 +188,13 @@ struct BudgetView: View {
             .onChange(of: categories.map(\.name)) { _, names in
                 expandedCategories.formUnion(names)
             }
+            .onChange(of: groupingMode) { _, newMode in
+                if newMode == .room {
+                    expandedCategories.formUnion(visibleRooms)
+                } else {
+                    expandedCategories.formUnion(categories.map(\.name))
+                }
+            }
             .onChange(of: initialSearchText) { _, newValue in
                 searchText = newValue
                 expandedCategories = Set(categories.map(\.name))
@@ -181,6 +208,73 @@ struct BudgetView: View {
                 Text(deleteBlockedMessage ?? "")
             }
         }
+    }
+
+    private func budgetSection(
+        title: String,
+        systemImage: String,
+        items sectionItems: [BudgetLineItem],
+        @ViewBuilder header: () -> some View
+    ) -> some View {
+        Section {
+            if expandedCategories.contains(title) {
+                ForEach(sectionItems) { item in
+                    NavigationLink {
+                        BudgetDetailView(item: item)
+                    } label: {
+                        BudgetLineRow(item: item, roomName: displayRoom(for: item))
+                    }
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        Button {
+                            Haptics.lightTap()
+                            setPinned(!item.isPinned, forItemID: item.id)
+                        } label: {
+                            Label(item.isPinned ? "Unpin" : "Pin", systemImage: item.isPinned ? "pin.slash" : "pin")
+                        }
+                        .tint(.blue)
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            Haptics.lightTap()
+                            deleteItem(withID: item.id)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+
+                        Button {
+                            Haptics.lightTap()
+                            flagForReview(itemID: item.id)
+                        } label: {
+                            Label("Review", systemImage: "flag")
+                        }
+                        .tint(AppTheme.warning)
+                    }
+                }
+            }
+        } header: {
+            header()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(.smooth(duration: 0.24)) {
+                        toggle(title)
+                    }
+                }
+        }
+    }
+
+    private func displayRoom(for item: BudgetLineItem) -> String {
+        let tag = item.roomTag.trimmed
+        if !tag.isEmpty {
+            return tag
+        }
+        return RoomCatalog.inferredRoom(title: item.title, category: item.categoryName, project: project)
+    }
+
+    private func photoCount(forRoom room: String) -> Int {
+        photos.filter { photo in
+            let tag = photo.roomTag.trimmed
+            return !tag.isEmpty && tag.caseInsensitiveCompare(room) == .orderedSame
+        }.count
     }
 
     private func toggle(_ categoryName: String) {
@@ -331,6 +425,76 @@ private struct BudgetCategoryHeader: View {
     }
 }
 
+private struct BudgetRoomHeader: View {
+    let name: String
+    let items: [BudgetLineItem]
+    let photoCount: Int
+    let isExpanded: Bool
+
+    private var budget: Double {
+        items.reduce(0) { $0 + $1.budget }
+    }
+
+    private var used: Double {
+        items.reduce(0) { $0 + $1.spentAndCommitted }
+    }
+
+    private var health: BudgetHealth {
+        if used > budget { return .overBudget }
+        if budget > 0, used / budget >= 0.9 { return .nearLimit }
+        return .healthy
+    }
+
+    private var utilization: Double {
+        guard budget > 0 else { return 0 }
+        return used / budget
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(AppTheme.healthColor(health))
+                    .frame(width: 32, height: 32)
+                    .background(AppTheme.healthColor(health).opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(name)
+                        .font(.headline.weight(.semibold))
+                        .textCase(nil)
+                        .foregroundStyle(.primary)
+
+                    Text("\(used.compactCurrencyString) used of \(budget.compactCurrencyString)")
+                        .font(.caption)
+                        .textCase(nil)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if photoCount > 0 {
+                    Label("\(photoCount)", systemImage: "photo")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                }
+
+                BudgetHealthPill(health: health)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+            }
+
+            BudgetProgressBar(value: utilization, tint: AppTheme.healthColor(health))
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, AppTheme.pagePadding)
+        .background(.thinMaterial)
+    }
+}
+
 private struct BudgetOverviewCard: View {
     let used: Double
     let total: Double
@@ -406,6 +570,7 @@ private struct BudgetOverviewCard: View {
 
 private struct BudgetLineRow: View {
     let item: BudgetLineItem
+    let roomName: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -431,7 +596,7 @@ private struct BudgetLineRow: View {
                         }
                     }
 
-                    Text(item.categoryName)
+                    Text(roomName.isEmpty ? item.categoryName : "\(item.categoryName) • \(roomName)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

@@ -16,6 +16,7 @@ final class Expense {
     var paymentMethod: String = ""
     var paymentReference: String = ""
     var categoryName: String
+    var roomTag: String = ""
     var budgetLineItemID: UUID?
     var budgetLineItemTitle: String
     var notes: String
@@ -36,6 +37,7 @@ final class Expense {
         paymentMethod: String = "",
         paymentReference: String = "",
         categoryName: String,
+        roomTag: String = "",
         budgetLineItemID: UUID? = nil,
         budgetLineItemTitle: String = "",
         notes: String = "",
@@ -55,6 +57,7 @@ final class Expense {
         self.paymentMethod = paymentMethod
         self.paymentReference = paymentReference
         self.categoryName = categoryName
+        self.roomTag = roomTag
         self.budgetLineItemID = budgetLineItemID
         self.budgetLineItemTitle = budgetLineItemTitle
         self.notes = notes
