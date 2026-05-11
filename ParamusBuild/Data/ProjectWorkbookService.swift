@@ -66,6 +66,7 @@ enum ProjectWorkbookService {
         expenses: [Expense],
         changeOrders: [ChangeOrder],
         vendors: [Vendor],
+        allowanceSelections: [AllowanceSelection] = [],
         context: ModelContext
     ) throws {
         // Real Excel files (.xlsx) use ZIP+deflate. We only support uncompressed
@@ -83,14 +84,30 @@ enum ProjectWorkbookService {
         let workbookData = WorkbookDataExtractor.workbookData(from: data) ?? data
         let workbook = try WorkbookXMLParser.parse(data: workbookData)
         importProject(workbook["Project"] ?? [], project: project)
-        importBudget(workbook["Budget"] ?? [], project: project, items: items, context: context)
+        let importedItemIDMap = importBudget(workbook["Budget"] ?? [], project: project, items: items, context: context)
         let currentItems = fetchBudgetItems(for: project, context: context)
-        importExpenses(workbook["Expenses"] ?? [], project: project, items: currentItems, expenses: expenses, context: context)
+        importExpenses(
+            workbook["Expenses"] ?? [],
+            project: project,
+            items: currentItems,
+            expenses: expenses,
+            importedItemIDMap: importedItemIDMap,
+            context: context
+        )
         importChangeOrders(
             workbook["Change Orders"] ?? [],
             project: project,
             items: currentItems,
             changeOrders: changeOrders,
+            importedItemIDMap: importedItemIDMap,
+            context: context
+        )
+        importAllowances(
+            workbook["Allowances"] ?? [],
+            project: project,
+            items: currentItems,
+            allowanceSelections: allowanceSelections,
+            importedItemIDMap: importedItemIDMap,
             context: context
         )
         importVendors(workbook["Vendors"] ?? [], project: project, vendors: vendors, context: context)
@@ -126,8 +143,14 @@ enum ProjectWorkbookService {
         }
     }
 
-    private static func importBudget(_ rows: [[String]], project: Project, items: [BudgetLineItem], context: ModelContext) {
+    private static func importBudget(
+        _ rows: [[String]],
+        project: Project,
+        items: [BudgetLineItem],
+        context: ModelContext
+    ) -> [String: UUID] {
         let byID = Dictionary(uniqueKeysWithValues: items.map { ($0.id.uuidString, $0) })
+        var importedItemIDMap: [String: UUID] = [:]
 
         for row in rows.dropFirst() {
             guard row.count >= 6 else { continue }
@@ -148,7 +171,12 @@ enum ProjectWorkbookService {
             item.committed = Double(row[5]) ?? item.committed
             item.notes = row.count > 6 ? row[6] : item.notes
             item.roomTag = row[safe: 12] ?? item.roomTag
+            item.isAllowance = parseBool(row[safe: 10] ?? "") ?? item.isAllowance
+            item.allowanceAmount = Double(row[safe: 11] ?? "") ?? item.allowanceAmount
+            importedItemIDMap[id] = item.id
         }
+
+        return importedItemIDMap
     }
 
     private static func importExpenses(
@@ -156,6 +184,7 @@ enum ProjectWorkbookService {
         project: Project,
         items: [BudgetLineItem],
         expenses: [Expense],
+        importedItemIDMap: [String: UUID],
         context: ModelContext
     ) {
         let byID = Dictionary(uniqueKeysWithValues: expenses.map { ($0.id.uuidString, $0) })
@@ -164,7 +193,9 @@ enum ProjectWorkbookService {
         for row in rows.dropFirst() {
             guard row.count >= 6 else { continue }
             let id = row[0]
-            let item = itemsByID[row[safe: 8] ?? ""]
+            let sourceItemID = row[safe: 8] ?? ""
+            let mappedItemID = importedItemIDMap[sourceItemID]?.uuidString ?? sourceItemID
+            let item = itemsByID[mappedItemID]
             let categoryName = item?.categoryName ?? row[safe: 10] ?? "Unassigned"
             let expense = byID[id] ?? Expense(projectID: project.id, amount: 0, vendorName: "", categoryName: categoryName)
 
@@ -187,6 +218,7 @@ enum ProjectWorkbookService {
             expense.paymentReference = row[safe: 12] ?? expense.paymentReference
             expense.notes = row[safe: 13] ?? expense.notes
             expense.roomTag = row[safe: 16] ?? expense.roomTag
+            expense.expectedPaymentDate = parseDate(row[safe: 17] ?? "")
 
             if let paidFlag = parseBool(row[safe: 14] ?? "") {
                 expense.isPaid = paidFlag
@@ -207,6 +239,7 @@ enum ProjectWorkbookService {
         project: Project,
         items: [BudgetLineItem],
         changeOrders: [ChangeOrder],
+        importedItemIDMap: [String: UUID],
         context: ModelContext
     ) {
         let byID = Dictionary(uniqueKeysWithValues: changeOrders.map { ($0.id.uuidString, $0) })
@@ -214,7 +247,9 @@ enum ProjectWorkbookService {
 
         for row in rows.dropFirst() {
             guard row.count >= 7 else { continue }
-            let item = itemsByID[row[5]]
+            let sourceItemID = row[5]
+            let mappedItemID = importedItemIDMap[sourceItemID]?.uuidString ?? sourceItemID
+            let item = itemsByID[mappedItemID]
             let order = byID[row[0]] ?? ChangeOrder(projectID: project.id, title: row[2], amount: 0, status: .pending, categoryName: row[4])
 
             if byID[row[0]] == nil {
@@ -231,6 +266,56 @@ enum ProjectWorkbookService {
                 order.statusRawValue = parsed.rawValue
             }
             order.notes = row.count > 8 ? row[8] : order.notes
+            order.expectedPaymentDate = parseDate(row[safe: 9] ?? "")
+        }
+    }
+
+    private static func importAllowances(
+        _ rows: [[String]],
+        project: Project,
+        items: [BudgetLineItem],
+        allowanceSelections: [AllowanceSelection],
+        importedItemIDMap: [String: UUID],
+        context: ModelContext
+    ) {
+        let byID = Dictionary(uniqueKeysWithValues: allowanceSelections.map { ($0.id.uuidString, $0) })
+        let itemsByID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+        let itemsByCodeAndTitle = Dictionary(grouping: items) { item in
+            "\(item.costCode.trimmed.localizedLowercase)|\(item.title.trimmed.localizedLowercase)"
+        }
+
+        for row in rows.dropFirst() {
+            guard row.count >= 6 else { continue }
+            let selectionID = row[0]
+            let sourceItemID = row[safe: 9] ?? ""
+            let mappedItemID = importedItemIDMap[sourceItemID]
+            let codeTitleKey = "\(row[safe: 2]?.trimmed.localizedLowercase ?? "")|\(row[safe: 3]?.trimmed.localizedLowercase ?? "")"
+            guard let lineItemID = mappedItemID ?? itemsByCodeAndTitle[codeTitleKey]?.first?.id,
+                  let item = itemsByID[lineItemID]
+            else { continue }
+
+            item.isAllowance = true
+            if let importedAllowanceAmount = Double(row[safe: 6] ?? ""), importedAllowanceAmount > 0 {
+                item.allowanceAmount = importedAllowanceAmount
+            } else if item.allowanceAmount <= 0 {
+                item.allowanceAmount = item.budget
+            }
+
+            let selection = byID[selectionID] ?? AllowanceSelection(
+                projectID: project.id,
+                lineItemID: lineItemID,
+                vendor: "",
+                amount: 0
+            )
+            if byID[selectionID] == nil {
+                context.insert(selection)
+            }
+            selection.projectID = project.id
+            selection.lineItemID = lineItemID
+            selection.selectionDate = parseDate(row[safe: 1] ?? "") ?? selection.selectionDate
+            selection.vendor = row[safe: 4] ?? selection.vendor
+            selection.amount = max(0, Double(row[safe: 5] ?? "") ?? selection.amount)
+            selection.notes = row[safe: 8] ?? selection.notes
         }
     }
 
@@ -258,7 +343,15 @@ enum ProjectWorkbookService {
         let projectID = project.id
         let expenses = (try? context.fetch(FetchDescriptor<Expense>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
         let changeOrders = (try? context.fetch(FetchDescriptor<ChangeOrder>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
-        BudgetMathService.recalculateActuals(for: project.id, items: items, expenses: expenses, changeOrders: changeOrders)
+        let allowanceSelections = (try? context
+            .fetch(FetchDescriptor<AllowanceSelection>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
+        BudgetMathService.recalculateActuals(
+            for: project.id,
+            items: items,
+            expenses: expenses,
+            changeOrders: changeOrders,
+            allowanceSelections: allowanceSelections
+        )
     }
 
     @MainActor
@@ -437,7 +530,8 @@ enum ProjectWorkbookService {
             .text("Amount"),
             .text("Allowance Amount"),
             .text("Line Overage"),
-            .text("Notes")
+            .text("Notes"),
+            .text("Budget Item ID")
         ]]
 
         let rows = selections.sorted { $0.selectionDate < $1.selectionDate }.map { selection -> [Cell] in
@@ -453,7 +547,8 @@ enum ProjectWorkbookService {
                 .currency(selection.amount),
                 .currency(item?.allowanceAmount ?? 0),
                 lineOverage > 0 ? .negativeCurrency(lineOverage) : .currency(0),
-                .text(selection.notes)
+                .text(selection.notes),
+                .text(selection.lineItemID.uuidString)
             ]
         }
 
@@ -478,7 +573,8 @@ enum ProjectWorkbookService {
             .text("Notes"),
             .text("Paid?"),
             .text("Balance Due"),
-            .text("Room")
+            .text("Room"),
+            .text("Expected Payment Date")
         ]]
             + expenses.map { [
                 .text($0.id.uuidString),
@@ -497,7 +593,8 @@ enum ProjectWorkbookService {
                 .text($0.notes),
                 .text($0.isPaid ? "Yes" : "No"),
                 .currency($0.balanceDue),
-                .text($0.roomTag)
+                .text($0.roomTag),
+                .optionalDate($0.expectedPaymentDate)
             ] }
     }
 
@@ -511,7 +608,8 @@ enum ProjectWorkbookService {
             .text("Budget Item ID"),
             .text("Budget Item"),
             .text("Status"),
-            .text("Notes")
+            .text("Notes"),
+            .text("Expected Payment Date")
         ]]
             + orders.map { [
                 .text($0.id.uuidString),
@@ -522,7 +620,8 @@ enum ProjectWorkbookService {
                 .text($0.budgetLineItemID?.uuidString ?? ""),
                 .text($0.budgetLineItemTitle),
                 .text($0.status.rawValue),
-                .text($0.notes)
+                .text($0.notes),
+                .optionalDate($0.expectedPaymentDate)
             ] }
     }
 

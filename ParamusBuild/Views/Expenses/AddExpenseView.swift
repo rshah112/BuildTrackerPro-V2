@@ -550,7 +550,8 @@ struct AddExpenseView: View {
                 for: project.id,
                 items: fetchBudgetItems(),
                 expenses: fetchExpenses(),
-                changeOrders: fetchChangeOrders()
+                changeOrders: fetchChangeOrders(),
+                allowanceSelections: fetchAllowanceSelections()
             )
             saveAndDismiss {
                 mirrorReceiptToDisk(for: expenseToEdit)
@@ -564,7 +565,8 @@ struct AddExpenseView: View {
             for: project.id,
             items: fetchBudgetItems(),
             expenses: fetchExpenses(including: expense),
-            changeOrders: fetchChangeOrders()
+            changeOrders: fetchChangeOrders(),
+            allowanceSelections: fetchAllowanceSelections()
         )
         saveAndDismiss {
             mirrorReceiptToDisk(for: expense)
@@ -647,6 +649,14 @@ struct AddExpenseView: View {
         let descriptor = FetchDescriptor<ChangeOrder>(
             predicate: #Predicate { $0.projectID == projectID },
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    private func fetchAllowanceSelections() -> [AllowanceSelection] {
+        let projectID = project.id
+        let descriptor = FetchDescriptor<AllowanceSelection>(
+            predicate: #Predicate { $0.projectID == projectID }
         )
         return (try? modelContext.fetch(descriptor)) ?? []
     }

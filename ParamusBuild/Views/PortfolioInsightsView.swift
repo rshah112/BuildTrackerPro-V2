@@ -10,6 +10,7 @@ struct PortfolioInsightsView: View {
     @Query(sort: \Project.createdAt, order: .reverse) private var projects: [Project]
     @Query(sort: \BudgetLineItem.costCode) private var items: [BudgetLineItem]
     @Query(sort: \Expense.date, order: .reverse) private var expenses: [Expense]
+    @Query(sort: \AllowanceSelection.selectionDate, order: .reverse) private var allowanceSelections: [AllowanceSelection]
 
     @State private var selectedTab: InsightsTab = .costPerSquareFoot
     @State private var activePDF: InsightsPDF?
@@ -20,7 +21,13 @@ struct PortfolioInsightsView: View {
     }
 
     private var costRows: [CostPerSquareFootRow] {
-        InsightsMath.costPerSquareFootRows(projects: projects, items: items, expenses: expenses, changeOrders: changeOrders)
+        InsightsMath.costPerSquareFootRows(
+            projects: projects,
+            items: items,
+            expenses: expenses,
+            allowanceSelections: allowanceSelections,
+            changeOrders: changeOrders
+        )
     }
 
     private var phaseRows: [PhasePercentRow] {
@@ -176,6 +183,7 @@ struct PortfolioInsightsView: View {
                 projects: projects,
                 items: items,
                 expenses: expenses,
+                allowanceSelections: allowanceSelections,
                 changeOrders: changeOrders
             ))
             exportError = nil
@@ -192,14 +200,19 @@ enum InsightsMath {
         projects: [Project],
         items: [BudgetLineItem],
         expenses: [Expense],
+        allowanceSelections: [AllowanceSelection] = [],
         changeOrders: [ChangeOrder]
     ) -> [CostPerSquareFootRow] {
+        let itemsByProject = Dictionary(grouping: items, by: \.projectID)
         let expensesByProject = Dictionary(grouping: expenses, by: \.projectID)
+        let selectionsByProject = Dictionary(grouping: allowanceSelections, by: \.projectID)
         let ordersByProject = Dictionary(grouping: changeOrders, by: \.projectID)
         return projects.compactMap { project in
             guard let sqft = project.squareFootage, sqft > 0 else { return nil }
             let total = BudgetMathService.actualSpend(
+                items: itemsByProject[project.id, default: []],
                 expenses: expensesByProject[project.id, default: []],
+                allowanceSelections: selectionsByProject[project.id, default: []],
                 changeOrders: ordersByProject[project.id, default: []]
             )
             let fallback = project.constructionBudget > 0 ? project.constructionBudget : items.filter { $0.projectID == project.id }

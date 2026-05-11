@@ -104,7 +104,8 @@ enum CashFlowService {
             guard expense.projectID == project.id, expense.balanceDue > 0 else { return nil }
             guard let expectedDate = expense.expectedPaymentDate ?? expense.dueDate else { return nil }
             let day = calendar.startOfDay(for: expectedDate)
-            guard day >= start, day < end else { return nil }
+            let forecastDay = max(day, start)
+            guard forecastDay < end else { return nil }
             return CashFlowPayment(
                 id: "expense-\(expense.id.uuidString)",
                 sourceID: expense.id,
@@ -113,14 +114,15 @@ enum CashFlowService {
                 title: expense.vendorName,
                 subtitle: expense.invoiceNumber.trimmed.isEmpty ? expense.categoryName : "Inv \(expense.invoiceNumber)",
                 amount: expense.balanceDue,
-                expectedDate: day
+                expectedDate: forecastDay
             )
         }
 
         let changeOrderPayments = changeOrders.compactMap { order -> CashFlowPayment? in
             guard order.projectID == project.id, order.status != .paid, let expectedDate = order.expectedPaymentDate else { return nil }
             let day = calendar.startOfDay(for: expectedDate)
-            guard day >= start, day < end else { return nil }
+            let forecastDay = max(day, start)
+            guard forecastDay < end else { return nil }
             return CashFlowPayment(
                 id: "change-\(order.id.uuidString)",
                 sourceID: order.id,
@@ -129,7 +131,7 @@ enum CashFlowService {
                 title: order.title,
                 subtitle: order.status == .pending ? "Pending change" : "Approved change",
                 amount: order.amount,
-                expectedDate: day
+                expectedDate: forecastDay
             )
         }
 

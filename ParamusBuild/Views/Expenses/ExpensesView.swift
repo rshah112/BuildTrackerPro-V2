@@ -277,7 +277,8 @@ struct ExpensesView: View {
             for: project.id,
             items: effectiveItems,
             expenses: effectiveExpenses,
-            changeOrders: fetchChangeOrders()
+            changeOrders: fetchChangeOrders(),
+            allowanceSelections: fetchAllowanceSelections()
         )
     }
 
@@ -286,6 +287,14 @@ struct ExpensesView: View {
         let descriptor = FetchDescriptor<ChangeOrder>(
             predicate: #Predicate { $0.projectID == projectID },
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    private func fetchAllowanceSelections() -> [AllowanceSelection] {
+        let projectID = project.id
+        let descriptor = FetchDescriptor<AllowanceSelection>(
+            predicate: #Predicate { $0.projectID == projectID }
         )
         return (try? modelContext.fetch(descriptor)) ?? []
     }

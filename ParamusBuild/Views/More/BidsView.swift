@@ -291,7 +291,9 @@ private struct BidPackageDetailView: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            Button { bidToAward = bid; showingAwardActions = true } label: { Label("Award", systemImage: "checkmark.seal") }
+            if package.awardedBidID == nil {
+                Button { bidToAward = bid; showingAwardActions = true } label: { Label("Award", systemImage: "checkmark.seal") }
+            }
             Button(role: .destructive) { delete(bid) } label: { Label("Delete", systemImage: "trash") }
         }
     }
@@ -302,6 +304,12 @@ private struct BidPackageDetailView: View {
     }
 
     private func award(_ bid: Bid, asChangeOrder: Bool) {
+        guard package.awardedBidID == nil else {
+            errorMessage = "This bid package already has an awarded bid."
+            bidToAward = nil
+            Haptics.warning()
+            return
+        }
         package.status = .awarded
         package.awardedBidID = bid.id
         bid.awardedAt = .now

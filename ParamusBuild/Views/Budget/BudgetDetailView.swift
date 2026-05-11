@@ -429,12 +429,13 @@ struct BudgetDetailView: View {
         item.isPinned = isPinned
         item.isAllowance = isAllowance
         item.allowanceAmount = isAllowance ? max(0, allowanceAmount) : 0
+        syncLinkedRecords(to: item)
         let effectiveSelections = isAllowance ? seedSelectionsFromLinkedExpensesIfNeeded() : allowanceSelections
         BudgetMathService.recalculateActuals(
             for: projectID,
             items: projectItems,
             expenses: expenses,
-            changeOrders: [],
+            changeOrders: fetchLinkedChangeOrders(),
             allowanceSelections: effectiveSelections
         )
 
@@ -537,6 +538,31 @@ struct BudgetDetailView: View {
             predicate: #Predicate { $0.id == itemID && $0.projectID == projectID }
         )
         return try? modelContext.fetch(descriptor).first
+    }
+
+    private func fetchLinkedChangeOrders() -> [ChangeOrder] {
+        let descriptor = FetchDescriptor<ChangeOrder>(
+            predicate: #Predicate { $0.projectID == projectID && $0.budgetLineItemID == itemID }
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    private func syncLinkedRecords(to item: BudgetLineItem) {
+        for expense in linkedExpenses {
+            expense.categoryName = item.categoryName
+            expense.budgetLineItemTitle = item.title
+            expense.roomTag = item.roomTag
+        }
+
+        for photo in linkedPhotos {
+            photo.categoryName = item.categoryName
+            photo.roomTag = item.roomTag
+        }
+
+        for order in fetchLinkedChangeOrders() {
+            order.categoryName = item.categoryName
+            order.budgetLineItemTitle = item.title
+        }
     }
 }
 

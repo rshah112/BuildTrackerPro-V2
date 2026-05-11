@@ -6,6 +6,7 @@ enum InsightsPDFService {
         projects: [Project],
         items: [BudgetLineItem],
         expenses: [Expense],
+        allowanceSelections: [AllowanceSelection] = [],
         changeOrders: [ChangeOrder]
     ) throws -> URL {
         let url = FileManager.default.temporaryDirectory
@@ -21,9 +22,14 @@ enum InsightsPDFService {
 
             draw("$/sqft by Project", x: 44, y: y, size: 16, weight: .bold)
             y += 24
-            for row in InsightsMath.costPerSquareFootRows(projects: projects, items: items, expenses: expenses, changeOrders: changeOrders)
-                .prefix(10)
-            {
+            for row in InsightsMath.costPerSquareFootRows(
+                projects: projects,
+                items: items,
+                expenses: expenses,
+                allowanceSelections: allowanceSelections,
+                changeOrders: changeOrders
+            )
+            .prefix(10) {
                 guard ensureSpace(&y, context: context) else { continue }
                 draw(row.projectName, x: 44, y: y, size: 10)
                 draw(row.costPerSquareFoot.currencyString, x: 430, y: y, size: 10, alignment: .right)

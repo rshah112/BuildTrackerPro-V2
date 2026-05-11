@@ -277,19 +277,27 @@ struct PortfolioView: View {
         let items = fetchAllBudgetItems()
         let expenses = fetchAllExpenses()
         let changeOrders = fetchAllChangeOrders()
+        let allowanceSelections = fetchAllAllowanceSelections()
         let itemsByProjectID = Dictionary(grouping: items, by: \.projectID)
         let expensesByProjectID = Dictionary(grouping: expenses, by: \.projectID)
         let changeOrdersByProjectID = Dictionary(grouping: changeOrders, by: \.projectID)
+        let allowanceSelectionsByProjectID = Dictionary(grouping: allowanceSelections, by: \.projectID)
 
         metricsByProjectID = Dictionary(
             uniqueKeysWithValues: projects.map { project in
                 let projectItems = itemsByProjectID[project.id, default: []]
                 let projectExpenses = expensesByProjectID[project.id, default: []]
                 let projectChangeOrders = changeOrdersByProjectID[project.id, default: []]
+                let projectAllowanceSelections = allowanceSelectionsByProjectID[project.id, default: []]
                 return (
                     project.id,
                     ProjectCardMetrics(
-                        actual: BudgetMathService.actualSpend(expenses: projectExpenses, changeOrders: projectChangeOrders),
+                        actual: BudgetMathService.actualSpend(
+                            items: projectItems,
+                            expenses: projectExpenses,
+                            allowanceSelections: projectAllowanceSelections,
+                            changeOrders: projectChangeOrders
+                        ),
                         committed: BudgetMathService.committedSpend(items: projectItems, changeOrders: projectChangeOrders),
                         openInvoiceTotal: BudgetMathService.openInvoiceTotal(expenses: projectExpenses),
                         itemCount: projectItems.count
@@ -316,6 +324,13 @@ struct PortfolioView: View {
     private func fetchAllChangeOrders() -> [ChangeOrder] {
         let descriptor = FetchDescriptor<ChangeOrder>(
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    private func fetchAllAllowanceSelections() -> [AllowanceSelection] {
+        let descriptor = FetchDescriptor<AllowanceSelection>(
+            sortBy: [SortDescriptor(\.selectionDate, order: .reverse)]
         )
         return (try? modelContext.fetch(descriptor)) ?? []
     }

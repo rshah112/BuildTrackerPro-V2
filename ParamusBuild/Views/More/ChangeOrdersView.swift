@@ -120,13 +120,25 @@ struct ChangeOrdersView: View {
 
         modelContext.delete(order)
         changeOrders.removeAll { $0.id == orderID }
-        BudgetMathService.recalculateActuals(for: project.id, items: items, expenses: expenses, changeOrders: changeOrders)
+        BudgetMathService.recalculateActuals(
+            for: project.id,
+            items: items,
+            expenses: expenses,
+            changeOrders: changeOrders,
+            allowanceSelections: fetchAllowanceSelections()
+        )
         saveChanges()
     }
 
     private func refreshChangeOrders() {
         changeOrders = fetchChangeOrders()
-        if BudgetMathService.recalculateActuals(for: project.id, items: items, expenses: expenses, changeOrders: changeOrders) {
+        if BudgetMathService.recalculateActuals(
+            for: project.id,
+            items: items,
+            expenses: expenses,
+            changeOrders: changeOrders,
+            allowanceSelections: fetchAllowanceSelections()
+        ) {
             saveChanges()
         }
     }
@@ -144,6 +156,14 @@ struct ChangeOrdersView: View {
         let descriptor = FetchDescriptor<ChangeOrder>(
             predicate: #Predicate { $0.projectID == projectID },
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    private func fetchAllowanceSelections() -> [AllowanceSelection] {
+        let projectID = project.id
+        let descriptor = FetchDescriptor<AllowanceSelection>(
+            predicate: #Predicate { $0.projectID == projectID }
         )
         return (try? modelContext.fetch(descriptor)) ?? []
     }
@@ -391,7 +411,13 @@ struct AddChangeOrderView: View {
             effectiveChangeOrders.append(order)
         }
 
-        BudgetMathService.recalculateActuals(for: project.id, items: items, expenses: expenses, changeOrders: effectiveChangeOrders)
+        BudgetMathService.recalculateActuals(
+            for: project.id,
+            items: items,
+            expenses: expenses,
+            changeOrders: effectiveChangeOrders,
+            allowanceSelections: fetchAllowanceSelections()
+        )
         do {
             try modelContext.save()
             Haptics.success()
@@ -407,6 +433,14 @@ struct AddChangeOrderView: View {
         let descriptor = FetchDescriptor<ChangeOrder>(
             predicate: #Predicate { $0.projectID == projectID },
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    private func fetchAllowanceSelections() -> [AllowanceSelection] {
+        let projectID = project.id
+        let descriptor = FetchDescriptor<AllowanceSelection>(
+            predicate: #Predicate { $0.projectID == projectID }
         )
         return (try? modelContext.fetch(descriptor)) ?? []
     }

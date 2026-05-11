@@ -17,6 +17,7 @@ struct HomeBuildProApp: App {
             #endif
             container = try Self.makeContainer()
             SeedData.ensureSeeded(in: container.mainContext)
+            SwiftDataBackfillService.runIfNeeded(in: container.mainContext)
             // Attach undo AFTER seeding so the seed isn't on the undo stack.
             container.mainContext.undoManager = UndoManager()
         } catch {
@@ -25,6 +26,7 @@ struct HomeBuildProApp: App {
                     try Self.resetDevelopmentStore()
                     container = try Self.makeContainer()
                     SeedData.ensureSeeded(in: container.mainContext)
+                    SwiftDataBackfillService.runIfNeeded(in: container.mainContext)
                     container.mainContext.undoManager = UndoManager()
                 } catch {
                     fatalError("Could not create SwiftData container after resetting development store: \(error.localizedDescription)")
@@ -68,7 +70,7 @@ struct HomeBuildProApp: App {
     }
 
     #if DEBUG
-        private static let developmentStoreVersion = "2026-05-07-phase-11-insights-migration-7"
+        private static let developmentStoreVersion = "2026-05-08-demo-project-reset"
 
         private static var applicationSupportURL: URL {
             FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)

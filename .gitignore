@@ -25,3 +25,6 @@ Package.resolved
 # Project local
 .idea/
 *.swp
+
+# QA artifacts (local screen-walk screenshots, etc.)
+QA/

@@ -242,6 +242,7 @@ struct AddPhotoView: View {
             photo.categoryName = selectedItem.categoryName
             photo.budgetLineItemID = selectedItem.id
         } else {
+            photo.categoryName = ""
             photo.budgetLineItemID = nil
         }
         photo.notes = viewModel.notes.trimmed

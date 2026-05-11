@@ -18,20 +18,22 @@ enum SeedData {
         }
 
         let project = Project(
-            name: "676 Rutgers Pl",
-            address: "676 Rutgers Pl, Paramus NJ",
+            name: "Demo Project - 60% Complete",
+            address: "124 Maple Ave, Ridgewood NJ",
             status: .active,
             priority: .high,
-            purchasePrice: 925_000,
-            lotDimensions: "75 x 125",
-            proposedBuildDimensions: "70 x 48",
-            footprint: "70 x 48 footprint",
+            templateType: .customHome,
+            purchasePrice: 1_050_000,
+            squareFootage: 4850,
+            lotDimensions: "82 x 135",
+            proposedBuildDimensions: "72 x 50",
+            footprint: "72 x 50 footprint",
             stories: 2,
-            basement: "Unfinished basement",
-            scopeSummary: "Luxury two-story custom home with unfinished basement, premium finishes and full site improvements.",
-            warrantyNotes: "Track punch-list and warranty follow-ups after final handover.",
-            startDate: daysAgo(45),
-            targetFinishDate: daysFromNow(210),
+            basement: "Full unfinished basement",
+            scopeSummary: "Demo custom-home build at roughly 60% completion: shell is dried in, rough MEP is underway, invoices and allowance selections are active, and closeout items are still ahead.",
+            warrantyNotes: "Demo data. Use this project to explore budget, cash flow, documents, photos, tasks, bids and allowance workflows.",
+            startDate: daysAgo(126),
+            targetFinishDate: daysFromNow(84),
             constructionBudget: 1_300_000,
             contingencyBudget: 200_000
         )
@@ -51,6 +53,9 @@ enum SeedData {
 
         sampleChangeOrders(projectID: project.id).forEach { context.insert($0) }
         sampleDocuments(projectID: project.id).forEach { context.insert($0) }
+        sampleAllowanceSelections(projectID: project.id, using: insertedItems).forEach { context.insert($0) }
+        sampleTasks(projectID: project.id, using: insertedItems).forEach { context.insert($0) }
+        sampleBids(projectID: project.id, in: context)
 
         #if DEBUG
             if shouldSeedWorkflowSamples {
@@ -83,11 +88,14 @@ enum SeedData {
                     costCode: seed.costCode,
                     title: seed.title,
                     categoryName: category.name,
+                    roomTag: RoomCatalog.inferredRoom(title: seed.title, category: category.name, project: project),
                     budget: seed.budget,
                     actual: includeProgress ? seed.actual : 0,
                     committed: includeProgress ? seed.committed : 0,
                     notes: seed.notes,
-                    isPinned: includeProgress && seed.isPinned
+                    isPinned: includeProgress && seed.isPinned,
+                    isAllowance: seed.title.localizedCaseInsensitiveContains("allowance"),
+                    allowanceAmount: seed.title.localizedCaseInsensitiveContains("allowance") ? seed.budget : 0
                 )
                 insertedItems[seed.costCode] = item
                 context.insert(item)
@@ -140,9 +148,16 @@ enum SeedData {
         let items = (try? context.fetch(FetchDescriptor<BudgetLineItem>())) ?? []
         let expenses = (try? context.fetch(FetchDescriptor<Expense>())) ?? []
         let changeOrders = (try? context.fetch(FetchDescriptor<ChangeOrder>())) ?? []
+        let allowanceSelections = (try? context.fetch(FetchDescriptor<AllowanceSelection>())) ?? []
 
         for project in projects {
-            BudgetMathService.recalculateActuals(for: project.id, items: items, expenses: expenses, changeOrders: changeOrders)
+            BudgetMathService.recalculateActuals(
+                for: project.id,
+                items: items,
+                expenses: expenses,
+                changeOrders: changeOrders,
+                allowanceSelections: allowanceSelections
+            )
         }
     }
 
@@ -930,11 +945,16 @@ private func vendors(for projectID: UUID) -> [Vendor] {
             email: "studio@example.com"
         ),
         Vendor(projectID: projectID, name: "Garden State Survey", trade: "Survey"),
-        Vendor(projectID: projectID, name: "Paramus Permit Office", trade: "Municipal"),
+        Vendor(projectID: projectID, name: "Ridgewood Building Dept.", trade: "Municipal"),
         Vendor(projectID: projectID, name: "North Jersey Siteworks", trade: "Site Work"),
         Vendor(projectID: projectID, name: "Palisades Foundation Co.", trade: "Foundation"),
         Vendor(projectID: projectID, name: "Summit Frame and Lumber", trade: "Framing"),
-        Vendor(projectID: projectID, name: "Alpine Window Supply", trade: "Windows")
+        Vendor(projectID: projectID, name: "Alpine Window Supply", trade: "Windows"),
+        Vendor(projectID: projectID, name: "Tri-State Mechanical", trade: "HVAC"),
+        Vendor(projectID: projectID, name: "Hudson Valley Electric", trade: "Electrical"),
+        Vendor(projectID: projectID, name: "Paramount Plumbing", trade: "Plumbing"),
+        Vendor(projectID: projectID, name: "Stone Harbor Tile", trade: "Tile"),
+        Vendor(projectID: projectID, name: "Cedar Ridge Millwork", trade: "Cabinetry")
     ]
 }
 
@@ -944,8 +964,13 @@ private func sampleExpenses(projectID: UUID, using items: [String: BudgetLineIte
             projectID: projectID,
             amount: 14000,
             vendorName: "Bergen Design Studio",
+            invoiceNumber: "BDS-24017",
             date: daysAgo(28),
+            paidDate: daysAgo(26),
+            paymentMethod: "ACH",
+            paymentReference: "ACH-9102",
             categoryName: "Soft Costs",
+            roomTag: items["0101"]?.roomTag ?? "",
             budgetLineItemID: items["0101"]?.id,
             budgetLineItemTitle: items["0101"]?.title ?? "",
             notes: "Final construction drawings.",
@@ -955,8 +980,13 @@ private func sampleExpenses(projectID: UUID, using items: [String: BudgetLineIte
             projectID: projectID,
             amount: 6500,
             vendorName: "Garden State Survey",
+            invoiceNumber: "GSS-1184",
             date: daysAgo(24),
+            paidDate: daysAgo(23),
+            paymentMethod: "Check",
+            paymentReference: "CHK-1024",
             categoryName: "Soft Costs",
+            roomTag: items["0103"]?.roomTag ?? "",
             budgetLineItemID: items["0103"]?.id,
             budgetLineItemTitle: items["0103"]?.title ?? "",
             notes: "Boundary, topo and stakeout.",
@@ -965,19 +995,46 @@ private func sampleExpenses(projectID: UUID, using items: [String: BudgetLineIte
         Expense(
             projectID: projectID,
             amount: 9000,
-            vendorName: "Paramus Permit Office",
+            vendorName: "Ridgewood Building Dept.",
+            invoiceNumber: "PERMIT-2026-041",
             date: daysAgo(20),
+            paidDate: daysAgo(20),
+            paymentMethod: "Card",
+            paymentReference: "AUTH-6618",
             categoryName: "Soft Costs",
+            roomTag: items["0104"]?.roomTag ?? "",
             budgetLineItemID: items["0104"]?.id,
             budgetLineItemTitle: items["0104"]?.title ?? "",
+            notes: "Building, plumbing and electrical permit fees.",
+            isPaid: true
+        ),
+        Expense(
+            projectID: projectID,
+            amount: 18000,
+            vendorName: "North Jersey Siteworks",
+            invoiceNumber: "NJS-4021",
+            date: daysAgo(112),
+            paidDate: daysAgo(108),
+            paymentMethod: "ACH",
+            paymentReference: "ACH-9225",
+            categoryName: "Demo & Site Prep",
+            roomTag: items["0202"]?.roomTag ?? "Exterior",
+            budgetLineItemID: items["0202"]?.id,
+            budgetLineItemTitle: items["0202"]?.title ?? "",
+            notes: "Demo, dumpsters and initial haul-off.",
             isPaid: true
         ),
         Expense(
             projectID: projectID,
             amount: 8500,
             vendorName: "North Jersey Siteworks",
-            date: daysAgo(12),
+            invoiceNumber: "NJS-4188",
+            date: daysAgo(96),
+            paidDate: daysAgo(91),
+            paymentMethod: "ACH",
+            paymentReference: "ACH-9380",
             categoryName: "Demo & Site Prep",
+            roomTag: items["0203"]?.roomTag ?? "Exterior",
             budgetLineItemID: items["0203"]?.id,
             budgetLineItemTitle: items["0203"]?.title ?? "",
             notes: "Initial clearing and rough grade.",
@@ -987,11 +1044,146 @@ private func sampleExpenses(projectID: UUID, using items: [String: BudgetLineIte
             projectID: projectID,
             amount: 2200,
             vendorName: "PSE&G",
+            invoiceNumber: "PSEG-TEMP-07",
             date: daysAgo(5),
+            dueDate: daysFromNow(5),
+            expectedPaymentDate: daysFromNow(5),
             categoryName: "General Conditions",
+            roomTag: items["0303"]?.roomTag ?? "",
             budgetLineItemID: items["0303"]?.id,
             budgetLineItemTitle: items["0303"]?.title ?? "",
             notes: "Temporary power setup.",
+            isPaid: false
+        ),
+        Expense(
+            projectID: projectID,
+            amount: 86000,
+            vendorName: "Palisades Foundation Co.",
+            invoiceNumber: "PFC-1009",
+            date: daysAgo(82),
+            paidDate: daysAgo(76),
+            paymentMethod: "Wire",
+            paymentReference: "WIRE-1206",
+            categoryName: "Foundation",
+            roomTag: items["0503"]?.roomTag ?? "Basement",
+            budgetLineItemID: items["0503"]?.id,
+            budgetLineItemTitle: items["0503"]?.title ?? "",
+            notes: "Footings, foundation walls, slab prep and waterproofing draw.",
+            isPaid: true
+        ),
+        Expense(
+            projectID: projectID,
+            amount: 98000,
+            vendorName: "Summit Frame and Lumber",
+            invoiceNumber: "SFL-2230",
+            date: daysAgo(54),
+            paidDate: daysAgo(48),
+            paymentMethod: "Wire",
+            paymentReference: "WIRE-1244",
+            categoryName: "Framing & Structural",
+            roomTag: items["0701"]?.roomTag ?? "Whole House",
+            budgetLineItemID: items["0701"]?.id,
+            budgetLineItemTitle: items["0701"]?.title ?? "",
+            notes: "Lumber package and first framing draw.",
+            isPaid: true
+        ),
+        Expense(
+            projectID: projectID,
+            amount: 36000,
+            amountPaid: 18000,
+            vendorName: "Summit Frame and Lumber",
+            invoiceNumber: "SFL-2297",
+            date: daysAgo(19),
+            dueDate: daysFromNow(3),
+            expectedPaymentDate: daysFromNow(3),
+            paidDate: daysAgo(12),
+            paymentMethod: "ACH",
+            paymentReference: "ACH-9518",
+            categoryName: "Framing & Structural",
+            roomTag: items["0702"]?.roomTag ?? "Whole House",
+            budgetLineItemID: items["0702"]?.id,
+            budgetLineItemTitle: items["0702"]?.title ?? "",
+            notes: "Framing labor draw. Balance scheduled this week.",
+            isPaid: false
+        ),
+        Expense(
+            projectID: projectID,
+            amount: 52000,
+            vendorName: "Alpine Window Supply",
+            invoiceNumber: "AWS-3316",
+            date: daysAgo(35),
+            paidDate: daysAgo(31),
+            paymentMethod: "ACH",
+            paymentReference: "ACH-9440",
+            categoryName: "Windows & Exterior Doors",
+            roomTag: items["1101"]?.roomTag ?? "Exterior",
+            budgetLineItemID: items["1101"]?.id,
+            budgetLineItemTitle: items["1101"]?.title ?? "",
+            notes: "Window package deposit and release.",
+            isPaid: true
+        ),
+        Expense(
+            projectID: projectID,
+            amount: 42000,
+            vendorName: "Paramount Plumbing",
+            invoiceNumber: "PP-7710",
+            date: daysAgo(16),
+            dueDate: daysFromNow(9),
+            expectedPaymentDate: daysFromNow(9),
+            categoryName: "Plumbing",
+            roomTag: items["1201"]?.roomTag ?? "Whole House",
+            budgetLineItemID: items["1201"]?.id,
+            budgetLineItemTitle: items["1201"]?.title ?? "",
+            notes: "Rough plumbing draw. Included in cash-flow forecast.",
+            isPaid: false
+        ),
+        Expense(
+            projectID: projectID,
+            amount: 56000,
+            vendorName: "Tri-State Mechanical",
+            invoiceNumber: "TSM-8404",
+            date: daysAgo(11),
+            dueDate: daysFromNow(12),
+            expectedPaymentDate: daysFromNow(12),
+            categoryName: "HVAC",
+            roomTag: items["1302"]?.roomTag ?? "Whole House",
+            budgetLineItemID: items["1302"]?.id,
+            budgetLineItemTitle: items["1302"]?.title ?? "",
+            notes: "Duct rough-in and equipment deposit.",
+            isPaid: false
+        ),
+        Expense(
+            projectID: projectID,
+            amount: 61000,
+            amountPaid: 30000,
+            vendorName: "Hudson Valley Electric",
+            invoiceNumber: "HVE-5199",
+            date: daysAgo(8),
+            dueDate: daysFromNow(14),
+            expectedPaymentDate: daysFromNow(14),
+            paidDate: daysAgo(4),
+            paymentMethod: "ACH",
+            paymentReference: "ACH-9660",
+            categoryName: "Electrical",
+            roomTag: items["1401"]?.roomTag ?? "Whole House",
+            budgetLineItemID: items["1401"]?.id,
+            budgetLineItemTitle: items["1401"]?.title ?? "",
+            notes: "Rough electrical progress invoice with partial payment.",
+            isPaid: false
+        ),
+        Expense(
+            projectID: projectID,
+            amount: 32000,
+            vendorName: "Stone Harbor Tile",
+            invoiceNumber: "SHT-2044",
+            date: daysAgo(2),
+            dueDate: daysFromNow(21),
+            expectedPaymentDate: daysFromNow(21),
+            categoryName: "Tile & Stone",
+            roomTag: "Primary Suite",
+            budgetLineItemID: items["2001"]?.id,
+            budgetLineItemTitle: items["2001"]?.title ?? "",
+            notes: "Tile material order for primary suite.",
             isPaid: false
         )
     ]
@@ -1002,7 +1194,7 @@ private func samplePhotos(projectID: UUID, using items: [String: BudgetLineItem]
         PhotoAttachment(
             projectID: projectID,
             imageData: placeholderImageData(title: "Site cleared", tint: .systemGreen),
-            createdAt: daysAgo(12),
+            createdAt: daysAgo(112),
             roomTag: "Exterior",
             phaseTag: "Demo & Site Prep",
             categoryName: "Demo & Site Prep",
@@ -1012,7 +1204,7 @@ private func samplePhotos(projectID: UUID, using items: [String: BudgetLineItem]
         PhotoAttachment(
             projectID: projectID,
             imageData: placeholderImageData(title: "Stakeout", tint: .systemBlue),
-            createdAt: daysAgo(9),
+            createdAt: daysAgo(96),
             roomTag: "Lot",
             phaseTag: "Foundation",
             categoryName: "Foundation",
@@ -1022,12 +1214,62 @@ private func samplePhotos(projectID: UUID, using items: [String: BudgetLineItem]
         PhotoAttachment(
             projectID: projectID,
             imageData: placeholderImageData(title: "Temp power", tint: .systemOrange),
-            createdAt: daysAgo(5),
+            createdAt: daysAgo(82),
             roomTag: "Front",
             phaseTag: "General Conditions",
             categoryName: "General Conditions",
             budgetLineItemID: items["0303"]?.id,
             notes: "Temporary service installed."
+        ),
+        PhotoAttachment(
+            projectID: projectID,
+            imageData: placeholderImageData(title: "Foundation poured", tint: .systemIndigo),
+            createdAt: daysAgo(72),
+            roomTag: "Basement",
+            phaseTag: "Foundation",
+            categoryName: "Foundation",
+            budgetLineItemID: items["0503"]?.id,
+            notes: "Foundation walls stripped and waterproofing prep started."
+        ),
+        PhotoAttachment(
+            projectID: projectID,
+            imageData: placeholderImageData(title: "Framing complete", tint: .systemBrown),
+            createdAt: daysAgo(42),
+            roomTag: "Whole House",
+            phaseTag: "Framing & Structural",
+            categoryName: "Framing & Structural",
+            budgetLineItemID: items["0702"]?.id,
+            notes: "Second floor framed and roof sheathing complete."
+        ),
+        PhotoAttachment(
+            projectID: projectID,
+            imageData: placeholderImageData(title: "Windows set", tint: .systemTeal),
+            createdAt: daysAgo(27),
+            roomTag: "Exterior",
+            phaseTag: "Windows & Exterior Doors",
+            categoryName: "Windows & Exterior Doors",
+            budgetLineItemID: items["1101"]?.id,
+            notes: "Main window package installed."
+        ),
+        PhotoAttachment(
+            projectID: projectID,
+            imageData: placeholderImageData(title: "Rough plumbing", tint: .systemCyan),
+            createdAt: daysAgo(10),
+            roomTag: "Kitchen",
+            phaseTag: "Plumbing",
+            categoryName: "Plumbing",
+            budgetLineItemID: items["1201"]?.id,
+            notes: "Kitchen island and sink rough-in underway."
+        ),
+        PhotoAttachment(
+            projectID: projectID,
+            imageData: placeholderImageData(title: "Primary tile", tint: .systemPurple),
+            createdAt: daysAgo(3),
+            roomTag: "Primary Suite",
+            phaseTag: "Tile & Stone",
+            categoryName: "Tile & Stone",
+            budgetLineItemID: items["2001"]?.id,
+            notes: "Primary bath tile selections approved."
         )
     ]
 }
@@ -1041,7 +1283,8 @@ private func sampleChangeOrders(projectID: UUID) -> [ChangeOrder] {
             status: .approved,
             notes: "Add dimple mat and enhanced footing drain scope.",
             categoryName: "Foundation",
-            createdAt: daysAgo(4)
+            createdAt: daysAgo(4),
+            expectedPaymentDate: daysFromNow(10)
         ),
         ChangeOrder(
             projectID: projectID,
@@ -1050,7 +1293,17 @@ private func sampleChangeOrders(projectID: UUID) -> [ChangeOrder] {
             status: .pending,
             notes: "Owner review before window package release.",
             categoryName: "Windows & Exterior Doors",
-            createdAt: daysAgo(2)
+            createdAt: daysAgo(2),
+            expectedPaymentDate: daysFromNow(18)
+        ),
+        ChangeOrder(
+            projectID: projectID,
+            title: "Paid framing hardware upgrade",
+            amount: 6400,
+            status: .paid,
+            notes: "Additional hangers and connectors required by field inspection.",
+            categoryName: "Framing & Structural",
+            createdAt: daysAgo(21)
         )
     ]
 }
@@ -1059,21 +1312,178 @@ private func sampleDocuments(projectID: UUID) -> [ProjectDocument] {
     [
         ProjectDocument(
             projectID: projectID,
-            fileName: "676 Rutgers Survey Placeholder.txt",
+            fileName: "Demo Survey.pdf",
             kind: .survey,
-            notes: "Replace with final signed survey.",
-            uploadedAt: daysAgo(18),
-            fileData: Data("Survey placeholder for 676 Rutgers Pl, Paramus NJ.".utf8)
+            notes: "Demo boundary/topographic survey.",
+            uploadedAt: daysAgo(118),
+            fileData: Data("Demo survey placeholder for 124 Maple Ave, Ridgewood NJ.".utf8)
         ),
         ProjectDocument(
             projectID: projectID,
-            fileName: "Architect Plans Placeholder.txt",
+            fileName: "Demo Building Permit.pdf",
+            kind: .approvals,
+            notes: "Demo permit approval with required inspections.",
+            uploadedAt: daysAgo(110),
+            fileData: Data("Demo permit approval placeholder.".utf8)
+        ),
+        ProjectDocument(
+            projectID: projectID,
+            fileName: "Demo Architectural Plans.pdf",
             kind: .plans,
-            notes: "Final PDF set can be uploaded here.",
-            uploadedAt: daysAgo(14),
-            fileData: Data("Architectural plan placeholder for 70 x 48 proposed build.".utf8)
+            notes: "Demo final architectural plan set.",
+            uploadedAt: daysAgo(104),
+            fileData: Data("Demo architectural plan placeholder for 72 x 50 proposed build.".utf8)
+        ),
+        ProjectDocument(
+            projectID: projectID,
+            fileName: "Demo Builder Contract.pdf",
+            kind: .contractsInsurance,
+            notes: "Signed demo construction agreement.",
+            uploadedAt: daysAgo(101),
+            fileData: Data("Demo builder contract placeholder.".utf8)
+        ),
+        ProjectDocument(
+            projectID: projectID,
+            fileName: "Demo Framing Inspection.txt",
+            kind: .inspections,
+            notes: "Passed framing inspection. Rough MEP inspections pending.",
+            uploadedAt: daysAgo(18),
+            fileData: Data("Demo framing inspection passed.".utf8)
+        ),
+        ProjectDocument(
+            projectID: projectID,
+            fileName: "Demo Window Warranty.txt",
+            kind: .receiptsWarranties,
+            notes: "Window package receipt and warranty placeholder.",
+            uploadedAt: daysAgo(24),
+            fileData: Data("Demo window warranty placeholder.".utf8)
         )
     ]
+}
+
+private func sampleAllowanceSelections(projectID: UUID, using items: [String: BudgetLineItem]) -> [AllowanceSelection] {
+    [
+        AllowanceSelection(
+            projectID: projectID,
+            lineItemID: items["1204"]?.id ?? UUID(),
+            selectionDate: daysAgo(14),
+            vendor: "Paramount Plumbing",
+            amount: 19850,
+            notes: "Owner selected upgraded Kohler bath and kitchen fixtures.",
+            photoData: placeholderImageData(title: "Plumbing fixture selection", tint: .systemCyan)
+        ),
+        AllowanceSelection(
+            projectID: projectID,
+            lineItemID: items["1404"]?.id ?? UUID(),
+            selectionDate: daysAgo(9),
+            vendor: "Hudson Valley Electric",
+            amount: 11400,
+            notes: "Decorative lighting package selected under allowance.",
+            photoData: placeholderImageData(title: "Lighting selection", tint: .systemYellow)
+        ),
+        AllowanceSelection(
+            projectID: projectID,
+            lineItemID: items["2303"]?.id ?? UUID(),
+            selectionDate: daysAgo(3),
+            vendor: "Stone Harbor Tile",
+            amount: 25700,
+            notes: "Primary suite bath fixtures selected above allowance.",
+            photoData: placeholderImageData(title: "Bath fixture selection", tint: .systemPurple)
+        )
+    ]
+}
+
+private func sampleTasks(projectID: UUID, using items: [String: BudgetLineItem]) -> [ProjectTask] {
+    [
+        ProjectTask(
+            projectID: projectID,
+            title: "Confirm rough plumbing inspection window",
+            status: .inProgress,
+            dueDate: daysFromNow(2),
+            budgetLineItemID: items["1201"]?.id,
+            notes: "Coordinate inspector after pressure test."
+        ),
+        ProjectTask(
+            projectID: projectID,
+            title: "Resolve stair opening field measurement",
+            status: .blocked,
+            dueDate: daysAgo(1),
+            budgetLineItemID: items["2601"]?.id,
+            notes: "Needs updated shop drawing before stair release."
+        ),
+        ProjectTask(
+            projectID: projectID,
+            title: "Order primary bath tile trim pieces",
+            status: .todo,
+            dueDate: daysFromNow(6),
+            budgetLineItemID: items["2001"]?.id,
+            notes: "Selections approved; trim quantity pending."
+        ),
+        ProjectTask(
+            projectID: projectID,
+            title: "Upload final cabinet shop drawings",
+            status: .todo,
+            dueDate: daysFromNow(12),
+            budgetLineItemID: items["2201"]?.id,
+            notes: "Use Documents tab once approved."
+        ),
+        ProjectTask(
+            projectID: projectID,
+            title: "Foundation waterproofing photos reviewed",
+            status: .done,
+            dueDate: daysAgo(62),
+            budgetLineItemID: items["0505"]?.id,
+            notes: "Demo completed task.",
+            completedAt: daysAgo(61)
+        )
+    ]
+}
+
+@MainActor
+private func sampleBids(projectID: UUID, in context: ModelContext) {
+    let package = BidPackage(
+        projectID: projectID,
+        scopeTitle: "Cabinetry and built-ins",
+        dueDate: daysFromNow(7),
+        status: .open,
+        notes: "Demo bid package for side-by-side comparison."
+    )
+    context.insert(package)
+
+    let bids = [
+        Bid(
+            projectID: projectID,
+            packageID: package.id,
+            vendorName: "Cedar Ridge Millwork",
+            amount: 58400,
+            fileData: Data("Demo Cedar Ridge cabinet proposal.".utf8),
+            fileName: "Cedar Ridge Cabinet Bid.pdf",
+            notes: "Best detail and shortest lead time.",
+            lineItems: [
+                BidLine(title: "Kitchen cabinets", amount: 36000),
+                BidLine(title: "Vanities", amount: 12800),
+                BidLine(title: "Built-ins", amount: 9600)
+            ],
+            createdAt: daysAgo(4)
+        ),
+        Bid(
+            projectID: projectID,
+            packageID: package.id,
+            vendorName: "Metro Custom Cabinetry",
+            amount: 54900,
+            fileData: Data("Demo Metro cabinet proposal.".utf8),
+            fileName: "Metro Custom Cabinetry Bid.pdf",
+            notes: "Lower number; longer lead time.",
+            lineItems: [
+                BidLine(title: "Kitchen cabinets", amount: 34500),
+                BidLine(title: "Vanities", amount: 11600),
+                BidLine(title: "Built-ins", amount: 8800)
+            ],
+            createdAt: daysAgo(3)
+        )
+    ]
+
+    bids.forEach { context.insert($0) }
 }
 
 private func daysAgo(_ value: Int) -> Date {
@@ -1107,6 +1517,6 @@ private func placeholderImageData(title: String, tint: UIColor) -> Data? {
         ]
 
         title.draw(in: CGRect(x: 56, y: 820, width: 780, height: 180), withAttributes: titleAttributes)
-        "676 Rutgers Pl".draw(in: CGRect(x: 56, y: 1008, width: 780, height: 80), withAttributes: subtitleAttributes)
+        "Demo Project - 60% Complete".draw(in: CGRect(x: 56, y: 1008, width: 780, height: 80), withAttributes: subtitleAttributes)
     }
 }

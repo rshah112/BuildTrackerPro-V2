@@ -162,6 +162,7 @@ struct ExportProjectView: View {
                 expenses: expenses,
                 changeOrders: changeOrders,
                 vendors: vendors,
+                allowanceSelections: allowanceSelections,
                 context: modelContext
             )
             try modelContext.save()
