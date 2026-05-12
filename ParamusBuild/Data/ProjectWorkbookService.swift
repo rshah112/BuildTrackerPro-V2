@@ -222,6 +222,11 @@ enum ProjectWorkbookService {
 
             if let paidFlag = parseBool(row[safe: 14] ?? "") {
                 expense.isPaid = paidFlag
+                // If a user externally edits the workbook to set Paid? = Yes without
+                // filling Amount Paid or Paid Date, treat "Yes" as "fully paid on the
+                // expense date" — that matches in-app semantics where the toggle is
+                // a closed/open binary. Worst case: a Yes + $0 + no paid date round-
+                // trips as Yes + full amount + expense date, never the reverse.
                 if paidFlag, expense.amountPaid <= 0 {
                     expense.amountPaid = expense.amount
                 }

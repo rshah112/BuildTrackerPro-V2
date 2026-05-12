@@ -18,6 +18,8 @@ struct ExportProjectView: View {
     @State private var exportError: String?
     @State private var showingImporter = false
     @State private var backupSnapshotCount = 0
+    @State private var inFlightScope: ProjectExportScope?
+    @State private var importInFlight = false
 
     @ObservedObject private var health = StorageHealthMonitor.shared
 
@@ -81,9 +83,16 @@ struct ExportProjectView: View {
                     Button {
                         export(scope)
                     } label: {
-                        MoreRow(title: scope.title, subtitle: scope.subtitle, systemImage: scope.systemImage)
+                        HStack {
+                            MoreRow(title: scope.title, subtitle: scope.subtitle, systemImage: scope.systemImage)
+                            if inFlightScope == scope {
+                                ProgressView()
+                                    .padding(.trailing, 4)
+                            }
+                        }
                     }
                     .foregroundStyle(.primary)
+                    .disabled(inFlightScope != nil || importInFlight)
                 }
             }
 
@@ -91,13 +100,20 @@ struct ExportProjectView: View {
                 Button {
                     showingImporter = true
                 } label: {
-                    MoreRow(
-                        title: "Import Edited Workbook",
-                        subtitle: "Select the edited Excel workbook or the exported ZIP",
-                        systemImage: "square.and.arrow.down"
-                    )
+                    HStack {
+                        MoreRow(
+                            title: "Import Edited Workbook",
+                            subtitle: "Select the edited Excel workbook or the exported ZIP",
+                            systemImage: "square.and.arrow.down"
+                        )
+                        if importInFlight {
+                            ProgressView()
+                                .padding(.trailing, 4)
+                        }
+                    }
                 }
                 .foregroundStyle(.primary)
+                .disabled(inFlightScope != nil || importInFlight)
             }
 
             Section {
@@ -174,6 +190,9 @@ struct ExportProjectView: View {
     }
 
     private func export(_ scope: ProjectExportScope) {
+        guard inFlightScope == nil, !importInFlight else { return }
+        inFlightScope = scope
+        exportError = nil
         do {
             let changeOrders = fetchChangeOrders()
             let url = try ProjectExportService.createArchive(
@@ -188,14 +207,18 @@ struct ExportProjectView: View {
                 allowanceSelections: allowanceSelections
             )
             activeArchive = ExportedArchive(url: url)
-            exportError = nil
             Haptics.success()
         } catch {
             exportError = error.localizedDescription
         }
+        inFlightScope = nil
     }
 
     private func importWorkbook(_ result: Result<[URL], Error>) {
+        guard inFlightScope == nil, !importInFlight else { return }
+        importInFlight = true
+        exportError = nil
+        defer { importInFlight = false }
         do {
             guard let url = try result.get().first else { return }
             let isScoped = url.startAccessingSecurityScopedResource()
@@ -218,7 +241,6 @@ struct ExportProjectView: View {
                 context: modelContext
             )
             try modelContext.save()
-            exportError = nil
             Haptics.success()
         } catch {
             exportError = "Import failed: \(error.localizedDescription)"

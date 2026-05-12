@@ -107,6 +107,10 @@ enum BackupService {
         let tmpFolder = FileManager.default.temporaryDirectory.appending(path: snapshotFolderName, directoryHint: .isDirectory)
         try? FileManager.default.removeItem(at: tmpFolder)
         try FileManager.default.createDirectory(at: tmpFolder, withIntermediateDirectories: true)
+        // If we throw partway through, don't leave a half-built snapshot tree in /tmp.
+        // After a successful move into Backups/, tmpFolder no longer exists and the
+        // try? swallows the no-op.
+        defer { try? FileManager.default.removeItem(at: tmpFolder) }
 
         var perProjectStats: [(name: String, sizeBytes: Int)] = []
 
@@ -220,6 +224,10 @@ enum BackupService {
             guard isDir else { return nil }
             let projectCount = (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil))?
                 .filter { $0.pathExtension.lowercased() == "zip" }.count ?? 0
+            // Hide empty folders: a snapshot with zero project ZIPs is a half-finished
+            // write or stray directory, never a usable restore target. Surfacing it as
+            // "0 projects" would make the user think they have backups they don't.
+            guard projectCount > 0 else { return nil }
             return BackupSnapshot(
                 id: UUID(),
                 folderURL: url,
