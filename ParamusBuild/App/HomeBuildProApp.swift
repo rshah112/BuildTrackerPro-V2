@@ -92,7 +92,19 @@ struct HomeBuildProApp: App {
     }
 
     private static func makeContainer() throws -> ModelContainer {
-        let configuration = ModelConfiguration("HomeBuildPro", schema: appSchema, isStoredInMemoryOnly: false)
+        // Explicitly opt OUT of SwiftData ↔ CloudKit mirroring. The iCloud entitlement
+        // on this app is only for CloudDocuments (BackupService writes rotating ZIPs
+        // to the iCloud Drive ubiquity container — that's file I/O, unrelated to
+        // SwiftData). Without `.none` here, SwiftData sees the iCloud container
+        // identifier in the entitlement and auto-enables CloudKit mirroring, which
+        // then refuses to load the store because our models use `@Attribute(.unique)`
+        // and non-optional fields (both forbidden in CloudKit-backed schemas).
+        let configuration = ModelConfiguration(
+            "HomeBuildPro",
+            schema: appSchema,
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .none
+        )
         return try ModelContainer(
             for: appSchema,
             migrationPlan: HomeBuildProMigrationPlan.self,
