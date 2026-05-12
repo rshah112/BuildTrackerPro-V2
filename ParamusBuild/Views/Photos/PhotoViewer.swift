@@ -167,7 +167,6 @@ struct PhotoViewer: View {
 
     // MARK: - Metadata overlay
 
-    @ViewBuilder
     private func metadataOverlay(for photo: PhotoAttachment) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {

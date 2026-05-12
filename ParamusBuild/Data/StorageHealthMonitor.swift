@@ -59,7 +59,7 @@ final class StorageHealthMonitor: ObservableObject {
         availableBytes = Self.currentAvailableBytes()
         iCloudAvailable = Self.iCloudReachable()
         lastBackupDate = BackupService.lastBackupDate()
-        if mirrorFailureMessage != nil && !isDiskLow {
+        if mirrorFailureMessage != nil, !isDiskLow {
             mirrorFailureMessage = nil
         }
     }

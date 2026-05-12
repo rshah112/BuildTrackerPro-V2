@@ -17,7 +17,9 @@ private enum PhotoDateFilter: String, CaseIterable, Identifiable {
     case thirtyDays
     case ninetyDays
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -42,15 +44,15 @@ private enum PhotoDateFilter: String, CaseIterable, Identifiable {
     func contains(_ date: Date, relativeTo reference: Date = .now, calendar: Calendar = .current) -> Bool {
         switch self {
         case .all:
-            return true
+            true
         case .today:
-            return calendar.isDate(date, inSameDayAs: reference)
+            calendar.isDate(date, inSameDayAs: reference)
         case .sevenDays:
-            return windowContains(date, days: 7, reference: reference, calendar: calendar)
+            windowContains(date, days: 7, reference: reference, calendar: calendar)
         case .thirtyDays:
-            return windowContains(date, days: 30, reference: reference, calendar: calendar)
+            windowContains(date, days: 30, reference: reference, calendar: calendar)
         case .ninetyDays:
-            return windowContains(date, days: 90, reference: reference, calendar: calendar)
+            windowContains(date, days: 90, reference: reference, calendar: calendar)
         }
     }
 
@@ -97,11 +99,11 @@ struct PhotosView: View {
     // MARK: - Derived state
 
     private var libraryMode: PhotoLibraryMode {
-        get { PhotoLibraryMode(rawValue: libraryModeRaw) ?? .folders }
+        PhotoLibraryMode(rawValue: libraryModeRaw) ?? .folders
     }
 
     private var dateFilter: PhotoDateFilter {
-        get { PhotoDateFilter(rawValue: dateFilterRaw) ?? .all }
+        PhotoDateFilter(rawValue: dateFilterRaw) ?? .all
     }
 
     private var sortedPhotos: [PhotoAttachment] {
@@ -175,7 +177,7 @@ struct PhotosView: View {
             photo.categoryName,
             photo.notes
         ]
-        .map { $0.localizedLowercase }
+        .map(\.localizedLowercase)
         return haystack.contains { $0.contains(query) }
     }
 

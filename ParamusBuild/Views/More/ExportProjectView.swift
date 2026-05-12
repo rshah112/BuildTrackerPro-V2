@@ -113,7 +113,8 @@ struct ExportProjectView: View {
                 } label: {
                     MoreRow(
                         title: "Reveal Backups in Files",
-                        subtitle: health.iCloudAvailable == true ? "iCloud Drive › HomeBuild Pro › Backups" : "On My iPhone › HomeBuild Pro › Backups",
+                        subtitle: health
+                            .iCloudAvailable == true ? "iCloud Drive › HomeBuild Pro › Backups" : "On My iPhone › HomeBuild Pro › Backups",
                         systemImage: "folder"
                     )
                 }
@@ -121,7 +122,9 @@ struct ExportProjectView: View {
             } header: {
                 Text("Automatic backups")
             } footer: {
-                Text("Manual exports above produce a single ZIP you can share. The app also writes rotating ZIP snapshots automatically on every launch and after project changes — those live in the Backups folder above and survive uninstall when iCloud Drive is on.")
+                Text(
+                    "Manual exports above produce a single ZIP you can share. The app also writes rotating ZIP snapshots automatically on every launch and after project changes — those live in the Backups folder above and survive uninstall when iCloud Drive is on."
+                )
             }
 
             if let exportError {

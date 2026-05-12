@@ -173,7 +173,8 @@ extension Project {
         let vendors = (try? context.fetch(FetchDescriptor<Vendor>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
         let photos = (try? context.fetch(FetchDescriptor<PhotoAttachment>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
         let documents = (try? context.fetch(FetchDescriptor<ProjectDocument>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
-        let allowanceSelections = (try? context.fetch(FetchDescriptor<AllowanceSelection>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
+        let allowanceSelections = (try? context
+            .fetch(FetchDescriptor<AllowanceSelection>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
         let tasks = (try? context.fetch(FetchDescriptor<ProjectTask>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
         let changeOrders = (try? context.fetch(FetchDescriptor<ChangeOrder>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
         let bidPackages = (try? context.fetch(FetchDescriptor<BidPackage>(predicate: #Predicate { $0.projectID == projectID }))) ?? []

@@ -33,8 +33,10 @@ struct DataRecoveryView: View {
                             Label("Data store didn't open", systemImage: "exclamationmark.triangle.fill")
                                 .font(.headline)
                                 .foregroundStyle(.orange)
-                            Text("HomeBuild Pro couldn't open its database this launch. Your photos, receipts and document files are still on disk and any iCloud backups are safe.")
-                                .font(.subheadline)
+                            Text(
+                                "HomeBuild Pro couldn't open its database this launch. Your photos, receipts and document files are still on disk and any iCloud backups are safe."
+                            )
+                            .font(.subheadline)
                             Text(failure.localizedDescription)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -45,9 +47,11 @@ struct DataRecoveryView: View {
 
                 Section("Available backups") {
                     if snapshots.isEmpty {
-                        Text("No backup snapshots found yet. If you've used the app before, look in Files.app under 'On My iPhone › HomeBuild Pro › Backups' or iCloud Drive › HomeBuild Pro › Backups.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                        Text(
+                            "No backup snapshots found yet. If you've used the app before, look in Files.app under 'On My iPhone › HomeBuild Pro › Backups' or iCloud Drive › HomeBuild Pro › Backups."
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                     } else {
                         ForEach(snapshots) { snapshot in
                             HStack(alignment: .top) {
@@ -56,9 +60,11 @@ struct DataRecoveryView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(snapshot.displayName)
                                         .font(.subheadline.weight(.semibold))
-                                    Text("\(snapshot.projectCount) project\(snapshot.projectCount == 1 ? "" : "s") • \(snapshot.isInCloud ? "iCloud Drive" : "On My iPhone")")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                    Text(
+                                        "\(snapshot.projectCount) project\(snapshot.projectCount == 1 ? "" : "s") • \(snapshot.isInCloud ? "iCloud Drive" : "On My iPhone")"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                                 }
                             }
                             .padding(.vertical, 2)
@@ -87,9 +93,11 @@ struct DataRecoveryView: View {
                         } label: {
                             Label("Delete corrupted database & start fresh", systemImage: "trash")
                         }
-                        Text("Wipes the broken database file only. Your Backups/ and Projects/ folders are NOT touched — you can re-import projects from a backup ZIP using Settings → Export / Import after the app restarts.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text(
+                            "Wipes the broken database file only. Your Backups/ and Projects/ folders are NOT touched — you can re-import projects from a backup ZIP using Settings → Export / Import after the app restarts."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                 }
 
@@ -140,7 +148,9 @@ struct DataRecoveryView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("The database file will be deleted and the app will close. Your backups and media files will NOT be touched. Relaunch the app to start fresh, then re-import from a backup if needed.")
+                Text(
+                    "The database file will be deleted and the app will close. Your backups and media files will NOT be touched. Relaunch the app to start fresh, then re-import from a backup if needed."
+                )
             }
             .alert("Database deleted", isPresented: $resetCompleted) {
                 Button("Close App") {
@@ -152,7 +162,6 @@ struct DataRecoveryView: View {
         }
     }
 
-    @ViewBuilder
     private func recoveryStep(_ text: String, icon: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: icon)

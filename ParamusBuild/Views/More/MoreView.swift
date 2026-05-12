@@ -149,7 +149,11 @@ struct MoreView: View {
                     Button(role: .destructive) {
                         showingDeleteAlert = true
                     } label: {
-                        MoreRow(title: "Delete Project", subtitle: "Move to Trash (restorable for \(Project.trashRetentionDays) days)", systemImage: "trash")
+                        MoreRow(
+                            title: "Delete Project",
+                            subtitle: "Move to Trash (restorable for \(Project.trashRetentionDays) days)",
+                            systemImage: "trash"
+                        )
                     }
                 }
             }

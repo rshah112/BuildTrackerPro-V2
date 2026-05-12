@@ -64,7 +64,9 @@ struct SettingsView: View {
         } header: {
             Text("Data safety")
         } footer: {
-            Text("Automatic ZIP snapshots run on launch and after every project change. With iCloud Drive signed in, snapshots are also mirrored outside the app sandbox so they survive uninstall, re-signing and device loss.")
+            Text(
+                "Automatic ZIP snapshots run on launch and after every project change. With iCloud Drive signed in, snapshots are also mirrored outside the app sandbox so they survive uninstall, re-signing and device loss."
+            )
         }
     }
 
@@ -75,7 +77,9 @@ struct SettingsView: View {
         } header: {
             Text("Jobsite")
         } footer: {
-            Text("Large targets size buttons and form fields up for gloved use on a phone in the field. Auto-fill pre-populates new expense forms from receipt OCR.")
+            Text(
+                "Large targets size buttons and form fields up for gloved use on a phone in the field. Auto-fill pre-populates new expense forms from receipt OCR."
+            )
         }
     }
 
@@ -85,7 +89,9 @@ struct SettingsView: View {
         } header: {
             Text("Exports")
         } footer: {
-            Text("Spreadsheets and ZIP exports include fractional cents when this is on. The in-app dashboard always rounds to whole dollars for readability — all aggregation runs on cent-exact math regardless of this setting.")
+            Text(
+                "Spreadsheets and ZIP exports include fractional cents when this is on. The in-app dashboard always rounds to whole dollars for readability — all aggregation runs on cent-exact math regardless of this setting."
+            )
         }
     }
 
@@ -104,7 +110,9 @@ struct SettingsView: View {
         } header: {
             Text("Diagnostics")
         } footer: {
-            Text("If iCloud Drive shows as unavailable, make sure you're signed into iCloud in iOS Settings AND the iCloud capability is enabled for this App ID in the Apple Developer portal.")
+            Text(
+                "If iCloud Drive shows as unavailable, make sure you're signed into iCloud in iOS Settings AND the iCloud capability is enabled for this App ID in the Apple Developer portal."
+            )
         }
     }
 

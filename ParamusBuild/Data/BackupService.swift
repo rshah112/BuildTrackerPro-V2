@@ -115,10 +115,12 @@ enum BackupService {
             let items = (try? context.fetch(FetchDescriptor<BudgetLineItem>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
             let expenses = (try? context.fetch(FetchDescriptor<Expense>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
             let photos = (try? context.fetch(FetchDescriptor<PhotoAttachment>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
-            let documents = (try? context.fetch(FetchDescriptor<ProjectDocument>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
+            let documents = (try? context.fetch(FetchDescriptor<ProjectDocument>(predicate: #Predicate { $0.projectID == projectID }))) ??
+                []
             let changeOrders = (try? context.fetch(FetchDescriptor<ChangeOrder>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
             let vendors = (try? context.fetch(FetchDescriptor<Vendor>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
-            let allowanceSelections = (try? context.fetch(FetchDescriptor<AllowanceSelection>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
+            let allowanceSelections = (try? context
+                .fetch(FetchDescriptor<AllowanceSelection>(predicate: #Predicate { $0.projectID == projectID }))) ?? []
 
             let archiveURL = try ProjectExportService.createArchive(
                 project: project,
@@ -187,7 +189,7 @@ enum BackupService {
         let iCloud = iCloudBackupsRoot.map { snapshots(in: $0, isInCloud: true) } ?? []
 
         var bestByName: [String: BackupSnapshot] = [:]
-        for snap in (local + iCloud) {
+        for snap in local + iCloud {
             let name = snap.folderURL.lastPathComponent
             if let existing = bestByName[name], existing.isInCloud { continue }
             bestByName[name] = snap
@@ -304,7 +306,7 @@ enum BackupService {
     }
 
     private static func parseTimestamp(_ string: String) -> Date? {
-        Self.timestampFormatter.date(from: string)
+        timestampFormatter.date(from: string)
     }
 
     private static let timestampFormatter: DateFormatter = {

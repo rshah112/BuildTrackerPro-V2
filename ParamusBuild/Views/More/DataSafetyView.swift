@@ -100,22 +100,28 @@ struct DataSafetyView: View {
                         }
                     }
                     Section {
-                        Text("Projects in Trash are auto-deleted after \(Project.trashRetentionDays) days. Until then, Restore brings them back with every photo, expense and document intact.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text(
+                            "Projects in Trash are auto-deleted after \(Project.trashRetentionDays) days. Until then, Restore brings them back with every photo, expense and document intact."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                 } else {
                     Section("Trash") {
-                        Text("No deleted projects. Anything you delete from Portfolio lands here for \(Project.trashRetentionDays) days before permanent removal.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text(
+                            "No deleted projects. Anything you delete from Portfolio lands here for \(Project.trashRetentionDays) days before permanent removal."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                 }
 
                 Section("About backups") {
-                    Text("HomeBuild Pro writes a full ZIP snapshot of all projects (data + photos + receipts + documents) to the Backups folder on every launch and after project changes. If iCloud Drive is signed in, snapshots are also mirrored there so they survive uninstall and device loss. The newest 30 snapshots are kept; older ones rotate out.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        "HomeBuild Pro writes a full ZIP snapshot of all projects (data + photos + receipts + documents) to the Backups folder on every launch and after project changes. If iCloud Drive is signed in, snapshots are also mirrored there so they survive uninstall and device loss. The newest 30 snapshots are kept; older ones rotate out."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("Data Safety")
@@ -135,7 +141,9 @@ struct DataSafetyView: View {
                     projectToPermanentlyDelete = nil
                 }
             } message: { project in
-                Text("\(project.name) and all of its data — budget, expenses, photos, documents, vendors, change orders, bids — will be removed for good. Backups in Files.app and iCloud Drive are NOT touched.")
+                Text(
+                    "\(project.name) and all of its data — budget, expenses, photos, documents, vendors, change orders, bids — will be removed for good. Backups in Files.app and iCloud Drive are NOT touched."
+                )
             }
             .alert(
                 manualBackupResult?.title ?? "",

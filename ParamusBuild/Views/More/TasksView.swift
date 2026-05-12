@@ -7,7 +7,9 @@ private enum TasksFilter: String, CaseIterable, Identifiable {
     case open
     case done
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -83,10 +85,10 @@ struct TasksView: View {
 
     private func tasks(for filter: TasksFilter) -> [ProjectTask] {
         switch filter {
-        case .all: return tasks
-        case .overdue: return overdueTasks
-        case .open: return openTasks
-        case .done: return doneTasks
+        case .all: tasks
+        case .overdue: overdueTasks
+        case .open: openTasks
+        case .done: doneTasks
         }
     }
 
@@ -247,7 +249,10 @@ struct TasksView: View {
                                 Haptics.lightTap()
                                 cycleStatus(for: task)
                             } label: {
-                                Label(task.status == .done ? "Reopen" : "Advance", systemImage: task.status == .done ? "arrow.uturn.backward" : "checkmark")
+                                Label(
+                                    task.status == .done ? "Reopen" : "Advance",
+                                    systemImage: task.status == .done ? "arrow.uturn.backward" : "checkmark"
+                                )
                             }
                             .tint(task.status == .done ? AppTheme.warning : AppTheme.positive)
                         }

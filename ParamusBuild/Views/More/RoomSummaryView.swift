@@ -8,7 +8,9 @@ private enum RoomSummarySortField: String, CaseIterable, Identifiable {
     case spent
     case utilization
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -67,16 +69,16 @@ struct RoomSummaryView: View {
     private func applySort(to source: [RoomSummary]) -> [RoomSummary] {
         switch sortField {
         case .projectOrder:
-            return source
+            source
         case .alpha:
-            return source.sorted { $0.room.localizedStandardCompare($1.room) == .orderedAscending }
+            source.sorted { $0.room.localizedStandardCompare($1.room) == .orderedAscending }
         case .budget:
             // Cent-exact comparison so two near-identical budgets don't flip from a sub-cent drift.
-            return source.sorted { MoneyMath.cents($0.budget) > MoneyMath.cents($1.budget) }
+            source.sorted { MoneyMath.cents($0.budget) > MoneyMath.cents($1.budget) }
         case .spent:
-            return source.sorted { MoneyMath.cents($0.spent) > MoneyMath.cents($1.spent) }
+            source.sorted { MoneyMath.cents($0.spent) > MoneyMath.cents($1.spent) }
         case .utilization:
-            return source.sorted { lhs, rhs in
+            source.sorted { lhs, rhs in
                 let lhsRatio = lhs.budget > 0 ? lhs.spent / lhs.budget : 0
                 let rhsRatio = rhs.budget > 0 ? rhs.spent / rhs.budget : 0
                 return lhsRatio > rhsRatio

@@ -34,7 +34,7 @@ enum MoneyMath {
 
     /// Sum a sequence of Double dollar values via integer cents. The result is
     /// guaranteed cent-exact: no IEEE 754 drift can sneak in across operands.
-    static func sum<S: Sequence>(_ values: S) -> Double where S.Element == Double {
+    static func sum(_ values: some Sequence<Double>) -> Double {
         let totalCents = values.reduce(Int64(0)) { $0 + cents($1) }
         return dollars(totalCents)
     }
@@ -61,7 +61,7 @@ extension Double {
     }
 }
 
-extension Sequence where Element == Double {
+extension Sequence<Double> {
     /// `[1.10, 2.20, 3.30].sumRoundedToCents()` → 6.60, even when the same `reduce(+)`
     /// would produce 6.6000000000000005.
     func sumRoundedToCents() -> Double {

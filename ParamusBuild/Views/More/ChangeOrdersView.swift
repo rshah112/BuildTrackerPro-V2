@@ -7,7 +7,9 @@ private enum ChangeOrderStatusFilter: String, CaseIterable, Identifiable {
     case approved
     case paid
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -38,10 +40,10 @@ private enum ChangeOrderStatusFilter: String, CaseIterable, Identifiable {
 
     func matches(_ status: ChangeOrderStatus) -> Bool {
         switch self {
-        case .all: return true
-        case .pending: return status == .pending
-        case .approved: return status == .approved
-        case .paid: return status == .paid
+        case .all: true
+        case .pending: status == .pending
+        case .approved: status == .approved
+        case .paid: status == .paid
         }
     }
 }
@@ -112,9 +114,9 @@ struct ChangeOrdersView: View {
 
     private func statusCount(_ filter: ChangeOrderStatusFilter) -> Int {
         switch filter {
-        case .all: return changeOrders.count
+        case .all: changeOrders.count
         case .pending, .approved, .paid:
-            return changeOrders.filter { filter.matches($0.status) }.count
+            changeOrders.filter { filter.matches($0.status) }.count
         }
     }
 

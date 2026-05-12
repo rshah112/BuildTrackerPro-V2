@@ -12,6 +12,7 @@
 		2A00010100000000000000AD /* DataRecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000AD /* DataRecoveryView.swift */; };
 		2A00010100000000000000AE /* DataSafetyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000AE /* DataSafetyView.swift */; };
 		2A00010100000000000000B1 /* MoneyMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000B1 /* MoneyMath.swift */; };
+		2A00010100000000000000B2 /* AppSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000B2 /* AppSchema.swift */; };
 		2A00010100000000000000A9 /* PortfolioInsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000A9 /* PortfolioInsightsView.swift */; };
 		2A00010100000000000000A8 /* InsightsPDFService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000A8 /* InsightsPDFService.swift */; };
 		2A00010100000000000000A7 /* BidsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000A7 /* BidsView.swift */; };
@@ -82,6 +83,7 @@
 		2A00020100000000000000AE /* DataSafetyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSafetyView.swift; sourceTree = "<group>"; };
 		2A00020100000000000000AF /* ParamusBuild.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ParamusBuild.entitlements; sourceTree = "<group>"; };
 		2A00020100000000000000B1 /* MoneyMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyMath.swift; sourceTree = "<group>"; };
+		2A00020100000000000000B2 /* AppSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSchema.swift; sourceTree = "<group>"; };
 		2A00020100000000000000A9 /* PortfolioInsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortfolioInsightsView.swift; sourceTree = "<group>"; };
 		2A00020100000000000000A8 /* InsightsPDFService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsPDFService.swift; sourceTree = "<group>"; };
 		2A00020100000000000000A7 /* BidsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BidsView.swift; sourceTree = "<group>"; };
@@ -234,6 +236,7 @@
 				2A00020100000000000000AB /* BackupService.swift */,
 				2A00020100000000000000AC /* StorageHealthMonitor.swift */,
 				2A00020100000000000000B1 /* MoneyMath.swift */,
+				2A00020100000000000000B2 /* AppSchema.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -465,6 +468,7 @@
 				2A00010100000000000000AD /* DataRecoveryView.swift in Sources */,
 				2A00010100000000000000AE /* DataSafetyView.swift in Sources */,
 				2A00010100000000000000B1 /* MoneyMath.swift in Sources */,
+				2A00010100000000000000B2 /* AppSchema.swift in Sources */,
 				2A0001010000000000000015 /* DashboardView.swift in Sources */,
 				2A0001010000000000000016 /* BudgetView.swift in Sources */,
 				2A0001010000000000000017 /* BudgetDetailView.swift in Sources */,

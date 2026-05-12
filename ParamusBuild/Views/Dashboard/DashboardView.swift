@@ -260,11 +260,11 @@ struct DashboardView: View {
     private var backupChip: DashboardChipInfo? {
         switch health.iCloudAvailable {
         case .some(true):
-            return DashboardChipInfo(title: "Backed up", systemImage: "icloud.fill", tint: AppTheme.positive)
+            DashboardChipInfo(title: "Backed up", systemImage: "icloud.fill", tint: AppTheme.positive)
         case .some(false):
-            return DashboardChipInfo(title: "Local only", systemImage: "iphone", tint: AppTheme.warning)
+            DashboardChipInfo(title: "Local only", systemImage: "iphone", tint: AppTheme.warning)
         case .none:
-            return nil
+            nil
         }
     }
 
@@ -474,7 +474,8 @@ struct DashboardView: View {
 
                         Spacer()
 
-                        Text(MoneyMath.dollars(MoneyMath.cents(viewModel.actualSpent) + MoneyMath.cents(viewModel.committedSpend)).compactCurrencyString)
+                        Text(MoneyMath.dollars(MoneyMath.cents(viewModel.actualSpent) + MoneyMath.cents(viewModel.committedSpend))
+                            .compactCurrencyString)
                             .font(.headline.weight(.bold))
                     }
 
@@ -1311,7 +1312,9 @@ private struct DashboardCustomizationView: View {
                 } header: {
                     Text("Sections")
                 } footer: {
-                    Text("Project name, status chips, the today/7-day metrics, quick actions, and the Budget Progress card always stay visible. These toggles control the optional cards below.")
+                    Text(
+                        "Project name, status chips, the today/7-day metrics, quick actions, and the Budget Progress card always stay visible. These toggles control the optional cards below."
+                    )
                 }
 
                 Section {

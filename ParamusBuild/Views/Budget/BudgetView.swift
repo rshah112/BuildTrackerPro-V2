@@ -17,7 +17,9 @@ private enum BudgetSortField: String, CaseIterable, Identifiable {
     case variance
     case utilization
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -36,7 +38,9 @@ private enum BudgetHealthFilter: String, CaseIterable, Identifiable {
     case nearLimit
     case healthy
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -67,10 +71,10 @@ private enum BudgetHealthFilter: String, CaseIterable, Identifiable {
 
     func matches(_ item: BudgetLineItem) -> Bool {
         switch self {
-        case .all: return true
-        case .overBudget: return item.health == .overBudget
-        case .nearLimit: return item.health == .nearLimit
-        case .healthy: return item.health == .healthy
+        case .all: true
+        case .overBudget: item.health == .overBudget
+        case .nearLimit: item.health == .nearLimit
+        case .healthy: item.health == .healthy
         }
     }
 }
@@ -178,8 +182,8 @@ struct BudgetView: View {
         items.filter { $0.categoryName.trimmed.caseInsensitiveCompare("Contingency") != .orderedSame }
     }
 
-    // Cent-exact rollups via MoneyMath so the overview card and progress bar never drift
-    // and `progress > 1` / `>= 0.9` thresholds match what the per-item cards show.
+    /// Cent-exact rollups via MoneyMath so the overview card and progress bar never drift
+    /// and `progress > 1` / `>= 0.9` thresholds match what the per-item cards show.
     private var budgetUsed: Double {
         MoneyMath.sum(constructionItems, by: \.spentAndCommitted)
     }
@@ -414,7 +418,6 @@ struct BudgetView: View {
         }
     }
 
-    @ViewBuilder
     private func emptyStateSection(title: String, subtitle: String, action: (String, () -> Void)?) -> some View {
         Section {
             VStack(spacing: 12) {

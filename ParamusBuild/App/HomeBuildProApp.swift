@@ -86,30 +86,26 @@ struct HomeBuildProApp: App {
         }
     }
 
+    /// Versioned schema — see `AppSchema.swift` for how to add V2 etc. when the schema changes.
     private static var appSchema: Schema {
-        Schema([
-            Project.self,
-            BudgetCategory.self,
-            BudgetLineItem.self,
-            Expense.self,
-            Vendor.self,
-            PhotoAttachment.self,
-            ChangeOrder.self,
-            ProjectDocument.self,
-            AllowanceSelection.self,
-            ProjectTask.self,
-            BidPackage.self,
-            Bid.self
-        ])
+        Schema(versionedSchema: AppSchemaV1.self)
     }
 
     private static func makeContainer() throws -> ModelContainer {
         let configuration = ModelConfiguration("HomeBuildPro", schema: appSchema, isStoredInMemoryOnly: false)
-        return try ModelContainer(for: appSchema, configurations: [configuration])
+        return try ModelContainer(
+            for: appSchema,
+            migrationPlan: HomeBuildProMigrationPlan.self,
+            configurations: configuration
+        )
     }
 
     #if DEBUG
-        private static let developmentStoreVersion = "2026-05-08-demo-project-reset"
+        /// Bump this string whenever the SwiftData schema changes during development. DEBUG
+        /// builds will auto-wipe their store on next launch when this differs from the last
+        /// value persisted to UserDefaults. Lets simulator iteration stay painless without
+        /// hitting DataRecoveryView every schema bump.
+        private static let developmentStoreVersion = "2026-05-11-phase14-versioned-schema"
 
         private static var applicationSupportURL: URL {
             FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)

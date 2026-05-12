@@ -8,7 +8,9 @@ private enum BidPackageStatusFilter: String, CaseIterable, Identifiable {
     case awarded
     case passed
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -39,10 +41,10 @@ private enum BidPackageStatusFilter: String, CaseIterable, Identifiable {
 
     func matches(_ status: BidPackageStatus) -> Bool {
         switch self {
-        case .all: return true
-        case .open: return status == .open
-        case .awarded: return status == .awarded
-        case .passed: return status == .passed
+        case .all: true
+        case .open: status == .open
+        case .awarded: status == .awarded
+        case .passed: status == .passed
         }
     }
 }
@@ -113,8 +115,8 @@ struct BidsView: View {
 
     private func statusCount(_ filter: BidPackageStatusFilter) -> Int {
         switch filter {
-        case .all: return packages.count
-        case .open, .awarded, .passed: return packages.filter { filter.matches($0.status) }.count
+        case .all: packages.count
+        case .open, .awarded, .passed: packages.filter { filter.matches($0.status) }.count
         }
     }
 

@@ -19,7 +19,9 @@ private enum ExpenseDateFilter: String, CaseIterable, Identifiable {
     case ninetyDays
     case thisYear
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -62,7 +64,9 @@ private enum ExpenseSortField: String, CaseIterable, Identifiable {
     case vendor
     case dueDate
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -80,7 +84,9 @@ private enum ExpenseGroupBy: String, CaseIterable, Identifiable {
     case category
     case vendor
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -135,11 +141,11 @@ struct ExpensesView: View {
     private var statusFilteredRows: [ExpenseRowSnapshot] {
         switch selectedFilter {
         case .all:
-            return expenseRows
+            expenseRows
         case .open:
-            return expenseRows.filter { !$0.isPaid || $0.balanceDue > 0 }
+            expenseRows.filter { !$0.isPaid || $0.balanceDue > 0 }
         case .paid:
-            return expenseRows.filter { $0.isPaid && $0.balanceDue <= 0 }
+            expenseRows.filter { $0.isPaid && $0.balanceDue <= 0 }
         }
     }
 
@@ -172,13 +178,13 @@ struct ExpensesView: View {
     private var groupedRows: [(title: String, rows: [ExpenseRowSnapshot])] {
         switch groupBy {
         case .none:
-            return [("", sortedRows)]
+            [("", sortedRows)]
         case .month:
-            return groupedByMonth(sortedRows)
+            groupedByMonth(sortedRows)
         case .category:
-            return groupedByKey(sortedRows) { $0.categoryName.trimmed.isEmpty ? "Unassigned" : $0.categoryName }
+            groupedByKey(sortedRows) { $0.categoryName.trimmed.isEmpty ? "Unassigned" : $0.categoryName }
         case .vendor:
-            return groupedByKey(sortedRows) { $0.vendorName.trimmed.isEmpty ? "Unknown vendor" : $0.vendorName }
+            groupedByKey(sortedRows) { $0.vendorName.trimmed.isEmpty ? "Unknown vendor" : $0.vendorName }
         }
     }
 
@@ -297,7 +303,6 @@ struct ExpensesView: View {
 
     // MARK: - Sections
 
-    @ViewBuilder
     private var summaryTilesSection: some View {
         Section {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
@@ -376,7 +381,13 @@ struct ExpensesView: View {
         }
     }
 
-    private func alertBadge(systemImage: String, tint: Color, primary: String, secondary: String, action: @escaping () -> Void) -> some View {
+    private func alertBadge(
+        systemImage: String,
+        tint: Color,
+        primary: String,
+        secondary: String,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: systemImage)
@@ -526,7 +537,6 @@ struct ExpensesView: View {
         }
     }
 
-    @ViewBuilder
     private var emptyState: some View {
         VStack(spacing: 12) {
             EmptyStateView(title: emptyStateTitle, subtitle: emptyStateSubtitle, systemImage: "creditcard")
