@@ -395,15 +395,21 @@ enum ProjectWorkbookService {
         )
         let paid = BudgetMathService.cashPaidTotal(expenses: constructionExpenses, changeOrders: constructionChangeOrders)
         let committed = BudgetMathService.committedSpend(items: constructionItems, changeOrders: constructionChangeOrders)
-        let remaining = project.constructionBudget - actual - committed
-        let contingencyItems = items
-            .filter { isContingency($0.categoryName) }
-            .reduce(0) { $0 + $1.spentAndCommitted }
-        let approvedChanges = changeOrders
-            .filter { $0.status == .approved || $0.status == .paid }
-            .reduce(0) { $0 + $1.amount }
-        let contingencyRemaining = project.contingencyBudget - contingencyItems - approvedChanges
-        let openInvoices = expenses.reduce(0) { $0 + $1.balanceDue }
+        let remaining = MoneyMath.dollars(
+            MoneyMath.cents(project.constructionBudget) - MoneyMath.cents(actual) - MoneyMath.cents(committed)
+        )
+        let contingencyItems = MoneyMath.sum(
+            items.filter { isContingency($0.categoryName) },
+            by: \.spentAndCommitted
+        )
+        let approvedChanges = MoneyMath.sum(
+            changeOrders.filter { $0.status == .approved || $0.status == .paid },
+            by: \.amount
+        )
+        let contingencyRemaining = MoneyMath.dollars(
+            MoneyMath.cents(project.contingencyBudget) - MoneyMath.cents(contingencyItems) - MoneyMath.cents(approvedChanges)
+        )
+        let openInvoices = MoneyMath.sum(expenses, by: \.balanceDue)
         let pendingChanges = BudgetMathService.pendingExposure(changeOrders: constructionChangeOrders)
         let allowanceOverage = BudgetMathService.allowanceOverage(
             items: constructionItems,
@@ -465,11 +471,13 @@ enum ProjectWorkbookService {
         let grouped = Dictionary(grouping: items, by: \.categoryName)
         let rows = grouped.keys.sorted { $0.localizedStandardCompare($1) == .orderedAscending }.map { category -> [Cell] in
             let categoryItems = grouped[category, default: []]
-            let budget = categoryItems.reduce(0) { $0 + $1.budget }
-            let actual = categoryItems.reduce(0) { $0 + $1.actual }
-            let committed = categoryItems.reduce(0) { $0 + $1.committed }
-            let openCommitment = categoryItems.reduce(0) { $0 + $1.openCommitment }
-            let remaining = budget - actual - openCommitment
+            let budget = MoneyMath.sum(categoryItems, by: \.budget)
+            let actual = MoneyMath.sum(categoryItems, by: \.actual)
+            let committed = MoneyMath.sum(categoryItems, by: \.committed)
+            let openCommitment = MoneyMath.sum(categoryItems, by: \.openCommitment)
+            let remaining = MoneyMath.dollars(
+                MoneyMath.cents(budget) - MoneyMath.cents(actual) - MoneyMath.cents(openCommitment)
+            )
             return [
                 .text(category),
                 .number(Double(categoryItems.count)),
@@ -537,7 +545,7 @@ enum ProjectWorkbookService {
         let rows = selections.sorted { $0.selectionDate < $1.selectionDate }.map { selection -> [Cell] in
             let item = itemsByID[selection.lineItemID]
             let lineActual = item.map { BudgetMathService.allowanceSelectionTotal(for: $0, selections: selections) } ?? selection.amount
-            let lineOverage = item.map { max(0, lineActual - $0.allowanceAmount) } ?? 0
+            let lineOverage = item.map { max(0, MoneyMath.diff(lineActual, $0.allowanceAmount)) } ?? 0
             return [
                 .text(selection.id.uuidString),
                 .date(selection.selectionDate),
