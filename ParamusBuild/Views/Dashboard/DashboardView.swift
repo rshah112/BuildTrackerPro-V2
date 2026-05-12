@@ -6,6 +6,7 @@ struct DashboardView: View {
     let project: Project
     let navigateToTarget: (ProjectNavigationTarget) -> Void
     @State private var showingProjectBrief = false
+    @State private var showingCustomizeSheet = false
 
     @Query private var items: [BudgetLineItem]
     @Query private var expenses: [Expense]
@@ -13,6 +14,18 @@ struct DashboardView: View {
     @Query private var changeOrders: [ChangeOrder]
     @Query private var allowanceSelections: [AllowanceSelection]
     @Query private var tasks: [ProjectTask]
+
+    @AppStorage(AppSettingsKeys.dashboardShowMetricsGrid) private var showMetricsGrid = true
+    @AppStorage(AppSettingsKeys.dashboardShowCashFlow) private var showCashFlow = true
+    @AppStorage(AppSettingsKeys.dashboardShowAttention) private var showAttention = true
+    @AppStorage(AppSettingsKeys.dashboardShowWatchlist) private var showWatchlist = true
+    @AppStorage(AppSettingsKeys.dashboardShowPhasePulse) private var showPhasePulse = true
+    @AppStorage(AppSettingsKeys.dashboardShowRecentExpenses) private var showRecentExpenses = true
+    @AppStorage(AppSettingsKeys.dashboardShowRecentPhotos) private var showRecentPhotos = true
+    @AppStorage(AppSettingsKeys.dashboardShowOverBudget) private var showOverBudget = true
+    @AppStorage(AppSettingsKeys.dashboardShowUpcomingPayments) private var showUpcomingPayments = true
+
+    @ObservedObject private var health = StorageHealthMonitor.shared
 
     init(project: Project, navigateToTarget: @escaping (ProjectNavigationTarget) -> Void = { _ in }) {
         self.project = project
@@ -47,25 +60,39 @@ struct DashboardView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     header
+                    todayMetricsRow
                     quickActions
                     progressCard
-                    cashFlowCard
-                    metricsGrid
-                    attentionCard
-                    pinnedWatchlist
-                    phasePulse
-                    recentExpenses
-                    recentPhotos
-                    overBudgetItems
-                    upcomingPayments
+                    if showCashFlow { cashFlowCard }
+                    if showMetricsGrid { metricsGrid }
+                    if showAttention { attentionCard }
+                    if showWatchlist { pinnedWatchlist }
+                    if showPhasePulse { phasePulse }
+                    if showRecentExpenses { recentExpenses }
+                    if showRecentPhotos { recentPhotos }
+                    if showOverBudget { overBudgetItems }
+                    if showUpcomingPayments { upcomingPayments }
                 }
                 .padding(.horizontal, AppTheme.pagePadding)
                 .padding(.bottom, 28)
             }
             .background(AppTheme.pageBackground)
             .navigationTitle("Dashboard")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingCustomizeSheet = true
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                    }
+                    .accessibilityLabel("Customize dashboard")
+                }
+            }
             .sheet(isPresented: $showingProjectBrief) {
                 ProjectBriefSheet(project: project)
+            }
+            .sheet(isPresented: $showingCustomizeSheet) {
+                DashboardCustomizationView()
             }
             .onAppear {
                 refreshBudgetMath()
@@ -121,58 +148,182 @@ struct DashboardView: View {
             }
             .foregroundStyle(AppTheme.inkSecondary)
 
-            HStack(spacing: 6) {
-                Menu {
-                    ForEach(ProjectStatus.allCases) { status in
-                        Button {
-                            project.status = status
-                            persistProjectChange()
-                        } label: {
-                            Label(status.title, systemImage: status.systemImage)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    Menu {
+                        ForEach(ProjectStatus.allCases) { status in
+                            Button {
+                                project.status = status
+                                persistProjectChange()
+                            } label: {
+                                Label(status.title, systemImage: status.systemImage)
+                            }
                         }
-                    }
-                } label: {
-                    DashboardStatusChip(
-                        title: project.status.title,
-                        systemImage: project.status.systemImage,
-                        tint: AppTheme.projectStatusColor(project.status)
-                    )
-                }
-
-                Menu {
-                    ForEach(ProjectPriority.allCases) { priority in
-                        Button {
-                            project.priority = priority
-                            persistProjectChange()
-                        } label: {
-                            Label(priority.title, systemImage: "flag.fill")
-                        }
-                    }
-                } label: {
-                    DashboardStatusChip(
-                        title: project.priority.title,
-                        systemImage: "flag.fill",
-                        tint: AppTheme.projectPriorityColor(project.priority)
-                    )
-                }
-
-                if hasProjectBrief {
-                    Button {
-                        showingProjectBrief = true
                     } label: {
                         DashboardStatusChip(
-                            title: "Brief",
-                            systemImage: "doc.text",
-                            tint: AppTheme.accent
+                            title: project.status.title,
+                            systemImage: project.status.systemImage,
+                            tint: AppTheme.projectStatusColor(project.status)
                         )
                     }
-                    .buttonStyle(.plain)
+
+                    Menu {
+                        ForEach(ProjectPriority.allCases) { priority in
+                            Button {
+                                project.priority = priority
+                                persistProjectChange()
+                            } label: {
+                                Label(priority.title, systemImage: "flag.fill")
+                            }
+                        }
+                    } label: {
+                        DashboardStatusChip(
+                            title: project.priority.title,
+                            systemImage: "flag.fill",
+                            tint: AppTheme.projectPriorityColor(project.priority)
+                        )
+                    }
+
+                    if let timelineChip {
+                        DashboardStatusChip(
+                            title: timelineChip.title,
+                            systemImage: timelineChip.systemImage,
+                            tint: timelineChip.tint
+                        )
+                    }
+
+                    if hasProjectBrief {
+                        Button {
+                            showingProjectBrief = true
+                        } label: {
+                            DashboardStatusChip(
+                                title: "Brief",
+                                systemImage: "doc.text",
+                                tint: AppTheme.accent
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if let backupChip {
+                        DashboardStatusChip(
+                            title: backupChip.title,
+                            systemImage: backupChip.systemImage,
+                            tint: backupChip.tint
+                        )
+                    }
                 }
+                .padding(.top, 2)
             }
-            .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 4)
+    }
+
+    private struct DashboardChipInfo {
+        let title: String
+        let systemImage: String
+        let tint: Color
+    }
+
+    /// Days-to-target chip. Hidden when no target date, or when the project is marked complete.
+    private var timelineChip: DashboardChipInfo? {
+        guard project.status != .complete,
+              let target = project.targetFinishDate
+        else { return nil }
+        let now = Calendar.current.startOfDay(for: .now)
+        let targetDay = Calendar.current.startOfDay(for: target)
+        let days = Calendar.current.dateComponents([.day], from: now, to: targetDay).day ?? 0
+        if days < 0 {
+            let overdue = abs(days)
+            return DashboardChipInfo(
+                title: "\(overdue) day\(overdue == 1 ? "" : "s") overdue",
+                systemImage: "clock.badge.exclamationmark",
+                tint: AppTheme.negative
+            )
+        }
+        if days == 0 {
+            return DashboardChipInfo(
+                title: "Target today",
+                systemImage: "flag.checkered",
+                tint: AppTheme.warning
+            )
+        }
+        return DashboardChipInfo(
+            title: "\(days) day\(days == 1 ? "" : "s") to target",
+            systemImage: "flag.checkered",
+            tint: days <= 14 ? AppTheme.warning : AppTheme.info
+        )
+    }
+
+    /// Backup status chip — matches the indicator used on Photos / Expenses / Budget.
+    private var backupChip: DashboardChipInfo? {
+        switch health.iCloudAvailable {
+        case .some(true):
+            return DashboardChipInfo(title: "Backed up", systemImage: "icloud.fill", tint: AppTheme.positive)
+        case .some(false):
+            return DashboardChipInfo(title: "Local only", systemImage: "iphone", tint: AppTheme.warning)
+        case .none:
+            return nil
+        }
+    }
+
+    /// Today / this-week activity at a glance. Compact tiles below the header.
+    @ViewBuilder
+    private var todayMetricsRow: some View {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let weekStart = calendar.date(byAdding: .day, value: -6, to: today) ?? today
+
+        let todayExpenses = expenses.filter { calendar.isDate($0.date, inSameDayAs: .now) }
+        let weekPhotos = photos.filter { $0.createdAt >= weekStart }
+        let weekExpenses = expenses.filter { $0.date >= weekStart }
+
+        HStack(spacing: 10) {
+            todayMetricTile(
+                value: todayExpenses.isEmpty ? "—" : MoneyMath.sum(todayExpenses, by: \.amount).compactCurrencyString,
+                label: "Logged today",
+                systemImage: "creditcard"
+            )
+            todayMetricTile(
+                value: "\(weekExpenses.count)",
+                label: "Expenses · 7d",
+                systemImage: "calendar.day.timeline.left"
+            )
+            todayMetricTile(
+                value: "\(weekPhotos.count)",
+                label: "Photos · 7d",
+                systemImage: "photo.stack"
+            )
+        }
+    }
+
+    private func todayMetricTile(value: String, label: String, systemImage: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(AppTheme.accent)
+                .frame(width: 26, height: 26)
+                .background(AppTheme.accent.opacity(0.13), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(value)
+                    .font(.subheadline.weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                Text(label)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity)
+        .background(AppTheme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(AppTheme.border, lineWidth: 0.75)
+        )
     }
 
     @ViewBuilder
@@ -323,7 +474,7 @@ struct DashboardView: View {
 
                         Spacer()
 
-                        Text((viewModel.actualSpent + viewModel.committedSpend).compactCurrencyString)
+                        Text(MoneyMath.dollars(MoneyMath.cents(viewModel.actualSpent) + MoneyMath.cents(viewModel.committedSpend)).compactCurrencyString)
                             .font(.headline.weight(.bold))
                     }
 
@@ -569,9 +720,17 @@ struct DashboardView: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(viewModel.recentPhotos) { photo in
+                        ForEach(Array(viewModel.recentPhotos.enumerated()), id: \.element.id) { index, photo in
                             NavigationLink {
-                                PhotoViewer(photo: photo)
+                                PhotoViewer(
+                                    context: PhotoViewerContext(
+                                        photos: viewModel.recentPhotos,
+                                        initialIndex: index,
+                                        linkedItemTitle: { _ in nil }
+                                    ),
+                                    onEdit: { _ in },
+                                    onDelete: { _ in }
+                                )
                             } label: {
                                 VStack(alignment: .leading, spacing: 8) {
                                     PhotoThumbnail(data: photo.imageData)
@@ -769,7 +928,7 @@ private struct CashFlowMiniChart: View {
                     .font(AppFont.caption)
                     .foregroundStyle(AppTheme.inkSecondary)
                 Spacer()
-                Text((selectedDay?.total ?? days.reduce(0) { $0 + $1.total }).compactCurrencyString)
+                Text((selectedDay?.total ?? MoneyMath.sum(days, by: \.total)).compactCurrencyString)
                     .font(AppFont.numeric(13, weight: .bold))
                     .foregroundStyle(selectedDay == nil ? AppTheme.inkSecondary : AppTheme.ink)
             }
@@ -1105,6 +1264,96 @@ private struct ProjectBriefSheet: View {
     }
 }
 
+private struct DashboardCustomizationView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    @AppStorage(AppSettingsKeys.dashboardShowMetricsGrid) private var showMetricsGrid = true
+    @AppStorage(AppSettingsKeys.dashboardShowCashFlow) private var showCashFlow = true
+    @AppStorage(AppSettingsKeys.dashboardShowAttention) private var showAttention = true
+    @AppStorage(AppSettingsKeys.dashboardShowWatchlist) private var showWatchlist = true
+    @AppStorage(AppSettingsKeys.dashboardShowPhasePulse) private var showPhasePulse = true
+    @AppStorage(AppSettingsKeys.dashboardShowRecentExpenses) private var showRecentExpenses = true
+    @AppStorage(AppSettingsKeys.dashboardShowRecentPhotos) private var showRecentPhotos = true
+    @AppStorage(AppSettingsKeys.dashboardShowOverBudget) private var showOverBudget = true
+    @AppStorage(AppSettingsKeys.dashboardShowUpcomingPayments) private var showUpcomingPayments = true
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Toggle(isOn: $showCashFlow) {
+                        Label("Cash Flow", systemImage: "chart.bar.xaxis")
+                    }
+                    Toggle(isOn: $showMetricsGrid) {
+                        Label("Metrics grid", systemImage: "square.grid.2x2")
+                    }
+                    Toggle(isOn: $showAttention) {
+                        Label("Needs Attention", systemImage: "exclamationmark.circle.fill")
+                    }
+                    Toggle(isOn: $showWatchlist) {
+                        Label("Watchlist", systemImage: "pin.fill")
+                    }
+                    Toggle(isOn: $showPhasePulse) {
+                        Label("Category Pulse", systemImage: "rectangle.split.3x1")
+                    }
+                    Toggle(isOn: $showRecentExpenses) {
+                        Label("Recent Expenses", systemImage: "creditcard")
+                    }
+                    Toggle(isOn: $showRecentPhotos) {
+                        Label("Recent Photos", systemImage: "photo.stack")
+                    }
+                    Toggle(isOn: $showOverBudget) {
+                        Label("Over Budget", systemImage: "flag.fill")
+                    }
+                    Toggle(isOn: $showUpcomingPayments) {
+                        Label("Upcoming Payments", systemImage: "calendar.badge.clock")
+                    }
+                } header: {
+                    Text("Sections")
+                } footer: {
+                    Text("Project name, status chips, the today/7-day metrics, quick actions, and the Budget Progress card always stay visible. These toggles control the optional cards below.")
+                }
+
+                Section {
+                    Button("Show all") {
+                        showMetricsGrid = true
+                        showCashFlow = true
+                        showAttention = true
+                        showWatchlist = true
+                        showPhasePulse = true
+                        showRecentExpenses = true
+                        showRecentPhotos = true
+                        showOverBudget = true
+                        showUpcomingPayments = true
+                    }
+                    Button("Minimal layout", role: .destructive) {
+                        showMetricsGrid = false
+                        showCashFlow = false
+                        showAttention = true
+                        showWatchlist = false
+                        showPhasePulse = false
+                        showRecentExpenses = false
+                        showRecentPhotos = false
+                        showOverBudget = false
+                        showUpcomingPayments = false
+                    }
+                } footer: {
+                    Text("Minimal keeps only the Budget Progress card and the Needs Attention alerts.")
+                }
+            }
+            .navigationTitle("Customize Dashboard")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
 private struct DashboardStatusChip: View {
     let title: String
     let systemImage: String
@@ -1328,7 +1577,7 @@ private struct PhasePulseTile: View {
             BudgetProgressBar(value: summary.utilization, tint: AppTheme.healthColor(summary.health))
 
             HStack {
-                Text((summary.actual + summary.committed).compactCurrencyString)
+                Text(MoneyMath.dollars(MoneyMath.cents(summary.actual) + MoneyMath.cents(summary.committed)).compactCurrencyString)
                 Spacer()
                 Text(summary.budget.compactCurrencyString)
             }

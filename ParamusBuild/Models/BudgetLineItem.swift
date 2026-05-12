@@ -56,26 +56,32 @@ final class BudgetLineItem {
         self.createdAt = createdAt
     }
 
+    // All computed money values pass through MoneyMath so comparisons (variance > 0,
+    // utilization >= 0.9, etc.) operate on cent-exact dollars, not IEEE 754 drift.
+
     var spentAndCommitted: Double {
-        actual + openCommitment
+        MoneyMath.dollars(MoneyMath.cents(actual) + MoneyMath.cents(openCommitment))
     }
 
     var openCommitment: Double {
-        isAllowance ? 0 : max(0, committed - actual)
+        guard !isAllowance else { return 0 }
+        let diffCents = MoneyMath.cents(committed) - MoneyMath.cents(actual)
+        return MoneyMath.dollars(max(Int64(0), diffCents))
     }
 
     var remaining: Double {
         if isAllowance {
-            return allowanceAmount - actual
+            return MoneyMath.diff(allowanceAmount, actual)
         }
-        return budget - spentAndCommitted
+        return MoneyMath.diff(budget, spentAndCommitted)
     }
 
     var variance: Double {
         if isAllowance {
-            return max(0, actual - allowanceAmount)
+            let diffCents = MoneyMath.cents(actual) - MoneyMath.cents(allowanceAmount)
+            return MoneyMath.dollars(max(Int64(0), diffCents))
         }
-        return spentAndCommitted - budget
+        return MoneyMath.diff(spentAndCommitted, budget)
     }
 
     var utilization: Double {
@@ -85,7 +91,8 @@ final class BudgetLineItem {
     }
 
     var health: BudgetHealth {
-        if variance > 0 {
+        // Compare in integer cents so an invisible 0.0000001 drift can't flip the bucket.
+        if MoneyMath.cents(variance) > 0 {
             return .overBudget
         }
 

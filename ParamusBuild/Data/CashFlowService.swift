@@ -27,15 +27,15 @@ struct CashFlowDay: Identifiable {
     let payments: [CashFlowPayment]
 
     var committedTotal: Double {
-        payments.filter { $0.exposure == .committed }.reduce(0) { $0 + $1.amount }
+        MoneyMath.sum(payments.filter { $0.exposure == .committed }, by: \.amount)
     }
 
     var pendingExposureTotal: Double {
-        payments.filter { $0.exposure == .pending }.reduce(0) { $0 + $1.amount }
+        MoneyMath.sum(payments.filter { $0.exposure == .pending }, by: \.amount)
     }
 
     var total: Double {
-        committedTotal + pendingExposureTotal
+        MoneyMath.dollars(MoneyMath.cents(committedTotal) + MoneyMath.cents(pendingExposureTotal))
     }
 }
 
@@ -78,15 +78,17 @@ enum CashFlowService {
     ) -> Double {
         let start = calendar.startOfDay(for: today)
         let end = calendar.date(byAdding: .day, value: forecastDayCount, to: start) ?? start
-        return payments(
-            project: project,
-            expenses: expenses,
-            changeOrders: changeOrders,
-            today: start,
-            horizonEnd: end,
-            calendar: calendar
+        return MoneyMath.sum(
+            payments(
+                project: project,
+                expenses: expenses,
+                changeOrders: changeOrders,
+                today: start,
+                horizonEnd: end,
+                calendar: calendar
+            ),
+            by: \.amount
         )
-        .reduce(0) { $0 + $1.amount }
     }
 
     static func payments(

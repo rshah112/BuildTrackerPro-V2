@@ -7,7 +7,11 @@ struct PortfolioInsightsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    @Query(sort: \Project.createdAt, order: .reverse) private var projects: [Project]
+    @Query(
+        filter: #Predicate<Project> { $0.deletedAt == nil },
+        sort: \Project.createdAt,
+        order: .reverse
+    ) private var projects: [Project]
     @Query(sort: \BudgetLineItem.costCode) private var items: [BudgetLineItem]
     @Query(sort: \Expense.date, order: .reverse) private var expenses: [Expense]
     @Query(sort: \AllowanceSelection.selectionDate, order: .reverse) private var allowanceSelections: [AllowanceSelection]
@@ -16,6 +20,26 @@ struct PortfolioInsightsView: View {
     @State private var activePDF: InsightsPDF?
     @State private var exportError: String?
 
+    private var activeProjectIDs: Set<UUID> {
+        Set(projects.map(\.id))
+    }
+
+    private var activeItems: [BudgetLineItem] {
+        items.filter { activeProjectIDs.contains($0.projectID) }
+    }
+
+    private var activeExpenses: [Expense] {
+        expenses.filter { activeProjectIDs.contains($0.projectID) }
+    }
+
+    private var activeAllowanceSelections: [AllowanceSelection] {
+        allowanceSelections.filter { activeProjectIDs.contains($0.projectID) }
+    }
+
+    private var activeChangeOrders: [ChangeOrder] {
+        changeOrders.filter { activeProjectIDs.contains($0.projectID) }
+    }
+
     private var changeOrders: [ChangeOrder] {
         fetchChangeOrders()
     }
@@ -23,19 +47,19 @@ struct PortfolioInsightsView: View {
     private var costRows: [CostPerSquareFootRow] {
         InsightsMath.costPerSquareFootRows(
             projects: projects,
-            items: items,
-            expenses: expenses,
-            allowanceSelections: allowanceSelections,
-            changeOrders: changeOrders
+            items: activeItems,
+            expenses: activeExpenses,
+            allowanceSelections: activeAllowanceSelections,
+            changeOrders: activeChangeOrders
         )
     }
 
     private var phaseRows: [PhasePercentRow] {
-        InsightsMath.phasePercentRows(projects: projects, items: items)
+        InsightsMath.phasePercentRows(projects: projects, items: activeItems)
     }
 
     private var trendRows: [CategoryTrendRow] {
-        InsightsMath.categoryTrendRows(expenses: expenses)
+        InsightsMath.categoryTrendRows(expenses: activeExpenses)
     }
 
     var body: some View {
@@ -215,8 +239,9 @@ enum InsightsMath {
                 allowanceSelections: selectionsByProject[project.id, default: []],
                 changeOrders: ordersByProject[project.id, default: []]
             )
-            let fallback = project.constructionBudget > 0 ? project.constructionBudget : items.filter { $0.projectID == project.id }
-                .reduce(0) { $0 + $1.budget }
+            let fallback = project.constructionBudget > 0
+                ? project.constructionBudget.roundedToCents
+                : MoneyMath.sum(items.filter { $0.projectID == project.id }, by: \.budget)
             let cost = total > 0 ? total : fallback
             guard cost > 0 else { return nil }
             return CostPerSquareFootRow(projectName: project.name, squareFootage: sqft, cost: cost, costPerSquareFoot: cost / sqft)
@@ -228,10 +253,10 @@ enum InsightsMath {
         let completedIDs = Set(projects.filter { $0.status == .complete }.map(\.id))
         let completedItems = items
             .filter { completedIDs.contains($0.projectID) && $0.categoryName.caseInsensitiveCompare("Contingency") != .orderedSame }
-        let total = completedItems.reduce(0) { $0 + $1.budget }
+        let total = MoneyMath.sum(completedItems, by: \.budget)
         guard total > 0 else { return [] }
         return Dictionary(grouping: completedItems, by: \.categoryName).map { category, items in
-            let amount = items.reduce(0) { $0 + $1.budget }
+            let amount = MoneyMath.sum(items, by: \.budget)
             return PhasePercentRow(category: category, amount: amount, percent: amount / total * 100)
         }
         .sorted { $0.percent > $1.percent }
@@ -245,7 +270,7 @@ enum InsightsMath {
             return TrendKey(month: month, category: expense.categoryName.trimmed.isEmpty ? "Unassigned" : expense.categoryName.trimmed)
         }
         return grouped.map { key, expenses in
-            CategoryTrendRow(month: key.month, category: key.category, amount: expenses.reduce(0) { $0 + $1.amount })
+            CategoryTrendRow(month: key.month, category: key.category, amount: MoneyMath.sum(expenses, by: \.amount))
         }
         .sorted {
             if $0.month == $1.month { return $0.category.localizedStandardCompare($1.category) == .orderedAscending }

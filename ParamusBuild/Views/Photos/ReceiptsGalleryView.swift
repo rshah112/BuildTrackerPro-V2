@@ -10,21 +10,27 @@ struct ReceiptsGalleryView: View {
 
     @State private var urls: [URL] = []
     @State private var quickLookURL: URL?
+    @State private var isReverseSorted = false
 
     private let columns = [GridItem(.adaptive(minimum: 110), spacing: 8)]
+
+    private var orderedURLs: [URL] {
+        // MediaStorageService.receiptURLs returns newest-first; flip on demand.
+        isReverseSorted ? Array(urls.reversed()) : urls
+    }
 
     var body: some View {
         Group {
             if urls.isEmpty {
                 EmptyStateView(
                     title: "No receipts yet",
-                    subtitle: "Receipts and invoices you scan when adding an expense will live here.",
+                    subtitle: "Receipts you scan when adding an expense are saved here as files. They're also visible in Files.app under HomeBuild Pro › Projects.",
                     systemImage: "doc.viewfinder"
                 )
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 8) {
-                        ForEach(urls, id: \.path) { url in
+                        ForEach(orderedURLs, id: \.path) { url in
                             ReceiptThumbnail(url: url)
                                 .aspectRatio(1, contentMode: .fill)
                                 .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.sm, style: .continuous))
@@ -48,6 +54,32 @@ struct ReceiptsGalleryView: View {
         .background(AppTheme.pageBackground)
         .navigationTitle("Receipts")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                if !urls.isEmpty {
+                    VStack(spacing: 0) {
+                        Text("Receipts")
+                            .font(.headline.weight(.semibold))
+                        Text("\(urls.count) on disk")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                if !urls.isEmpty {
+                    Menu {
+                        Picker("Sort", selection: $isReverseSorted) {
+                            Label("Newest first", systemImage: "arrow.down").tag(false)
+                            Label("Oldest first", systemImage: "arrow.up").tag(true)
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                    }
+                    .accessibilityLabel("Sort receipts")
+                }
+            }
+        }
         .onAppear { reload() }
         .sheet(item: Binding(
             get: { quickLookURL.map(QuickLookItem.init) },

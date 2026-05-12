@@ -10,6 +10,71 @@ private enum BudgetGroupingMode: String, CaseIterable, Identifiable {
     }
 }
 
+private enum BudgetSortField: String, CaseIterable, Identifiable {
+    case costCode
+    case budget
+    case used
+    case variance
+    case utilization
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .costCode: "Cost code"
+        case .budget: "Budget"
+        case .used: "Used"
+        case .variance: "Variance"
+        case .utilization: "Utilization %"
+        }
+    }
+}
+
+private enum BudgetHealthFilter: String, CaseIterable, Identifiable {
+    case all
+    case overBudget
+    case nearLimit
+    case healthy
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "All"
+        case .overBudget: "Over"
+        case .nearLimit: "Near"
+        case .healthy: "Healthy"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .all: "tray.full"
+        case .overBudget: "exclamationmark.triangle.fill"
+        case .nearLimit: "flag.fill"
+        case .healthy: "checkmark.seal.fill"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .all: AppTheme.brand
+        case .overBudget: AppTheme.negative
+        case .nearLimit: AppTheme.warning
+        case .healthy: AppTheme.positive
+        }
+    }
+
+    func matches(_ item: BudgetLineItem) -> Bool {
+        switch self {
+        case .all: return true
+        case .overBudget: return item.health == .overBudget
+        case .nearLimit: return item.health == .nearLimit
+        case .healthy: return item.health == .healthy
+        }
+    }
+}
+
 struct BudgetView: View {
     @Environment(\.modelContext) private var modelContext
     let project: Project
@@ -23,9 +88,16 @@ struct BudgetView: View {
 
     @State private var searchText = ""
     @State private var expandedCategories = Set<String>()
-    @State private var groupingMode: BudgetGroupingMode = .phase
+    @State private var seededCategoryNames = Set<String>()
     @State private var showingAddItem = false
     @State private var deleteBlockedMessage: String?
+
+    @AppStorage(AppSettingsKeys.budgetGroupingMode) private var groupingModeRaw = BudgetGroupingMode.phase.rawValue
+    @AppStorage(AppSettingsKeys.budgetSortField) private var sortFieldRaw = BudgetSortField.costCode.rawValue
+    @AppStorage(AppSettingsKeys.budgetSortAscending) private var sortAscending = true
+    @AppStorage(AppSettingsKeys.budgetHealthFilter) private var healthFilterRaw = BudgetHealthFilter.all.rawValue
+
+    @ObservedObject private var health = StorageHealthMonitor.shared
 
     init(project: Project, initialSearchText: String = "") {
         self.project = project
@@ -43,14 +115,42 @@ struct BudgetView: View {
         )
     }
 
-    private var filteredItems: [BudgetLineItem] {
-        guard !searchText.trimmed.isEmpty else { return items }
-        let query = searchText.localizedLowercase
+    // MARK: - Derived state
+
+    private var groupingMode: BudgetGroupingMode {
+        BudgetGroupingMode(rawValue: groupingModeRaw) ?? .phase
+    }
+
+    private var sortField: BudgetSortField {
+        BudgetSortField(rawValue: sortFieldRaw) ?? .costCode
+    }
+
+    private var healthFilter: BudgetHealthFilter {
+        BudgetHealthFilter(rawValue: healthFilterRaw) ?? .all
+    }
+
+    private var searchedItems: [BudgetLineItem] {
+        let query = searchText.trimmed.localizedLowercase
+        guard !query.isEmpty else { return items }
         return items.filter {
             $0.title.localizedLowercase.contains(query) ||
                 $0.costCode.localizedLowercase.contains(query) ||
                 $0.categoryName.localizedLowercase.contains(query) ||
+                $0.notes.localizedLowercase.contains(query) ||
                 displayRoom(for: $0).localizedLowercase.contains(query)
+        }
+    }
+
+    private var filteredItems: [BudgetLineItem] {
+        let filter = healthFilter
+        guard filter != .all else { return searchedItems }
+        return searchedItems.filter { filter.matches($0) }
+    }
+
+    private func sortedItems(_ source: [BudgetLineItem]) -> [BudgetLineItem] {
+        let direction: ComparisonResult = sortAscending ? .orderedAscending : .orderedDescending
+        return source.sorted { lhs, rhs in
+            compare(lhs, rhs, by: sortField) == direction
         }
     }
 
@@ -78,22 +178,45 @@ struct BudgetView: View {
         items.filter { $0.categoryName.trimmed.caseInsensitiveCompare("Contingency") != .orderedSame }
     }
 
+    // Cent-exact rollups via MoneyMath so the overview card and progress bar never drift
+    // and `progress > 1` / `>= 0.9` thresholds match what the per-item cards show.
     private var budgetUsed: Double {
-        constructionItems.reduce(0) { $0 + $1.spentAndCommitted }
+        MoneyMath.sum(constructionItems, by: \.spentAndCommitted)
     }
 
     private var budgetTotal: Double {
-        project.constructionBudget > 0 ? project.constructionBudget : constructionItems.reduce(0) { $0 + $1.budget }
+        if project.constructionBudget > 0 {
+            return project.constructionBudget.roundedToCents
+        }
+        return MoneyMath.sum(constructionItems, by: \.budget)
     }
 
     private var budgetRemaining: Double {
-        budgetTotal - budgetUsed
+        MoneyMath.diff(budgetTotal, budgetUsed)
     }
 
     private var budgetProgress: Double {
         guard budgetTotal > 0 else { return 0 }
         return budgetUsed / budgetTotal
     }
+
+    private var overBudgetCount: Int {
+        constructionItems.filter { $0.health == .overBudget }.count
+    }
+
+    private var nearLimitCount: Int {
+        constructionItems.filter { $0.health == .nearLimit }.count
+    }
+
+    private var allowanceCount: Int {
+        items.filter(\.isAllowance).count
+    }
+
+    private var hasActiveFilters: Bool {
+        !searchText.trimmed.isEmpty || healthFilter != .all
+    }
+
+    // MARK: - Body
 
     var body: some View {
         NavigationStack {
@@ -105,59 +228,42 @@ struct BudgetView: View {
                         remaining: budgetRemaining,
                         progress: budgetProgress,
                         itemCount: constructionItems.count,
-                        overBudgetCount: constructionItems.filter { $0.health == .overBudget }.count
+                        overBudgetCount: overBudgetCount,
+                        nearLimitCount: nearLimitCount,
+                        allowanceCount: allowanceCount,
+                        iCloudAvailable: health.iCloudAvailable
                     )
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
                     .listRowBackground(Color.clear)
                 }
 
-                Section {
-                    Picker("Budget grouping", selection: $groupingMode) {
-                        ForEach(BudgetGroupingMode.allCases) { mode in
-                            Text(mode.rawValue).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                if groupingMode == .phase {
-                    ForEach(categories) { category in
-                        let categoryItems = groupedItems[category.name, default: []]
-
-                        if !categoryItems.isEmpty {
-                            budgetSection(
-                                title: category.name,
-                                systemImage: category.systemImage,
-                                items: categoryItems
-                            ) {
-                                BudgetCategoryHeader(
-                                    category: category,
-                                    items: categoryItems,
-                                    isExpanded: expandedCategories.contains(category.name)
-                                )
+                if !items.isEmpty {
+                    Section {
+                        Picker("Budget grouping", selection: Binding(
+                            get: { BudgetGroupingMode(rawValue: groupingModeRaw) ?? .phase },
+                            set: { newMode in
+                                let oldMode = groupingMode
+                                groupingModeRaw = newMode.rawValue
+                                if newMode != oldMode {
+                                    seedExpansion(for: newMode)
+                                }
+                            }
+                        )) {
+                            ForEach(BudgetGroupingMode.allCases) { mode in
+                                Text(mode.rawValue).tag(mode)
                             }
                         }
+                        .pickerStyle(.segmented)
                     }
-                } else {
-                    ForEach(visibleRooms, id: \.self) { room in
-                        let roomItems = groupedRoomItems[room, default: []]
 
-                        if !roomItems.isEmpty {
-                            budgetSection(
-                                title: room,
-                                systemImage: "square.grid.2x2",
-                                items: roomItems
-                            ) {
-                                BudgetRoomHeader(
-                                    name: room,
-                                    items: roomItems,
-                                    photoCount: photoCount(forRoom: room),
-                                    isExpanded: expandedCategories.contains(room)
-                                )
-                            }
-                        }
+                    Section {
+                        healthFilterBar
+                            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 4, trailing: 16))
+                            .listRowBackground(Color.clear)
                     }
                 }
+
+                contentSections
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
@@ -169,35 +275,29 @@ struct BudgetView: View {
             .searchable(
                 text: $searchText,
                 placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "Search cost code, item, category"
+                prompt: "Search cost code, item, category, notes"
             )
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    sortMenu
+                }
+            }
             .onAppear {
-                if expandedCategories.isEmpty {
-                    expandedCategories = Set(categories.map(\.name))
-                }
-                if BudgetMathService.recalculateActuals(
-                    for: project.id,
-                    items: items,
-                    expenses: expenses,
-                    changeOrders: fetchChangeOrders(),
-                    allowanceSelections: allowanceSelections
-                ) {
-                    saveChanges()
-                }
+                seedExpansionOnFirstAppear()
+                runRecalcIfNeeded()
             }
             .onChange(of: categories.map(\.name)) { _, names in
-                expandedCategories.formUnion(names)
-            }
-            .onChange(of: groupingMode) { _, newMode in
-                if newMode == .room {
-                    expandedCategories.formUnion(visibleRooms)
-                } else {
-                    expandedCategories.formUnion(categories.map(\.name))
+                // Only auto-expand newly added categories — never re-expand ones the user has
+                // collapsed. Track which names we've already seeded.
+                let new = Set(names).subtracting(seededCategoryNames)
+                if !new.isEmpty {
+                    expandedCategories.formUnion(new)
+                    seededCategoryNames.formUnion(new)
                 }
             }
             .onChange(of: initialSearchText) { _, newValue in
                 searchText = newValue
-                expandedCategories = Set(categories.map(\.name))
+                expandedCategories = Set(currentSectionTitles())
             }
             .sheet(isPresented: $showingAddItem) {
                 AddBudgetItemView(project: project)
@@ -210,9 +310,128 @@ struct BudgetView: View {
         }
     }
 
+    // MARK: - Health filter bar
+
+    private var healthFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(BudgetHealthFilter.allCases) { filter in
+                    Button {
+                        withAnimation(.smooth(duration: 0.2)) {
+                            healthFilterRaw = filter.rawValue
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: filter.systemImage)
+                                .font(.caption.weight(.bold))
+                            Text(filter.title)
+                                .font(.caption.weight(.bold))
+                            Text("\(filterCount(filter))")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(healthFilter == filter ? .white.opacity(0.78) : .secondary)
+                        }
+                        .foregroundStyle(healthFilter == filter ? .white : .primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(healthFilter == filter ? filter.tint : AppTheme.surface, in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(healthFilter == filter ? Color.clear : AppTheme.border, lineWidth: 0.75)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private func filterCount(_ filter: BudgetHealthFilter) -> Int {
+        let scope = searchedItems
+        switch filter {
+        case .all: return scope.count
+        case .overBudget, .nearLimit, .healthy: return scope.filter(filter.matches).count
+        }
+    }
+
+    // MARK: - Content sections
+
+    @ViewBuilder
+    private var contentSections: some View {
+        if items.isEmpty {
+            emptyStateSection(
+                title: "No budget items yet",
+                subtitle: "Set up your build budget by adding cost codes for each scope of work.",
+                action: ("Add first item", { showingAddItem = true })
+            )
+        } else if filteredItems.isEmpty {
+            emptyStateSection(
+                title: "No matches",
+                subtitle: hasActiveFilters
+                    ? "Clear the search or health filter to see all items."
+                    : "Try a different filter.",
+                action: ("Clear filters", { clearFilters() })
+            )
+        } else if groupingMode == .phase {
+            ForEach(categories) { category in
+                let raw = groupedItems[category.name, default: []]
+                let categoryItems = sortedItems(raw)
+
+                if !categoryItems.isEmpty {
+                    budgetSection(
+                        title: category.name,
+                        systemImage: category.systemImage,
+                        items: categoryItems
+                    ) {
+                        BudgetCategoryHeader(
+                            category: category,
+                            items: categoryItems,
+                            isExpanded: expandedCategories.contains(category.name)
+                        )
+                    }
+                }
+            }
+        } else {
+            ForEach(visibleRooms, id: \.self) { room in
+                let raw = groupedRoomItems[room, default: []]
+                let roomItems = sortedItems(raw)
+
+                if !roomItems.isEmpty {
+                    budgetSection(
+                        title: room,
+                        systemImage: "square.grid.2x2",
+                        items: roomItems
+                    ) {
+                        BudgetRoomHeader(
+                            name: room,
+                            items: roomItems,
+                            photoCount: photoCount(forRoom: room),
+                            isExpanded: expandedCategories.contains(room)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func emptyStateSection(title: String, subtitle: String, action: (String, () -> Void)?) -> some View {
+        Section {
+            VStack(spacing: 12) {
+                EmptyStateView(title: title, subtitle: subtitle, systemImage: "list.bullet.rectangle")
+                if let action {
+                    Button(action.0, action: action.1)
+                        .buttonStyle(.borderedProminent)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+        }
+    }
+
     private func budgetSection(
         title: String,
-        systemImage: String,
+        systemImage _: String,
         items sectionItems: [BudgetLineItem],
         @ViewBuilder header: () -> some View
     ) -> some View {
@@ -223,6 +442,23 @@ struct BudgetView: View {
                         BudgetDetailView(item: item)
                     } label: {
                         BudgetLineRow(item: item, roomName: displayRoom(for: item))
+                    }
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        Button {
+                            Haptics.lightTap()
+                            setPinned(!item.isPinned, forItemID: item.id)
+                        } label: {
+                            Label(item.isPinned ? "Unpin" : "Pin", systemImage: item.isPinned ? "pin.slash" : "pin")
+                        }
+                        .tint(AppTheme.accent)
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            Haptics.lightTap()
+                            deleteItem(withID: item.id)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                     .contextMenu {
                         Button {
@@ -236,7 +472,7 @@ struct BudgetView: View {
                             Haptics.lightTap()
                             flagForReview(itemID: item.id)
                         } label: {
-                            Label("Review", systemImage: "flag")
+                            Label("Mark for review", systemImage: "flag")
                         }
 
                         Button(role: .destructive) {
@@ -256,6 +492,85 @@ struct BudgetView: View {
                         toggle(title)
                     }
                 }
+        }
+    }
+
+    // MARK: - Sort menu
+
+    private var sortMenu: some View {
+        Menu {
+            ForEach(BudgetSortField.allCases) { field in
+                Button {
+                    if sortField == field {
+                        sortAscending.toggle()
+                    } else {
+                        sortFieldRaw = field.rawValue
+                        sortAscending = field == .costCode // alphanumeric ascending by default; others usually descending
+                            ? true
+                            : false
+                    }
+                } label: {
+                    Label(field.title, systemImage: sortField == field ? (sortAscending ? "arrow.up" : "arrow.down") : "")
+                }
+            }
+        } label: {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+        }
+        .accessibilityLabel("Sort budget items")
+    }
+
+    private func compare(_ lhs: BudgetLineItem, _ rhs: BudgetLineItem, by field: BudgetSortField) -> ComparisonResult {
+        switch field {
+        case .costCode:
+            return lhs.costCode.localizedStandardCompare(rhs.costCode)
+        case .budget:
+            return compareCents(MoneyMath.cents(lhs.budget), MoneyMath.cents(rhs.budget))
+        case .used:
+            return compareCents(MoneyMath.cents(lhs.spentAndCommitted), MoneyMath.cents(rhs.spentAndCommitted))
+        case .variance:
+            return compareCents(MoneyMath.cents(lhs.variance), MoneyMath.cents(rhs.variance))
+        case .utilization:
+            if lhs.utilization == rhs.utilization { return .orderedSame }
+            return lhs.utilization < rhs.utilization ? .orderedAscending : .orderedDescending
+        }
+    }
+
+    private func compareCents(_ lhs: Int64, _ rhs: Int64) -> ComparisonResult {
+        if lhs == rhs { return .orderedSame }
+        return lhs < rhs ? .orderedAscending : .orderedDescending
+    }
+
+    // MARK: - Helpers
+
+    private func currentSectionTitles() -> [String] {
+        groupingMode == .phase ? categories.map(\.name) : visibleRooms
+    }
+
+    private func seedExpansionOnFirstAppear() {
+        let titles = currentSectionTitles()
+        if expandedCategories.isEmpty {
+            expandedCategories = Set(titles)
+        }
+        seededCategoryNames.formUnion(titles)
+    }
+
+    private func seedExpansion(for mode: BudgetGroupingMode) {
+        let titles = mode == .phase ? categories.map(\.name) : visibleRooms
+        expandedCategories = Set(titles)
+        if mode == .phase {
+            seededCategoryNames = Set(categories.map(\.name))
+        }
+    }
+
+    private func runRecalcIfNeeded() {
+        if BudgetMathService.recalculateActuals(
+            for: project.id,
+            items: items,
+            expenses: expenses,
+            changeOrders: fetchChangeOrders(),
+            allowanceSelections: allowanceSelections
+        ) {
+            saveChanges()
         }
     }
 
@@ -282,6 +597,11 @@ struct BudgetView: View {
         }
     }
 
+    private func clearFilters() {
+        searchText = ""
+        healthFilterRaw = BudgetHealthFilter.all.rawValue
+    }
+
     private var deleteBlockedBinding: Binding<Bool> {
         Binding(
             get: { deleteBlockedMessage != nil },
@@ -299,9 +619,15 @@ struct BudgetView: View {
         saveChanges()
     }
 
+    /// Append (or no-op) a "Needs review" marker on the item's notes. Idempotent: running it
+    /// twice doesn't duplicate. Preserves existing notes by prefixing the marker.
     private func flagForReview(itemID: UUID) {
         guard let item = fetchItem(withID: itemID) else { return }
-        item.notes = item.notes.isEmpty ? "Needs review" : item.notes
+        let marker = "Needs review"
+        if item.notes.localizedCaseInsensitiveContains(marker) {
+            return // already flagged
+        }
+        item.notes = item.notes.trimmed.isEmpty ? marker : "\(marker) — \(item.notes.trimmed)"
         saveChanges()
     }
 
@@ -356,26 +682,28 @@ private struct BudgetCategoryHeader: View {
     let isExpanded: Bool
 
     private var budget: Double {
-        items.reduce(0) { $0 + $1.budget }
+        MoneyMath.sum(items, by: \.budget)
     }
 
     private var actual: Double {
-        items.reduce(0) { $0 + $1.actual }
+        MoneyMath.sum(items, by: \.actual)
     }
 
     private var committed: Double {
-        items.reduce(0) { $0 + $1.openCommitment }
-    }
-
-    private var health: BudgetHealth {
-        let spent = actual + committed
-        if spent > budget { return .overBudget }
-        if budget > 0, spent / budget >= 0.9 { return .nearLimit }
-        return .healthy
+        MoneyMath.sum(items, by: \.openCommitment)
     }
 
     private var used: Double {
-        actual + committed
+        MoneyMath.dollars(MoneyMath.cents(actual) + MoneyMath.cents(committed))
+    }
+
+    private var health: BudgetHealth {
+        // Cent-exact thresholds so a 0.0000001 drift can't flip the bucket.
+        let usedCents = MoneyMath.cents(used)
+        let budgetCents = MoneyMath.cents(budget)
+        if usedCents > budgetCents { return .overBudget }
+        if budgetCents > 0, Double(usedCents) / Double(budgetCents) >= 0.9 { return .nearLimit }
+        return .healthy
     }
 
     private var utilization: Double {
@@ -429,16 +757,18 @@ private struct BudgetRoomHeader: View {
     let isExpanded: Bool
 
     private var budget: Double {
-        items.reduce(0) { $0 + $1.budget }
+        MoneyMath.sum(items, by: \.budget)
     }
 
     private var used: Double {
-        items.reduce(0) { $0 + $1.spentAndCommitted }
+        MoneyMath.sum(items, by: \.spentAndCommitted)
     }
 
     private var health: BudgetHealth {
-        if used > budget { return .overBudget }
-        if budget > 0, used / budget >= 0.9 { return .nearLimit }
+        let usedCents = MoneyMath.cents(used)
+        let budgetCents = MoneyMath.cents(budget)
+        if usedCents > budgetCents { return .overBudget }
+        if budgetCents > 0, Double(usedCents) / Double(budgetCents) >= 0.9 { return .nearLimit }
         return .healthy
     }
 
@@ -499,11 +829,20 @@ private struct BudgetOverviewCard: View {
     let progress: Double
     let itemCount: Int
     let overBudgetCount: Int
+    let nearLimitCount: Int
+    let allowanceCount: Int
+    let iCloudAvailable: Bool?
 
     private var tint: Color {
         if progress > 1 { return AppTheme.negative }
         if progress >= 0.9 { return AppTheme.warning }
         return AppTheme.accent
+    }
+
+    private var overallHealth: BudgetHealth {
+        if progress > 1 { return .overBudget }
+        if progress >= 0.9 { return .nearLimit }
+        return .healthy
     }
 
     var body: some View {
@@ -520,7 +859,7 @@ private struct BudgetOverviewCard: View {
 
                     Spacer()
 
-                    BudgetHealthPill(health: progress > 1 ? .overBudget : progress >= 0.9 ? .nearLimit : .healthy)
+                    BudgetHealthPill(health: overallHealth)
                 }
 
                 BudgetProgressBar(value: progress, tint: tint)
@@ -545,7 +884,7 @@ private struct BudgetOverviewCard: View {
                     }
                 }
 
-                HStack {
+                HStack(spacing: 8) {
                     Label(
                         remaining >= 0 ? "\(remaining.compactCurrencyString) remaining" : "\(abs(remaining).compactCurrencyString) over",
                         systemImage: remaining >= 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
@@ -554,14 +893,57 @@ private struct BudgetOverviewCard: View {
 
                     Spacer()
 
-                    if overBudgetCount > 0 {
-                        Label("\(overBudgetCount) over", systemImage: "flag.fill")
-                            .foregroundStyle(AppTheme.negative)
-                    }
+                    backupBadge
                 }
                 .font(.caption.weight(.bold))
+
+                if overBudgetCount > 0 || nearLimitCount > 0 || allowanceCount > 0 {
+                    HStack(spacing: 12) {
+                        if overBudgetCount > 0 {
+                            chip(systemImage: "exclamationmark.triangle.fill", text: "\(overBudgetCount) over", tint: AppTheme.negative)
+                        }
+                        if nearLimitCount > 0 {
+                            chip(systemImage: "flag.fill", text: "\(nearLimitCount) near", tint: AppTheme.warning)
+                        }
+                        if allowanceCount > 0 {
+                            chip(systemImage: "list.bullet.rectangle", text: "\(allowanceCount) allowance", tint: AppTheme.info)
+                        }
+                        Spacer()
+                    }
+                    .font(.caption2.weight(.bold))
+                }
             }
         }
+    }
+
+    @ViewBuilder
+    private var backupBadge: some View {
+        switch iCloudAvailable {
+        case .some(true):
+            Label("Backed up", systemImage: "icloud.fill")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.green)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.green.opacity(0.13), in: Capsule())
+        case .some(false):
+            Label("Local only", systemImage: "iphone")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.orange.opacity(0.13), in: Capsule())
+        case .none:
+            EmptyView()
+        }
+    }
+
+    private func chip(systemImage: String, text: String, tint: Color) -> some View {
+        Label(text, systemImage: systemImage)
+            .foregroundStyle(tint)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(tint.opacity(0.13), in: Capsule())
     }
 }
 
@@ -590,6 +972,15 @@ private struct BudgetLineRow: View {
                             Image(systemName: "pin.fill")
                                 .font(.caption)
                                 .foregroundStyle(AppTheme.accent)
+                        }
+
+                        if item.isAllowance {
+                            Text("ALLOWANCE")
+                                .font(.caption2.weight(.heavy))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(AppTheme.info, in: Capsule())
                         }
                     }
 

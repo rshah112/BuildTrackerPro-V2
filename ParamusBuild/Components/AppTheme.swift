@@ -226,6 +226,40 @@ enum AppSettingsKeys {
     static let preferLargeControls = "preferLargeJobsiteControls"
     static let showCentsInExports = "showCentsInExports"
     static let autoFillFromScans = "autoFillFromReceiptScans"
+
+    // Photo tab preferences (persisted)
+    static let photosNewestFirst = "photosNewestFirst"
+    static let photosLibraryMode = "photosLibraryMode"
+    static let photosDateFilter = "photosDateFilter"
+
+    // Expenses tab preferences (persisted)
+    static let expensesDateFilter = "expensesDateFilter"
+    static let expensesSortField = "expensesSortField"
+    static let expensesSortAscending = "expensesSortAscending"
+    static let expensesGroupBy = "expensesGroupBy"
+
+    // Budget tab preferences (persisted)
+    static let budgetGroupingMode = "budgetGroupingMode"
+    static let budgetSortField = "budgetSortField"
+    static let budgetSortAscending = "budgetSortAscending"
+    static let budgetHealthFilter = "budgetHealthFilter"
+
+    // Dashboard section-visibility preferences (persisted)
+    static let dashboardShowCashFlow = "dashboardShowCashFlow"
+    static let dashboardShowMetricsGrid = "dashboardShowMetricsGrid"
+    static let dashboardShowAttention = "dashboardShowAttention"
+    static let dashboardShowWatchlist = "dashboardShowWatchlist"
+    static let dashboardShowPhasePulse = "dashboardShowPhasePulse"
+    static let dashboardShowRecentExpenses = "dashboardShowRecentExpenses"
+    static let dashboardShowRecentPhotos = "dashboardShowRecentPhotos"
+    static let dashboardShowOverBudget = "dashboardShowOverBudget"
+    static let dashboardShowUpcomingPayments = "dashboardShowUpcomingPayments"
+
+    // More-tab list preferences (persisted)
+    static let changeOrdersStatusFilter = "changeOrdersStatusFilter"
+    static let tasksFilter = "tasksFilter"
+    static let bidsStatusFilter = "bidsStatusFilter"
+    static let roomSummarySortField = "roomSummarySortField"
 }
 
 // MARK: - Text field behaviour

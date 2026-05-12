@@ -2,6 +2,11 @@ import Foundation
 import SwiftData
 import UIKit
 
+enum MediaStorageError: Error {
+    case outOfSpace
+    case writeFailed(underlying: Error)
+}
+
 /// On-disk mirror of every binary asset (receipts, jobsite photos, project documents)
 /// in a folder structure that's:
 /// - Visible in iOS Files.app under "On My iPhone › HomeBuild Pro" (enabled via
@@ -24,6 +29,8 @@ import UIKit
 ///           Documents/
 ///             <Kind>/
 ///               <fileName>
+///       Backups/
+///         HomeBuildPro-YYYYMMDD-HHmmss.zip
 ///
 /// SwiftData's external storage (`@Attribute(.externalStorage)`) is kept as the in-DB
 /// source of truth for reads inside the app. This service writes a parallel copy that
@@ -73,14 +80,20 @@ enum MediaStorageService {
           Receipts/   — receipt and invoice images attached to expenses
           Photos/     — jobsite photos, organized by folder (Daily Progress, etc.)
           Documents/  — surveys, permits, plans, contracts, etc.
+      Backups/
+        HomeBuildPro-YYYYMMDD-HHmmss.zip — full app data + media snapshots
 
     Why a separate folder hierarchy:
       - The app's internal database (SwiftData) is the source of truth in-app, but
         it's an opaque sqlite file. This folder is the human-readable mirror.
-      - Files here can be backed up to iCloud Drive by dragging the HomeBuild Pro
-        folder elsewhere in Files.app, or downloaded to a computer.
+      - Files here are visible in Files.app and can be copied to a Mac, dragged
+        into iCloud Drive, AirDropped, or emailed for off-device backup.
       - On reinstall after deletion, files in the iOS app sandbox are also deleted.
-        Back up this folder BEFORE deleting the app if you want manual recovery.
+        The app writes rotating ZIP backups into Backups/ on every launch and after
+        any project change. If iCloud Drive is enabled in Settings → Data Safety,
+        backups are ALSO mirrored to iCloud and survive uninstall automatically.
+      - To restore after a wipe/reinstall: relaunch the app, open Settings →
+        Data Safety → Restore from backup, and pick a ZIP.
     """
 
     // MARK: - Receipts (expenses)
@@ -90,7 +103,7 @@ enum MediaStorageService {
         data: Data,
         project: Project,
         expense: Expense
-    ) -> URL? {
+    ) throws -> URL {
         let folder = projectFolder(project: project).appending(path: "Receipts", directoryHint: .isDirectory)
         try? fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
         removeReceipt(for: expense, project: project)
@@ -100,12 +113,8 @@ enum MediaStorageService {
         let idPrefix = String(expense.id.uuidString.prefix(6))
         let name = [dateSlug, vendorSlug, idPrefix].filter { !$0.isEmpty }.joined(separator: "-")
         let url = folder.appending(path: "\(name).jpg")
-        do {
-            try data.write(to: url, options: .atomic)
-            return url
-        } catch {
-            return nil
-        }
+        try writeAtomically(data: data, to: url)
+        return url
     }
 
     /// Returns receipt-image URLs for a project, newest first.
@@ -139,7 +148,7 @@ enum MediaStorageService {
         data: Data,
         project: Project,
         photo: PhotoAttachment
-    ) -> URL? {
+    ) throws -> URL {
         let folderName = photo.phaseTag.safeFolderComponent
         let folder = projectFolder(project: project)
             .appending(path: "Photos", directoryHint: .isDirectory)
@@ -152,12 +161,8 @@ enum MediaStorageService {
         let idPrefix = String(photo.id.uuidString.prefix(6))
         let name = [dateSlug, roomSlug, idPrefix].filter { !$0.isEmpty }.joined(separator: "-")
         let url = folder.appending(path: "\(name).jpg")
-        do {
-            try data.write(to: url, options: .atomic)
-            return url
-        } catch {
-            return nil
-        }
+        try writeAtomically(data: data, to: url)
+        return url
     }
 
     static func removePhoto(for photo: PhotoAttachment, project: Project) {
@@ -176,7 +181,7 @@ enum MediaStorageService {
         data: Data,
         project: Project,
         document: ProjectDocument
-    ) -> URL? {
+    ) throws -> URL {
         let kindSlug = document.kind.title.safeFolderComponent
         let folder = projectFolder(project: project)
             .appending(path: "Documents", directoryHint: .isDirectory)
@@ -187,12 +192,8 @@ enum MediaStorageService {
         let safeName = document.fileName.safeFileNamePreservingExtension
         let idPrefix = String(document.id.uuidString.prefix(6))
         let url = folder.appending(path: safeName.isEmpty ? "\(idPrefix).bin" : safeName.appendingIDPrefix(idPrefix))
-        do {
-            try data.write(to: url, options: .atomic)
-            return url
-        } catch {
-            return nil
-        }
+        try writeAtomically(data: data, to: url)
+        return url
     }
 
     static func removeDocument(for document: ProjectDocument, project: Project) {
@@ -220,6 +221,25 @@ enum MediaStorageService {
 
     static func removeAllMedia(at folder: URL) {
         try? fileManager.removeItem(at: folder)
+    }
+
+    // MARK: - Atomic write helper
+
+    /// Writes data atomically and translates quota / out-of-space errors into a typed error
+    /// so the surrounding UI / health monitor can react. Other write failures rethrow as
+    /// `.writeFailed(...)` so the underlying cause is preserved.
+    private static func writeAtomically(data: Data, to url: URL) throws {
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            let nsError = error as NSError
+            let isOutOfSpace = (nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileWriteOutOfSpaceError)
+                || (nsError.domain == NSPOSIXErrorDomain && nsError.code == Int(POSIXError.ENOSPC.rawValue))
+            if isOutOfSpace {
+                throw MediaStorageError.outOfSpace
+            }
+            throw MediaStorageError.writeFailed(underlying: error)
+        }
     }
 
     private static func removeMirroredFiles(under folder: URL, idPrefix: String) {
@@ -257,6 +277,8 @@ private extension Date {
 private extension String {
     /// Sanitize a string for use as a single filesystem path component.
     /// Keeps letters, digits, dashes, underscores and spaces; spaces collapse to dashes.
+    /// Caps at 120 chars so very long project / vendor / file names don't overflow filesystem
+    /// path limits (HFS+/APFS allow longer, but iCloud Drive sync chokes on ~255-byte paths).
     var safeFolderComponent: String {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
@@ -265,10 +287,10 @@ private extension String {
         let stripped = trimmed.unicodeScalars
             .map { allowed.contains($0) ? Character($0) : "-" }
         let joined = String(stripped)
-        return joined
             .components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
             .joined(separator: "-")
+        return String(joined.prefix(120))
     }
 
     var safeFileNamePreservingExtension: String {

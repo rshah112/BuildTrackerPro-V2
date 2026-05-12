@@ -211,7 +211,11 @@ struct AddPhotoView: View {
 
             try modelContext.save()
             if let data = target.imageData {
-                MediaStorageService.savePhoto(data: data, project: project, photo: target)
+                do {
+                    try MediaStorageService.savePhoto(data: data, project: project, photo: target)
+                } catch {
+                    StorageHealthMonitor.shared.reportMirrorFailure(error)
+                }
             }
             Haptics.success()
             dismiss()

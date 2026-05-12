@@ -17,6 +17,9 @@ struct ExportProjectView: View {
     @State private var activeArchive: ExportedArchive?
     @State private var exportError: String?
     @State private var showingImporter = false
+    @State private var backupSnapshotCount = 0
+
+    @ObservedObject private var health = StorageHealthMonitor.shared
 
     init(project: Project) {
         self.project = project
@@ -97,6 +100,30 @@ struct ExportProjectView: View {
                 .foregroundStyle(.primary)
             }
 
+            Section {
+                ExportValueRow(
+                    title: "Last automatic backup",
+                    value: lastBackupText,
+                    systemImage: "shippingbox",
+                    tint: health.isBackupStale ? AppTheme.warning : AppTheme.positive
+                )
+                ExportCountRow(title: "Backup snapshots on disk", count: backupSnapshotCount, systemImage: "archivebox")
+                Button {
+                    openInFiles(BackupService.revealableBackupsURL())
+                } label: {
+                    MoreRow(
+                        title: "Reveal Backups in Files",
+                        subtitle: health.iCloudAvailable == true ? "iCloud Drive › HomeBuild Pro › Backups" : "On My iPhone › HomeBuild Pro › Backups",
+                        systemImage: "folder"
+                    )
+                }
+                .foregroundStyle(.primary)
+            } header: {
+                Text("Automatic backups")
+            } footer: {
+                Text("Manual exports above produce a single ZIP you can share. The app also writes rotating ZIP snapshots automatically on every launch and after project changes — those live in the Backups folder above and survive uninstall when iCloud Drive is on.")
+            }
+
             if let exportError {
                 Section {
                     Text(exportError)
@@ -118,6 +145,28 @@ struct ExportProjectView: View {
             allowsMultipleSelection: false
         ) { result in
             importWorkbook(result)
+        }
+        .onAppear {
+            health.refresh()
+            backupSnapshotCount = BackupService.availableBackups().count
+        }
+    }
+
+    private var lastBackupText: String {
+        guard let date = health.lastBackupDate else { return "Never" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: date, relativeTo: .now)
+    }
+
+    private func openInFiles(_ url: URL) {
+        var components = URLComponents()
+        components.scheme = "shareddocuments"
+        components.path = url.path
+        if let shareURL = components.url, UIApplication.shared.canOpenURL(shareURL) {
+            UIApplication.shared.open(shareURL)
+        } else {
+            UIApplication.shared.open(url)
         }
     }
 

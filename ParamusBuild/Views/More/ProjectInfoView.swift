@@ -56,7 +56,17 @@ struct ProjectInfoView: View {
     }
 
     private var lineItemBudget: Double {
-        items.filter { $0.categoryName != "Contingency" }.reduce(0) { $0 + $1.budget }
+        MoneyMath.sum(items.filter { $0.categoryName != "Contingency" }, by: \.budget)
+    }
+
+    /// True when the user has both dates on but the target falls before the start. Compared in
+    /// calendar days so a few-hours-after-midnight target still reads as same-day, not "before".
+    private var hasInvertedTimeline: Bool {
+        guard hasStartDate, hasTargetFinishDate else { return false }
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: startDate)
+        let finish = calendar.startOfDay(for: targetFinishDate)
+        return finish < start
     }
 
     var body: some View {
@@ -110,6 +120,15 @@ struct ProjectInfoView: View {
                     ModernField("Finish target") {
                         DatePicker("Finish target", selection: $targetFinishDate, displayedComponents: .date)
                             .labelsHidden()
+                    }
+
+                    if hasInvertedTimeline {
+                        Label(
+                            "Target finish is before the start date. Save is disabled until the dates make sense.",
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppTheme.negative)
                     }
                 }
             }
@@ -172,10 +191,15 @@ struct ProjectInfoView: View {
                         .modernTextField()
                 }
 
-                LabeledContent("Total Envelope", value: (constructionBudget + contingencyBudget).currencyString)
+                LabeledContent(
+                    "Total Envelope",
+                    value: MoneyMath.dollars(MoneyMath.cents(constructionBudget) + MoneyMath.cents(contingencyBudget)).currencyString
+                )
                 LabeledContent("Line Item Total", value: lineItemBudget.currencyString)
 
-                if abs(lineItemBudget - constructionBudget) > 1 {
+                // Cent-exact diff so the "use line item total" CTA appears only when the
+                // mismatch is real, not a sub-cent drift artifact.
+                if abs(MoneyMath.cents(lineItemBudget) - MoneyMath.cents(constructionBudget)) > 100 {
                     Button("Use Line Item Total") {
                         constructionBudget = lineItemBudget
                         Haptics.lightTap()
@@ -189,7 +213,7 @@ struct ProjectInfoView: View {
                 Button("Save") {
                     save()
                 }
-                .disabled(name.trimmed.isEmpty)
+                .disabled(name.trimmed.isEmpty || hasInvertedTimeline)
             }
         }
         .alert("Project Could Not Be Saved", isPresented: saveErrorBinding) {

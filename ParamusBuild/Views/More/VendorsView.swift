@@ -9,6 +9,7 @@ struct VendorsView: View {
     @State private var showingAddVendor = false
     @State private var showingEditVendor = false
     @State private var vendorIDToEdit: UUID?
+    @State private var searchText = ""
 
     init(project: Project) {
         self.project = project
@@ -16,17 +17,65 @@ struct VendorsView: View {
         _vendors = Query(filter: #Predicate<Vendor> { $0.projectID == projectID }, sort: \.name)
     }
 
+    private var filteredVendors: [Vendor] {
+        let query = searchText.trimmed.localizedLowercase
+        guard !query.isEmpty else { return vendors }
+        return vendors.filter { vendor in
+            vendor.name.localizedLowercase.contains(query) ||
+                vendor.trade.localizedLowercase.contains(query) ||
+                vendor.phone.localizedLowercase.contains(query) ||
+                vendor.email.localizedLowercase.contains(query) ||
+                vendor.notes.localizedLowercase.contains(query)
+        }
+    }
+
     var body: some View {
         List {
             if vendors.isEmpty {
-                EmptyStateView(title: "No vendors", subtitle: "Add contacts for the build team.", systemImage: "person.2")
+                VStack(spacing: 12) {
+                    EmptyStateView(title: "No vendors", subtitle: "Add contacts for the build team.", systemImage: "person.2")
+                    Button {
+                        showingAddVendor = true
+                    } label: {
+                        Label("Add first vendor", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+            } else if filteredVendors.isEmpty {
+                VStack(spacing: 12) {
+                    EmptyStateView(
+                        title: "No matches",
+                        subtitle: "Clear the search to see all vendors.",
+                        systemImage: "magnifyingglass"
+                    )
+                    Button("Clear search") { searchText = "" }
+                        .buttonStyle(.bordered)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
             } else {
-                ForEach(vendors) { vendor in
+                Section {
+                    Text("\(filteredVendors.count) of \(vendors.count) vendor\(vendors.count == 1 ? "" : "s")")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                        .listRowBackground(Color.clear)
+                }
+                ForEach(filteredVendors) { vendor in
                     VendorRow(vendor: vendor)
                         .contentShape(Rectangle())
                         .onTapGesture {
                             vendorIDToEdit = vendor.id
                             showingEditVendor = true
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                deleteVendor(withID: vendor.id)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                         .contextMenu {
                             Button {
@@ -49,6 +98,7 @@ struct VendorsView: View {
         .scrollContentBackground(.hidden)
         .background(AppTheme.pageBackground)
         .navigationTitle("Vendors")
+        .searchable(text: $searchText, prompt: "Search vendor, trade, phone, email")
         .primaryFloatingAction(title: "Vendor") {
             showingAddVendor = true
         }
@@ -130,14 +180,22 @@ private struct VendorRow: View {
     }
 
     private var phoneURL: URL? {
-        let digits = vendor.phone.filter(\.isNumber)
+        // Strip everything but digits (and a leading +) so "(914) 555-1234" → "+19145551234".
+        let raw = vendor.phone.trimmed
+        guard !raw.isEmpty else { return nil }
+        let hasPlus = raw.hasPrefix("+")
+        let digits = raw.filter(\.isNumber)
         guard !digits.isEmpty else { return nil }
-        return URL(string: "tel://\(digits)")
+        return URL(string: "tel://\(hasPlus ? "+" : "")\(digits)")
     }
 
     private var emailURL: URL? {
-        guard !vendor.email.trimmed.isEmpty else { return nil }
-        return URL(string: "mailto:\(vendor.email.trimmed)")
+        let trimmed = vendor.email.trimmed
+        guard !trimmed.isEmpty else { return nil }
+        // Percent-encode the address for safety against odd characters in the local-part.
+        let allowed = CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "?&="))
+        let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: allowed) ?? trimmed
+        return URL(string: "mailto:\(encoded)")
     }
 }
 

@@ -16,30 +16,32 @@ enum BudgetMathService {
         allowanceSelections: [AllowanceSelection]
     ) -> Bool {
         let projectItems = items.filter { $0.projectID == projectID }
-        var actualByItemID: [UUID: Double] = Dictionary(uniqueKeysWithValues: projectItems.map { ($0.id, 0) })
-        var selectionActualByItemID: [UUID: Double] = [:]
+        // Accumulate in integer cents to avoid IEEE 754 drift over many transactions.
+        var actualCentsByItemID: [UUID: Int64] = Dictionary(uniqueKeysWithValues: projectItems.map { ($0.id, Int64(0)) })
+        var selectionCentsByItemID: [UUID: Int64] = [:]
         var didChange = false
 
         for selection in allowanceSelections where selection.projectID == projectID {
-            selectionActualByItemID[selection.lineItemID, default: 0] += selection.amount
+            selectionCentsByItemID[selection.lineItemID, default: 0] += MoneyMath.cents(selection.amount)
         }
 
         for expense in expenses where expense.projectID == projectID {
             guard let item = resolveItem(for: expense, in: projectItems) else { continue }
-            actualByItemID[item.id, default: 0] += expense.amount
+            actualCentsByItemID[item.id, default: 0] += MoneyMath.cents(expense.amount)
         }
 
         for order in changeOrders where order.projectID == projectID && order.status == .paid {
             guard let item = resolveItem(for: order, in: projectItems) else { continue }
-            actualByItemID[item.id, default: 0] += order.amount
+            actualCentsByItemID[item.id, default: 0] += MoneyMath.cents(order.amount)
         }
 
         for item in projectItems {
-            let hasSelections = selectionActualByItemID[item.id] != nil
-            let calculatedActual = item.isAllowance && hasSelections
-                ? selectionActualByItemID[item.id, default: 0]
-                : actualByItemID[item.id, default: 0]
-            if item.actual != calculatedActual {
+            let hasSelections = selectionCentsByItemID[item.id] != nil
+            let calculatedCents = item.isAllowance && hasSelections
+                ? selectionCentsByItemID[item.id, default: 0]
+                : actualCentsByItemID[item.id, default: 0]
+            let calculatedActual = MoneyMath.dollars(calculatedCents)
+            if MoneyMath.cents(item.actual) != calculatedCents {
                 item.actual = calculatedActual
                 didChange = true
             }
@@ -50,8 +52,9 @@ enum BudgetMathService {
 
     /// Total invoiced/incurred against the construction scope.
     static func actualSpend(expenses: [Expense], changeOrders: [ChangeOrder]) -> Double {
-        expenses.reduce(0) { $0 + $1.amount }
-            + changeOrders.filter { $0.status == .paid }.reduce(0) { $0 + $1.amount }
+        let expenseTotal = MoneyMath.sum(expenses, by: \.amount)
+        let paidOrders = MoneyMath.sum(changeOrders.filter { $0.status == .paid }, by: \.amount)
+        return MoneyMath.dollars(MoneyMath.cents(expenseTotal) + MoneyMath.cents(paidOrders))
     }
 
     static func actualSpend(
@@ -62,47 +65,54 @@ enum BudgetMathService {
     ) -> Double {
         let allowanceItemIDs = Set(items.filter(\.isAllowance).map(\.id))
         let allowanceItemIDsWithSelections = Set(allowanceSelections.map(\.lineItemID))
-        let expenseTotal = expenses.reduce(0) { total, expense in
-            if let itemID = expense.budgetLineItemID,
-               allowanceItemIDs.contains(itemID),
-               allowanceItemIDsWithSelections.contains(itemID)
-            {
-                return total
+        let countedExpenses = expenses.filter { expense in
+            guard let itemID = expense.budgetLineItemID,
+                  allowanceItemIDs.contains(itemID),
+                  allowanceItemIDsWithSelections.contains(itemID)
+            else {
+                return true
             }
-            return total + expense.amount
+            return false
         }
-        let allowanceActuals = allowanceSelections.reduce(0) { total, selection in
-            allowanceItemIDs.contains(selection.lineItemID) ? total + selection.amount : total
-        }
-        let paidChangeOrders = changeOrders.filter { $0.status == .paid }.reduce(0) { $0 + $1.amount }
-        return expenseTotal + allowanceActuals + paidChangeOrders
+        let expenseCents = MoneyMath.sum(countedExpenses, by: \.amount)
+        let allowanceCents = MoneyMath.sum(
+            allowanceSelections.filter { allowanceItemIDs.contains($0.lineItemID) },
+            by: \.amount
+        )
+        let paidOrderCents = MoneyMath.sum(changeOrders.filter { $0.status == .paid }, by: \.amount)
+        return MoneyMath.dollars(
+            MoneyMath.cents(expenseCents) + MoneyMath.cents(allowanceCents) + MoneyMath.cents(paidOrderCents)
+        )
     }
 
     /// Open commitments + approved-but-not-yet-paid change orders.
     static func committedSpend(items: [BudgetLineItem], changeOrders: [ChangeOrder]) -> Double {
-        items.reduce(0) { $0 + $1.openCommitment }
-            + changeOrders.filter { $0.status == .approved }.reduce(0) { $0 + $1.amount }
+        let openCommitments = MoneyMath.sum(items, by: \.openCommitment)
+        let approvedOrders = MoneyMath.sum(changeOrders.filter { $0.status == .approved }, by: \.amount)
+        return MoneyMath.dollars(MoneyMath.cents(openCommitments) + MoneyMath.cents(approvedOrders))
     }
 
     /// Cash actually paid out. Preserved payment-field values are ignored while an
     /// expense is marked unpaid.
     static func cashPaidTotal(expenses: [Expense], changeOrders: [ChangeOrder]) -> Double {
-        expenses.reduce(0) { $0 + $1.effectiveAmountPaid }
-            + changeOrders.filter { $0.status == .paid }.reduce(0) { $0 + $1.amount }
+        let paidByExpense = MoneyMath.sum(expenses, by: \.effectiveAmountPaid)
+        let paidByOrder = MoneyMath.sum(changeOrders.filter { $0.status == .paid }, by: \.amount)
+        return MoneyMath.dollars(MoneyMath.cents(paidByExpense) + MoneyMath.cents(paidByOrder))
     }
 
     static func pendingExposure(changeOrders: [ChangeOrder]) -> Double {
-        changeOrders.filter { $0.status == .pending }.reduce(0) { $0 + $1.amount }
+        MoneyMath.sum(changeOrders.filter { $0.status == .pending }, by: \.amount)
     }
 
     static func openInvoiceTotal(expenses: [Expense]) -> Double {
-        expenses.reduce(0) { $0 + $1.balanceDue }
+        MoneyMath.sum(expenses, by: \.balanceDue)
     }
 
     static func allowanceSelectionTotal(for item: BudgetLineItem, selections: [AllowanceSelection]) -> Double {
-        selections
-            .filter { $0.projectID == item.projectID && $0.lineItemID == item.id }
-            .reduce(0) { $0 + $1.amount }
+        MoneyMath.sum(
+            selections.filter { $0.projectID == item.projectID && $0.lineItemID == item.id },
+            by: \.amount
+        )
     }
 
     static func allowanceOverage(
@@ -110,13 +120,18 @@ enum BudgetMathService {
         allowanceSelections: [AllowanceSelection],
         expenses: [Expense] = []
     ) -> Double {
-        items.filter(\.isAllowance).reduce(0) { total, item in
+        let overageCents: Int64 = items.filter(\.isAllowance).reduce(Int64(0)) { totalCents, item in
             let itemSelections = allowanceSelections.filter { $0.projectID == item.projectID && $0.lineItemID == item.id }
-            let actual = itemSelections.isEmpty
-                ? expenses.filter { $0.projectID == item.projectID && $0.budgetLineItemID == item.id }.reduce(0) { $0 + $1.amount }
-                : itemSelections.reduce(0) { $0 + $1.amount }
-            return total + max(0, actual - item.allowanceAmount)
+            let actual: Double = itemSelections.isEmpty
+                ? MoneyMath.sum(
+                    expenses.filter { $0.projectID == item.projectID && $0.budgetLineItemID == item.id },
+                    by: \.amount
+                )
+                : MoneyMath.sum(itemSelections, by: \.amount)
+            let itemOverageCents = max(Int64(0), MoneyMath.cents(actual) - MoneyMath.cents(item.allowanceAmount))
+            return totalCents + itemOverageCents
         }
+        return MoneyMath.dollars(overageCents)
     }
 
     private static func resolveItem(for expense: Expense, in items: [BudgetLineItem]) -> BudgetLineItem? {

@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2A00010100000000000000AB /* BackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000AB /* BackupService.swift */; };
+		2A00010100000000000000AC /* StorageHealthMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000AC /* StorageHealthMonitor.swift */; };
+		2A00010100000000000000AD /* DataRecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000AD /* DataRecoveryView.swift */; };
+		2A00010100000000000000AE /* DataSafetyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000AE /* DataSafetyView.swift */; };
+		2A00010100000000000000B1 /* MoneyMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000B1 /* MoneyMath.swift */; };
 		2A00010100000000000000A9 /* PortfolioInsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000A9 /* PortfolioInsightsView.swift */; };
 		2A00010100000000000000A8 /* InsightsPDFService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000A8 /* InsightsPDFService.swift */; };
 		2A00010100000000000000A7 /* BidsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00020100000000000000A7 /* BidsView.swift */; };
@@ -71,6 +76,12 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		2A00020100000000000000AB /* BackupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupService.swift; sourceTree = "<group>"; };
+		2A00020100000000000000AC /* StorageHealthMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageHealthMonitor.swift; sourceTree = "<group>"; };
+		2A00020100000000000000AD /* DataRecoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataRecoveryView.swift; sourceTree = "<group>"; };
+		2A00020100000000000000AE /* DataSafetyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSafetyView.swift; sourceTree = "<group>"; };
+		2A00020100000000000000AF /* ParamusBuild.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ParamusBuild.entitlements; sourceTree = "<group>"; };
+		2A00020100000000000000B1 /* MoneyMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyMath.swift; sourceTree = "<group>"; };
 		2A00020100000000000000A9 /* PortfolioInsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortfolioInsightsView.swift; sourceTree = "<group>"; };
 		2A00020100000000000000A8 /* InsightsPDFService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsPDFService.swift; sourceTree = "<group>"; };
 		2A00020100000000000000A7 /* BidsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BidsView.swift; sourceTree = "<group>"; };
@@ -164,8 +175,17 @@
 				2A0004010000000000000007 /* Components */,
 				2A0004010000000000000008 /* Views */,
 				2A0004010000000000000009 /* Resources */,
+				2A0004010000000000000017 /* Support */,
 			);
 			path = ParamusBuild;
+			sourceTree = "<group>";
+		};
+		2A0004010000000000000017 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				2A00020100000000000000AF /* ParamusBuild.entitlements */,
+			);
+			path = Support;
 			sourceTree = "<group>";
 		};
 		2A0004010000000000000003 /* App */ = {
@@ -211,6 +231,9 @@
 				2A00020100000000000000A3 /* RoomCatalog.swift */,
 				2A00020100000000000000AA /* SwiftDataBackfillService.swift */,
 				2A00020100000000000000A8 /* InsightsPDFService.swift */,
+				2A00020100000000000000AB /* BackupService.swift */,
+				2A00020100000000000000AC /* StorageHealthMonitor.swift */,
+				2A00020100000000000000B1 /* MoneyMath.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -322,6 +345,8 @@
 				2A0002010000000000000021 /* SettingsView.swift */,
 				2A0002010000000000000026 /* DocumentsView.swift */,
 				2A0002010000000000000027 /* ExportProjectView.swift */,
+				2A00020100000000000000AD /* DataRecoveryView.swift */,
+				2A00020100000000000000AE /* DataSafetyView.swift */,
 			);
 			path = More;
 			sourceTree = "<group>";
@@ -435,6 +460,11 @@
 				2A000101000000000000009E /* CashFlowService.swift in Sources */,
 				2A00010100000000000000A3 /* RoomCatalog.swift in Sources */,
 				2A00010100000000000000AA /* SwiftDataBackfillService.swift in Sources */,
+				2A00010100000000000000AB /* BackupService.swift in Sources */,
+				2A00010100000000000000AC /* StorageHealthMonitor.swift in Sources */,
+				2A00010100000000000000AD /* DataRecoveryView.swift in Sources */,
+				2A00010100000000000000AE /* DataSafetyView.swift in Sources */,
+				2A00010100000000000000B1 /* MoneyMath.swift in Sources */,
 				2A0001010000000000000015 /* DashboardView.swift in Sources */,
 				2A0001010000000000000016 /* BudgetView.swift in Sources */,
 				2A0001010000000000000017 /* BudgetDetailView.swift in Sources */,
@@ -591,6 +621,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ParamusBuild/Support/ParamusBuild.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Q72U936CL6;
@@ -623,6 +654,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ParamusBuild/Support/ParamusBuild.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Q72U936CL6;

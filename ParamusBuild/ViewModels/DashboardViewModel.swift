@@ -27,7 +27,10 @@ struct DashboardViewModel {
     }
 
     var totalBudget: Double {
-        project?.constructionBudget ?? constructionItems.reduce(0) { $0 + $1.budget }
+        if let projectBudget = project?.constructionBudget {
+            return projectBudget.roundedToCents
+        }
+        return MoneyMath.sum(constructionItems, by: \.budget)
     }
 
     var actualSpent: Double {
@@ -60,18 +63,22 @@ struct DashboardViewModel {
     }
 
     var remainingBudget: Double {
-        totalBudget - actualSpent - committedSpend
+        MoneyMath.dollars(MoneyMath.cents(totalBudget) - MoneyMath.cents(actualSpent) - MoneyMath.cents(committedSpend))
     }
 
     var contingencyRemaining: Double {
-        let contingencyBudget = project?.contingencyBudget ?? 0
-        let contingencyItemSpend = items
-            .filter { Self.isContingency($0.categoryName) }
-            .reduce(0) { $0 + $1.spentAndCommitted }
-        let pendingContingency = changeOrders
-            .filter { $0.status == .pending && Self.isContingency($0.categoryName) }
-            .reduce(0) { $0 + $1.amount }
-        return contingencyBudget - contingencyItemSpend - pendingContingency
+        let contingencyBudgetCents = MoneyMath.cents(project?.contingencyBudget ?? 0)
+        let contingencyItemSpend = MoneyMath.sum(
+            items.filter { Self.isContingency($0.categoryName) },
+            by: \.spentAndCommitted
+        )
+        let pendingContingency = MoneyMath.sum(
+            changeOrders.filter { $0.status == .pending && Self.isContingency($0.categoryName) },
+            by: \.amount
+        )
+        return MoneyMath.dollars(
+            contingencyBudgetCents - MoneyMath.cents(contingencyItemSpend) - MoneyMath.cents(pendingContingency)
+        )
     }
 
     var budgetProgress: Double {
@@ -100,9 +107,7 @@ struct DashboardViewModel {
     }
 
     var openChangeOrderTotal: Double {
-        changeOrders
-            .filter { $0.status != .paid }
-            .reduce(0) { $0 + $1.amount }
+        MoneyMath.sum(changeOrders.filter { $0.status != .paid }, by: \.amount)
     }
 
     var pendingExposure: Double {
@@ -130,14 +135,18 @@ struct DashboardViewModel {
     var categorySummaries: [BudgetCategorySummary] {
         let grouped = Dictionary(grouping: constructionItems, by: \.categoryName)
         return grouped.map { category, items in
-            let approvedChanges = constructionChangeOrders
-                .filter { $0.status == .approved && $0.categoryName.trimmed.caseInsensitiveCompare(category.trimmed) == .orderedSame }
-                .reduce(0) { $0 + $1.amount }
+            let approvedChanges = MoneyMath.sum(
+                constructionChangeOrders.filter {
+                    $0.status == .approved && $0.categoryName.trimmed.caseInsensitiveCompare(category.trimmed) == .orderedSame
+                },
+                by: \.amount
+            )
+            let openCommitments = MoneyMath.sum(items, by: \.openCommitment)
             return BudgetCategorySummary(
                 name: category,
-                budget: items.reduce(0) { $0 + $1.budget },
-                actual: items.reduce(0) { $0 + $1.actual },
-                committed: items.reduce(0) { $0 + $1.openCommitment } + approvedChanges
+                budget: MoneyMath.sum(items, by: \.budget),
+                actual: MoneyMath.sum(items, by: \.actual),
+                committed: MoneyMath.dollars(MoneyMath.cents(openCommitments) + MoneyMath.cents(approvedChanges))
             )
         }
         .sorted { $0.utilization > $1.utilization }
@@ -151,17 +160,19 @@ struct DashboardViewModel {
         return BudgetPhaseSummary.phaseOrder.compactMap { phase in
             guard let phaseItems = grouped[phase], !phaseItems.isEmpty else { return nil }
             let phaseCategories = Set(phaseItems.map(\.categoryName))
-            let approvedChanges = constructionChangeOrders
-                .filter { order in
+            let approvedChanges = MoneyMath.sum(
+                constructionChangeOrders.filter { order in
                     order.status == .approved && phaseCategories
                         .contains { $0.trimmed.caseInsensitiveCompare(order.categoryName.trimmed) == .orderedSame }
-                }
-                .reduce(0) { $0 + $1.amount }
+                },
+                by: \.amount
+            )
+            let openCommitments = MoneyMath.sum(phaseItems, by: \.openCommitment)
             return BudgetPhaseSummary(
                 name: phase,
-                budget: phaseItems.reduce(0) { $0 + $1.budget },
-                actual: phaseItems.reduce(0) { $0 + $1.actual },
-                committed: phaseItems.reduce(0) { $0 + $1.openCommitment } + approvedChanges
+                budget: MoneyMath.sum(phaseItems, by: \.budget),
+                actual: MoneyMath.sum(phaseItems, by: \.actual),
+                committed: MoneyMath.dollars(MoneyMath.cents(openCommitments) + MoneyMath.cents(approvedChanges))
             )
         }
     }
@@ -181,13 +192,17 @@ struct BudgetCategorySummary: Identifiable {
     let actual: Double
     let committed: Double
 
+    private var spentAndCommittedCents: Int64 {
+        MoneyMath.cents(actual) + MoneyMath.cents(committed)
+    }
+
     var utilization: Double {
         guard budget > 0 else { return 0 }
-        return (actual + committed) / budget
+        return MoneyMath.dollars(spentAndCommittedCents) / budget
     }
 
     var health: BudgetHealth {
-        if actual + committed > budget { return .overBudget }
+        if spentAndCommittedCents > MoneyMath.cents(budget) { return .overBudget }
         if utilization >= 0.9 { return .nearLimit }
         return .healthy
     }
@@ -221,17 +236,21 @@ struct BudgetPhaseSummary: Identifiable {
     let actual: Double
     let committed: Double
 
+    private var spentAndCommittedCents: Int64 {
+        MoneyMath.cents(actual) + MoneyMath.cents(committed)
+    }
+
     var utilization: Double {
         guard budget > 0 else { return 0 }
-        return (actual + committed) / budget
+        return MoneyMath.dollars(spentAndCommittedCents) / budget
     }
 
     var remaining: Double {
-        budget - actual - committed
+        MoneyMath.dollars(MoneyMath.cents(budget) - spentAndCommittedCents)
     }
 
     var health: BudgetHealth {
-        if actual + committed > budget { return .overBudget }
+        if spentAndCommittedCents > MoneyMath.cents(budget) { return .overBudget }
         if utilization >= 0.9 { return .nearLimit }
         return .healthy
     }

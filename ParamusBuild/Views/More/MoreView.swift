@@ -149,7 +149,7 @@ struct MoreView: View {
                     Button(role: .destructive) {
                         showingDeleteAlert = true
                     } label: {
-                        MoreRow(title: "Delete Project", subtitle: "Remove this build and all related data", systemImage: "trash")
+                        MoreRow(title: "Delete Project", subtitle: "Move to Trash (restorable for \(Project.trashRetentionDays) days)", systemImage: "trash")
                     }
                 }
             }
@@ -160,14 +160,14 @@ struct MoreView: View {
             .onAppear {
                 refreshCounts()
             }
-            .alert("Delete Project?", isPresented: $showingDeleteAlert) {
-                Button("Delete", role: .destructive) {
+            .alert("Move to Trash?", isPresented: $showingDeleteAlert) {
+                Button("Move to Trash", role: .destructive) {
                     requestProjectDelete()
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text(
-                    "This permanently removes \(project.name), including its budget, expenses, photos, documents, vendors and change orders."
+                    "\(project.name) will be moved to Trash for \(Project.trashRetentionDays) days. You can restore it any time from Data Safety → Trash before it's permanently deleted."
                 )
             }
         }

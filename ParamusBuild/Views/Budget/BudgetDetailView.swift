@@ -94,25 +94,31 @@ struct BudgetDetailView: View {
         return RoomCatalog.general
     }
 
+    // All money math here is cent-exact via MoneyMath so the comparisons that drive
+    // the BudgetHealthPill (`variance > 0`, `utilization >= 0.9`) match what the
+    // BudgetView list shows for the same item.
+
     private var linkedExpenseActual: Double {
-        linkedExpenses.reduce(0) { $0 + $1.amount }
+        MoneyMath.sum(linkedExpenses, by: \.amount)
     }
 
     private var allowanceActual: Double {
-        let selectionActual = allowanceSelections.reduce(0) { $0 + $1.amount }
+        let selectionActual = MoneyMath.sum(allowanceSelections, by: \.amount)
         return allowanceSelections.isEmpty ? linkedExpenseActual : selectionActual
     }
 
     private var actual: Double {
-        isAllowance ? allowanceActual : currentItem?.actual ?? 0
+        isAllowance ? allowanceActual : (currentItem?.actual.roundedToCents ?? 0)
     }
 
     private var openCommitment: Double {
-        isAllowance ? 0 : max(0, committed - actual)
+        guard !isAllowance else { return 0 }
+        let diffCents = MoneyMath.cents(committed) - MoneyMath.cents(actual)
+        return MoneyMath.dollars(max(Int64(0), diffCents))
     }
 
     private var spentAndCommitted: Double {
-        actual + openCommitment
+        MoneyMath.dollars(MoneyMath.cents(actual) + MoneyMath.cents(openCommitment))
     }
 
     private var limitAmount: Double {
@@ -120,11 +126,15 @@ struct BudgetDetailView: View {
     }
 
     private var remaining: Double {
-        limitAmount - spentAndCommitted
+        MoneyMath.diff(limitAmount, spentAndCommitted)
     }
 
     private var variance: Double {
-        isAllowance ? max(0, actual - allowanceAmount) : spentAndCommitted - budget
+        if isAllowance {
+            let diffCents = MoneyMath.cents(actual) - MoneyMath.cents(allowanceAmount)
+            return MoneyMath.dollars(max(Int64(0), diffCents))
+        }
+        return MoneyMath.diff(spentAndCommitted, budget)
     }
 
     private var utilization: Double {
@@ -133,7 +143,8 @@ struct BudgetDetailView: View {
     }
 
     private var health: BudgetHealth {
-        if variance > 0 { return .overBudget }
+        // Compare in integer cents so an invisible drift can't flip the badge.
+        if MoneyMath.cents(variance) > 0 { return .overBudget }
         if utilization >= 0.9 { return .nearLimit }
         return .healthy
     }
@@ -431,11 +442,13 @@ struct BudgetDetailView: View {
         item.allowanceAmount = isAllowance ? max(0, allowanceAmount) : 0
         syncLinkedRecords(to: item)
         let effectiveSelections = isAllowance ? seedSelectionsFromLinkedExpensesIfNeeded() : allowanceSelections
+        // Recalc needs ALL project change orders — passing only this item's would zero out
+        // paid-change-order contributions to actuals on other budget items.
         BudgetMathService.recalculateActuals(
             for: projectID,
             items: projectItems,
             expenses: expenses,
-            changeOrders: fetchLinkedChangeOrders(),
+            changeOrders: fetchAllProjectChangeOrders(),
             allowanceSelections: effectiveSelections
         )
 
@@ -496,7 +509,7 @@ struct BudgetDetailView: View {
             for: projectID,
             items: projectItems,
             expenses: expenses,
-            changeOrders: [],
+            changeOrders: fetchAllProjectChangeOrders(),
             allowanceSelections: effectiveSelections
         )
 
@@ -520,7 +533,7 @@ struct BudgetDetailView: View {
             for: projectID,
             items: projectItems,
             expenses: expenses,
-            changeOrders: [],
+            changeOrders: fetchAllProjectChangeOrders(),
             allowanceSelections: effectiveSelections
         )
         do {
@@ -540,9 +553,22 @@ struct BudgetDetailView: View {
         return try? modelContext.fetch(descriptor).first
     }
 
+    /// Change orders linked specifically to THIS budget line item. Used when syncing
+    /// category/title changes outward.
     private func fetchLinkedChangeOrders() -> [ChangeOrder] {
         let descriptor = FetchDescriptor<ChangeOrder>(
             predicate: #Predicate { $0.projectID == projectID && $0.budgetLineItemID == itemID }
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    /// ALL of the project's change orders. Required when running BudgetMathService.recalculateActuals
+    /// — that helper iterates every project item and applies paid change orders to each.
+    /// Filtering to just this item's COs would zero out other items' paid-CO contributions.
+    private func fetchAllProjectChangeOrders() -> [ChangeOrder] {
+        let descriptor = FetchDescriptor<ChangeOrder>(
+            predicate: #Predicate { $0.projectID == projectID },
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         return (try? modelContext.fetch(descriptor)) ?? []
     }

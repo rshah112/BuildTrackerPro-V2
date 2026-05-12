@@ -4,7 +4,11 @@ import SwiftUI
 struct PortfolioView: View {
     @Environment(\.modelContext) private var modelContext
 
-    @Query(sort: \Project.createdAt, order: .reverse) private var projects: [Project]
+    @Query(
+        filter: #Predicate<Project> { $0.deletedAt == nil },
+        sort: \Project.createdAt,
+        order: .reverse
+    ) private var projects: [Project]
 
     @State private var showingAddProject = false
     @State private var projectPendingDelete: ProjectDeleteCandidate?
@@ -12,9 +16,11 @@ struct PortfolioView: View {
     @State private var statusFilter: ProjectStatus?
     @State private var priorityFilter: ProjectPriority?
     @State private var showingInsights = false
+    @State private var showingDataSafety = false
+    @ObservedObject private var health = StorageHealthMonitor.shared
 
     private var portfolioOpenTotal: Double {
-        metricsByProjectID.values.reduce(0) { $0 + $1.openInvoiceTotal }
+        MoneyMath.sum(metricsByProjectID.values, by: \.openInvoiceTotal)
     }
 
     private var filteredProjects: [Project] {
@@ -58,9 +64,26 @@ struct PortfolioView: View {
                 .accessibilityLabel("Portfolio Insights")
                 .disabled(projects.isEmpty)
             }
+            ToolbarItem(placement: .topBarLeading) {
+                Button { showingDataSafety = true } label: {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: "shield.lefthalf.filled")
+                        if health.hasWarning {
+                            Circle()
+                                .fill(.orange)
+                                .frame(width: 8, height: 8)
+                                .offset(x: 6, y: -2)
+                        }
+                    }
+                }
+                .accessibilityLabel("Data Safety")
+            }
         }
         .sheet(isPresented: $showingInsights) {
             PortfolioInsightsView()
+        }
+        .sheet(isPresented: $showingDataSafety) {
+            DataSafetyView()
         }
         .onAppear {
             refreshProjectMetrics()
@@ -74,8 +97,8 @@ struct PortfolioView: View {
         .sheet(isPresented: $showingAddProject, onDismiss: refreshProjectMetrics) {
             ProjectFormView()
         }
-        .alert("Delete Project?", isPresented: deleteAlertBinding, presenting: projectPendingDelete) { project in
-            Button("Delete", role: .destructive) {
+        .alert("Move to Trash?", isPresented: deleteAlertBinding, presenting: projectPendingDelete) { project in
+            Button("Move to Trash", role: .destructive) {
                 deleteProject(withID: project.id)
             }
             Button("Cancel", role: .cancel) {
@@ -83,7 +106,7 @@ struct PortfolioView: View {
             }
         } message: { project in
             Text(
-                "This permanently removes \(project.name), including its budget, expenses, photos, documents, vendors and change orders."
+                "\(project.name) will be moved to Trash for \(Project.trashRetentionDays) days. You can restore it any time from Data Safety → Trash before it's permanently deleted."
             )
         })
     }
@@ -116,7 +139,7 @@ struct PortfolioView: View {
                 PortfolioSummaryTile(title: "Projects", value: "\(projects.count)", systemImage: "house")
                 PortfolioSummaryTile(
                     title: "Budget",
-                    value: projects.reduce(0) { $0 + $1.constructionBudget }.compactCurrencyString,
+                    value: MoneyMath.sum(projects, by: \.constructionBudget).compactCurrencyString,
                     systemImage: "banknote"
                 )
                 PortfolioSummaryTile(title: "Open", value: portfolioOpenTotal.compactCurrencyString, systemImage: "clock")
@@ -217,53 +240,24 @@ struct PortfolioView: View {
     }
 
     private func deleteProject(withID projectID: UUID) {
-        do {
-            let categories = try fetchAllForDelete(BudgetCategory.self, projectID: projectID)
-            let items = try fetchAllForDelete(BudgetLineItem.self, projectID: projectID)
-            let expenses = try fetchAllForDelete(Expense.self, projectID: projectID)
-            let vendors = try fetchAllForDelete(Vendor.self, projectID: projectID)
-            let photos = try fetchAllForDelete(PhotoAttachment.self, projectID: projectID)
-            let documents = try fetchAllForDelete(ProjectDocument.self, projectID: projectID)
-            let allowanceSelections = try fetchAllForDelete(AllowanceSelection.self, projectID: projectID)
-            let tasks = try fetchAllForDelete(ProjectTask.self, projectID: projectID)
-            let changeOrders = try fetchAllForDelete(ChangeOrder.self, projectID: projectID)
-            let bidPackages = try fetchAllForDelete(BidPackage.self, projectID: projectID)
-            let bids = try fetchAllForDelete(Bid.self, projectID: projectID)
-            let project = try fetchProject(withID: projectID)
-            let projectMediaFolder = project.map(MediaStorageService.projectFolder(project:))
-
-            categories.forEach(modelContext.delete)
-            items.forEach(modelContext.delete)
-            expenses.forEach(modelContext.delete)
-            vendors.forEach(modelContext.delete)
-            photos.forEach(modelContext.delete)
-            documents.forEach(modelContext.delete)
-            allowanceSelections.forEach(modelContext.delete)
-            tasks.forEach(modelContext.delete)
-            changeOrders.forEach(modelContext.delete)
-            bidPackages.forEach(modelContext.delete)
-            bids.forEach(modelContext.delete)
-            if let project {
-                modelContext.delete(project)
-            }
-
-            try modelContext.save()
-            if let projectMediaFolder {
-                MediaStorageService.removeAllMedia(at: projectMediaFolder)
-            }
+        guard let project = (try? fetchProject(withID: projectID)) ?? nil else {
             projectPendingDelete = nil
+            return
+        }
+        project.softDelete()
+        do {
+            try modelContext.save()
             Haptics.success()
+            projectPendingDelete = nil
             refreshProjectMetrics()
+            // Eagerly capture a safety snapshot so a "Restore" trip-through-Trash never needs
+            // to recover from the live store alone.
+            _ = BackupService.performIfDue(reason: .projectMutation, context: modelContext)
         } catch {
             modelContext.safeRollback()
             projectPendingDelete = nil
             Haptics.warning()
         }
-    }
-
-    private func fetchAllForDelete<T: PersistentModel & ProjectScoped>(_ type: T.Type, projectID: UUID) throws -> [T] {
-        let descriptor = FetchDescriptor<T>(predicate: #Predicate { $0.projectID == projectID })
-        return try modelContext.fetch(descriptor)
     }
 
     private func fetchProject(withID projectID: UUID) throws -> Project? {

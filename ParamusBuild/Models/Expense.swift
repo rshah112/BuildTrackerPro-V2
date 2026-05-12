@@ -65,12 +65,19 @@ final class Expense {
         self.receiptImageData = receiptImageData
     }
 
+    // Cent-exact via MoneyMath so balance comparisons (`balanceDue > 0` in cash flow)
+    // can't be fooled by a sub-cent IEEE 754 drift over many transactions.
+
     var balanceDue: Double {
-        max(0, amount - effectiveAmountPaid)
+        let due = MoneyMath.cents(amount) - MoneyMath.cents(effectiveAmountPaid)
+        return MoneyMath.dollars(max(Int64(0), due))
     }
 
     var effectiveAmountPaid: Double {
         guard isPaid else { return 0 }
-        return min(amount, max(0, amountPaid))
+        let amountCents = MoneyMath.cents(amount)
+        let paidCents = MoneyMath.cents(amountPaid)
+        let bounded = min(amountCents, max(Int64(0), paidCents))
+        return MoneyMath.dollars(bounded)
     }
 }

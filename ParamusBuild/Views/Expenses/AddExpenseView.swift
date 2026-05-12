@@ -575,7 +575,11 @@ struct AddExpenseView: View {
 
     private func mirrorReceiptToDisk(for expense: Expense) {
         guard let data = expense.receiptImageData else { return }
-        MediaStorageService.saveReceipt(data: data, project: project, expense: expense)
+        do {
+            try MediaStorageService.saveReceipt(data: data, project: project, expense: expense)
+        } catch {
+            StorageHealthMonitor.shared.reportMirrorFailure(error)
+        }
     }
 
     private func refreshData() {

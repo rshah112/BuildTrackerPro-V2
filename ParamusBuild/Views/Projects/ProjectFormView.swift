@@ -42,11 +42,11 @@ struct ProjectFormView: View {
     }
 
     private var allocatedBudget: Double {
-        draftCategories.reduce(0) { $0 + $1.amount }
+        MoneyMath.sum(draftCategories, by: \.amount)
     }
 
     private var unallocatedBudget: Double {
-        constructionBudget - allocatedBudget
+        MoneyMath.diff(constructionBudget, allocatedBudget)
     }
 
     private var saveErrorBinding: Binding<Bool> {

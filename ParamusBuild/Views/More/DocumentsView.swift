@@ -281,7 +281,11 @@ struct DocumentsView: View {
 
         if saveChanges(successHaptic: true) {
             for (document, data) in mirroredDocuments {
-                MediaStorageService.saveDocument(data: data, project: project, document: document)
+                do {
+                    try MediaStorageService.saveDocument(data: data, project: project, document: document)
+                } catch {
+                    StorageHealthMonitor.shared.reportMirrorFailure(error)
+                }
             }
         }
         pendingUploads.removeAll()
@@ -895,7 +899,11 @@ private struct DocumentEditorView: View {
         do {
             try modelContext.save()
             if let data = document.fileData {
-                MediaStorageService.saveDocument(data: data, project: project, document: document)
+                do {
+                    try MediaStorageService.saveDocument(data: data, project: project, document: document)
+                } catch {
+                    StorageHealthMonitor.shared.reportMirrorFailure(error)
+                }
             }
             Haptics.success()
             dismiss()

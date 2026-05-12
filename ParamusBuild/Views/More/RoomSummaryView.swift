@@ -1,6 +1,26 @@
 import SwiftData
 import SwiftUI
 
+private enum RoomSummarySortField: String, CaseIterable, Identifiable {
+    case projectOrder
+    case alpha
+    case budget
+    case spent
+    case utilization
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .projectOrder: "Project order"
+        case .alpha: "Name (A–Z)"
+        case .budget: "Budget (high → low)"
+        case .spent: "Spent (high → low)"
+        case .utilization: "Most over budget first"
+        }
+    }
+}
+
 struct RoomSummaryView: View {
     let project: Project
 
@@ -8,12 +28,18 @@ struct RoomSummaryView: View {
     @Query private var expenses: [Expense]
     @Query private var photos: [PhotoAttachment]
 
+    @AppStorage(AppSettingsKeys.roomSummarySortField) private var sortFieldRaw = RoomSummarySortField.projectOrder.rawValue
+
     init(project: Project) {
         self.project = project
         let projectID = project.id
         _items = Query(filter: #Predicate<BudgetLineItem> { $0.projectID == projectID }, sort: \.costCode)
         _expenses = Query(filter: #Predicate<Expense> { $0.projectID == projectID }, sort: \.date, order: .reverse)
         _photos = Query(filter: #Predicate<PhotoAttachment> { $0.projectID == projectID }, sort: \.createdAt, order: .reverse)
+    }
+
+    private var sortField: RoomSummarySortField {
+        RoomSummarySortField(rawValue: sortFieldRaw) ?? .projectOrder
     }
 
     private var summaries: [RoomSummary] {
@@ -25,14 +51,36 @@ struct RoomSummaryView: View {
             .filter { !allowedRooms.contains($0) }
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
 
-        return orderedRooms.compactMap { room in
+        let raw = orderedRooms.compactMap { room -> RoomSummary? in
             let roomItems = items.filter { roomName(for: $0) == room }
             let roomExpenses = expenses.filter { roomName(for: $0, itemRooms: itemRooms) == room }
             let roomPhotos = photos.filter { roomName(for: $0) == room }
-            let budget = roomItems.reduce(0) { $0 + $1.budget }
-            let spent = roomItems.reduce(0) { $0 + $1.spentAndCommitted }
+            let budget = MoneyMath.sum(roomItems, by: \.budget)
+            let spent = MoneyMath.sum(roomItems, by: \.spentAndCommitted)
             guard budget > 0 || spent > 0 || !roomExpenses.isEmpty || !roomPhotos.isEmpty else { return nil }
             return RoomSummary(room: room, budget: budget, spent: spent, expenseCount: roomExpenses.count, photoCount: roomPhotos.count)
+        }
+
+        return applySort(to: raw)
+    }
+
+    private func applySort(to source: [RoomSummary]) -> [RoomSummary] {
+        switch sortField {
+        case .projectOrder:
+            return source
+        case .alpha:
+            return source.sorted { $0.room.localizedStandardCompare($1.room) == .orderedAscending }
+        case .budget:
+            // Cent-exact comparison so two near-identical budgets don't flip from a sub-cent drift.
+            return source.sorted { MoneyMath.cents($0.budget) > MoneyMath.cents($1.budget) }
+        case .spent:
+            return source.sorted { MoneyMath.cents($0.spent) > MoneyMath.cents($1.spent) }
+        case .utilization:
+            return source.sorted { lhs, rhs in
+                let lhsRatio = lhs.budget > 0 ? lhs.spent / lhs.budget : 0
+                let rhsRatio = rhs.budget > 0 ? rhs.spent / rhs.budget : 0
+                return lhsRatio > rhsRatio
+            }
         }
     }
 
@@ -63,6 +111,28 @@ struct RoomSummaryView: View {
         .scrollContentBackground(.hidden)
         .background(AppTheme.pageBackground)
         .navigationTitle("By Room")
+        .toolbar {
+            if !summaries.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    sortMenu
+                }
+            }
+        }
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            ForEach(RoomSummarySortField.allCases) { field in
+                Button {
+                    sortFieldRaw = field.rawValue
+                } label: {
+                    Label(field.title, systemImage: sortField == field ? "checkmark" : "")
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        .accessibilityLabel("Sort rooms")
     }
 
     private func roomName(for item: BudgetLineItem) -> String {

@@ -5,7 +5,8 @@ import SwiftUI
 @main
 @MainActor
 struct HomeBuildProApp: App {
-    private let container: ModelContainer
+    private let container: ModelContainer?
+    private let launchFailure: Error?
 
     init() {
         TextFieldSelectionBehavior.enableSelectAllOnFocus()
@@ -15,24 +16,30 @@ struct HomeBuildProApp: App {
             #if DEBUG
                 try Self.resetDevelopmentStoreIfNeeded()
             #endif
-            container = try Self.makeContainer()
-            SeedData.ensureSeeded(in: container.mainContext)
-            SwiftDataBackfillService.runIfNeeded(in: container.mainContext)
+            let c = try Self.makeContainer()
+            SeedData.ensureSeeded(in: c.mainContext)
+            SwiftDataBackfillService.runIfNeeded(in: c.mainContext)
             // Attach undo AFTER seeding so the seed isn't on the undo stack.
-            container.mainContext.undoManager = UndoManager()
+            c.mainContext.undoManager = UndoManager()
+            container = c
+            launchFailure = nil
         } catch {
             #if DEBUG
                 do {
                     try Self.resetDevelopmentStore()
-                    container = try Self.makeContainer()
-                    SeedData.ensureSeeded(in: container.mainContext)
-                    SwiftDataBackfillService.runIfNeeded(in: container.mainContext)
-                    container.mainContext.undoManager = UndoManager()
-                } catch {
-                    fatalError("Could not create SwiftData container after resetting development store: \(error.localizedDescription)")
+                    let c = try Self.makeContainer()
+                    SeedData.ensureSeeded(in: c.mainContext)
+                    SwiftDataBackfillService.runIfNeeded(in: c.mainContext)
+                    c.mainContext.undoManager = UndoManager()
+                    container = c
+                    launchFailure = nil
+                } catch let recoveryError {
+                    container = nil
+                    launchFailure = recoveryError
                 }
             #else
-                fatalError("Could not create SwiftData container: \(error.localizedDescription)")
+                container = nil
+                launchFailure = error
             #endif
         }
     }
@@ -41,10 +48,42 @@ struct HomeBuildProApp: App {
 
     var body: some Scene {
         WindowGroup {
-            PortfolioView()
+            rootView
                 .environment(\.controlSize, preferLargeControls ? .large : .regular)
         }
-        .modelContainer(container)
+    }
+
+    /// We mount `.modelContainer` only on the happy path so a failed container init can't
+    /// cascade into a forced crash. The recovery path doesn't need SwiftData at all — it
+    /// just reveals folders in Files.app, lists backup snapshots, and can wipe the broken
+    /// store file. If the user picks "Start fresh", the next launch re-runs `makeContainer`
+    /// with a clean slate.
+    @ViewBuilder
+    private var rootView: some View {
+        if let container, launchFailure == nil {
+            PortfolioView()
+                .modelContainer(container)
+                .task {
+                    await onLaunch(context: container.mainContext)
+                }
+        } else {
+            DataRecoveryView(launchFailure: launchFailure ?? UnreachableStoreError())
+        }
+    }
+
+    private func onLaunch(context: ModelContext) async {
+        StorageHealthMonitor.shared.refresh()
+        Project.purgeExpiredSoftDeleted(in: context)
+        _ = BackupService.performIfDue(reason: .launch, context: context)
+        StorageHealthMonitor.shared.refresh()
+    }
+
+    /// Synthetic error shown by `DataRecoveryView` when the failure didn't surface a specific
+    /// Swift Error (e.g. a code path that nilled `container` without an exception).
+    private struct UnreachableStoreError: LocalizedError {
+        var errorDescription: String? {
+            "The HomeBuild Pro database could not be opened. Your photos, receipts and document files are still on disk and any iCloud Drive backups are unaffected."
+        }
     }
 
     private static var appSchema: Schema {

@@ -10,26 +10,83 @@ private enum PhotoLibraryMode: String, CaseIterable, Identifiable {
     }
 }
 
+private enum PhotoDateFilter: String, CaseIterable, Identifiable {
+    case all
+    case today
+    case sevenDays
+    case thirtyDays
+    case ninetyDays
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "All"
+        case .today: "Today"
+        case .sevenDays: "7 days"
+        case .thirtyDays: "30 days"
+        case .ninetyDays: "90 days"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .all: "calendar"
+        case .today: "sun.max"
+        case .sevenDays: "calendar.day.timeline.left"
+        case .thirtyDays: "calendar"
+        case .ninetyDays: "calendar.badge.clock"
+        }
+    }
+
+    func contains(_ date: Date, relativeTo reference: Date = .now, calendar: Calendar = .current) -> Bool {
+        switch self {
+        case .all:
+            return true
+        case .today:
+            return calendar.isDate(date, inSameDayAs: reference)
+        case .sevenDays:
+            return windowContains(date, days: 7, reference: reference, calendar: calendar)
+        case .thirtyDays:
+            return windowContains(date, days: 30, reference: reference, calendar: calendar)
+        case .ninetyDays:
+            return windowContains(date, days: 90, reference: reference, calendar: calendar)
+        }
+    }
+
+    private func windowContains(_ date: Date, days: Int, reference: Date, calendar: Calendar) -> Bool {
+        guard let cutoff = calendar.date(byAdding: .day, value: -days, to: reference) else { return true }
+        return date >= cutoff
+    }
+}
+
 struct PhotosView: View {
     @Environment(\.modelContext) private var modelContext
     let project: Project
 
     @Query private var photos: [PhotoAttachment]
+    @Query private var items: [BudgetLineItem]
 
     @State private var showingAddPhoto = false
     @State private var showingEditPhoto = false
-    @State private var selectedPhoto: PhotoAttachment?
     @State private var photoIDToEdit: UUID?
     @State private var taskPhotoID: UUID?
-    @State private var newestFirst = true
     @State private var selectedFolder = "All"
-    @State private var libraryMode: PhotoLibraryMode = .folders
     @State private var photoError: String?
+    @State private var searchQuery = ""
+    @State private var viewerContext: PhotoViewerContext?
+
+    @AppStorage(AppSettingsKeys.photosNewestFirst) private var newestFirst = true
+    @AppStorage(AppSettingsKeys.photosLibraryMode) private var libraryModeRaw = PhotoLibraryMode.folders.rawValue
+    @AppStorage(AppSettingsKeys.photosDateFilter) private var dateFilterRaw = PhotoDateFilter.all.rawValue
+
+    @ObservedObject private var health = StorageHealthMonitor.shared
 
     init(project: Project) {
         self.project = project
         let projectID = project.id
         _photos = Query(filter: #Predicate<PhotoAttachment> { $0.projectID == projectID }, sort: \.createdAt, order: .reverse)
+        _items = Query(filter: #Predicate<BudgetLineItem> { $0.projectID == projectID }, sort: \.costCode)
     }
 
     private let columns = [
@@ -37,19 +94,41 @@ struct PhotosView: View {
         GridItem(.flexible(), spacing: 12, alignment: .top)
     ]
 
+    // MARK: - Derived state
+
+    private var libraryMode: PhotoLibraryMode {
+        get { PhotoLibraryMode(rawValue: libraryModeRaw) ?? .folders }
+    }
+
+    private var dateFilter: PhotoDateFilter {
+        get { PhotoDateFilter(rawValue: dateFilterRaw) ?? .all }
+    }
+
     private var sortedPhotos: [PhotoAttachment] {
         newestFirst ? photos : Array(photos.reversed())
     }
 
+    /// Photos AFTER applying the date filter + search query. Folder filter happens later because
+    /// the folder bar's per-folder counts should reflect the same date/search scope.
+    private var scopedPhotos: [PhotoAttachment] {
+        let filter = dateFilter
+        let query = searchQuery.trimmed.localizedLowercase
+        return sortedPhotos.filter { photo in
+            guard filter.contains(photo.createdAt) else { return false }
+            guard !query.isEmpty else { return true }
+            return matches(photo, query: query)
+        }
+    }
+
     private var displayedPhotos: [PhotoAttachment] {
-        selectedFolder == "All" ? sortedPhotos : sortedPhotos.filter { folderName(for: $0) == selectedFolder }
+        selectedFolder == "All" ? scopedPhotos : scopedPhotos.filter { folderName(for: $0) == selectedFolder }
     }
 
     private var folderFilters: [String] {
-        let usedFolders = Set(photos.map { folderName(for: $0) })
+        let usedFolders = Set(scopedPhotos.map { folderName(for: $0) })
         var filters = ["All"]
         filters.append(contentsOf: PhotoFormViewModel.photoFolderOptions.filter { usedFolders.contains($0) })
-        let extras = photos
+        let extras = scopedPhotos
             .map { folderName(for: $0) }
             .filter { !filters.contains($0) }
             .sorted()
@@ -58,7 +137,7 @@ struct PhotosView: View {
     }
 
     private var folderSections: [(name: String, photos: [PhotoAttachment])] {
-        let grouped = Dictionary(grouping: sortedPhotos, by: folderName(for:))
+        let grouped = Dictionary(grouping: scopedPhotos, by: folderName(for:))
         return folderFilters
             .filter { $0 != "All" }
             .compactMap { name -> (String, [PhotoAttachment])? in
@@ -71,14 +150,43 @@ struct PhotosView: View {
         folderSections.count
     }
 
+    private var photosThisWeek: Int {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -7, to: .now) ?? .now
+        return photos.filter { $0.createdAt >= cutoff }.count
+    }
+
+    private var hasSearchOrFilter: Bool {
+        !searchQuery.trimmed.isEmpty || dateFilter != .all || selectedFolder != "All"
+    }
+
     private func folderName(for photo: PhotoAttachment) -> String {
         let name = photo.phaseTag.trimmed
         return name.isEmpty ? "Uncategorized" : name
     }
 
     private func count(for folder: String) -> Int {
-        folder == "All" ? photos.count : photos.filter { folderName(for: $0) == folder }.count
+        folder == "All" ? scopedPhotos.count : scopedPhotos.filter { folderName(for: $0) == folder }.count
     }
+
+    private func matches(_ photo: PhotoAttachment, query: String) -> Bool {
+        let haystack = [
+            photo.roomTag,
+            photo.phaseTag,
+            photo.categoryName,
+            photo.notes
+        ]
+        .map { $0.localizedLowercase }
+        return haystack.contains { $0.contains(query) }
+    }
+
+    private func linkedItemTitle(for photo: PhotoAttachment) -> String? {
+        guard let itemID = photo.budgetLineItemID,
+              let item = items.first(where: { $0.id == itemID })
+        else { return nil }
+        return "\(item.costCode) — \(item.title)"
+    }
+
+    // MARK: - Body
 
     var body: some View {
         NavigationStack {
@@ -92,57 +200,21 @@ struct PhotosView: View {
                         folderBar
                     }
 
-                    if photos.isEmpty {
-                        EmptyStateView(
-                            title: "No photos",
-                            subtitle: "Capture jobsite progress, receipts and finish details.",
-                            systemImage: "camera"
-                        )
-                        .padding(.top, 80)
-                    } else if libraryMode == .allPhotos {
-                        photoGrid(sortedPhotos)
-                            .padding(.horizontal, AppTheme.pagePadding)
-                            .padding(.bottom, 92)
-                    } else if selectedFolder == "All" {
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(folderSections, id: \.name) { section in
-                                Button {
-                                    withAnimation(.smooth(duration: 0.2)) {
-                                        selectedFolder = section.name
-                                    }
-                                } label: {
-                                    PhotoFolderCard(name: section.name, photos: section.photos)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal, AppTheme.pagePadding)
-                        .padding(.bottom, 92)
-                    } else {
-                        photoGrid(displayedPhotos)
-                            .padding(.horizontal, AppTheme.pagePadding)
-                            .padding(.bottom, 92)
-                    }
+                    dateFilterBar
+
+                    photoContent
                 }
                 .padding(.top, 8)
             }
             .background(AppTheme.pageBackground)
             .navigationTitle("Photos")
+            .searchable(text: $searchQuery, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search notes, rooms, folders")
             .primaryFloatingAction(title: "Photo", systemImage: "camera.fill") {
                 showingAddPhoto = true
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button(newestFirst ? "Oldest First" : "Newest First") {
-                            withAnimation(.smooth(duration: 0.2)) {
-                                newestFirst.toggle()
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "arrow.up.arrow.down")
-                    }
-                    .accessibilityLabel("Sort Photos")
+                    sortMenu
                 }
             }
             .sheet(isPresented: $showingAddPhoto) {
@@ -158,8 +230,17 @@ struct PhotosView: View {
             .sheet(item: taskPhotoBinding) { photoID in
                 AddTaskView(project: project, seedPhotoID: photoID.id)
             }
-            .fullScreenCover(item: $selectedPhoto) { photo in
-                PhotoViewer(photo: photo)
+            .fullScreenCover(item: $viewerContext) { ctx in
+                PhotoViewer(
+                    context: ctx,
+                    onEdit: { photo in
+                        photoIDToEdit = photo.id
+                        showingEditPhoto = true
+                    },
+                    onDelete: { photo in
+                        deletePhoto(withID: photo.id)
+                    }
+                )
             }
             .alert(
                 "Photo Error",
@@ -179,21 +260,76 @@ struct PhotosView: View {
         }
     }
 
+    // MARK: - Header
+
     private var photoHeader: some View {
         PremiumCard {
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Jobsite Photo Log")
-                        .font(.headline.weight(.semibold))
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Jobsite Photo Log")
+                            .font(.headline.weight(.semibold))
+                        Text("\(photos.count) photos · \(folderCount) folders")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    backupBadge
+                }
 
-                    Text("\(photos.count) photos - \(folderCount) folders")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                HStack(spacing: 12) {
+                    headerMetric(value: "\(photosThisWeek)", label: "This week", systemImage: "calendar.day.timeline.left")
+                    headerMetric(value: "\(scopedPhotos.count)", label: "In view", systemImage: "viewfinder")
                 }
             }
         }
         .padding(.horizontal, AppTheme.pagePadding)
     }
+
+    private func headerMetric(value: String, label: String, systemImage: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(AppTheme.accent)
+                .frame(width: 28, height: 28)
+                .background(AppTheme.accent.opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(value)
+                    .font(.subheadline.weight(.bold))
+                Text(label)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .background(AppTheme.surfaceSunken, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var backupBadge: some View {
+        switch health.iCloudAvailable {
+        case .some(true):
+            Label("Backed up", systemImage: "icloud.fill")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.green)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.green.opacity(0.13), in: Capsule())
+        case .some(false):
+            Label("Local only", systemImage: "iphone")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.orange.opacity(0.13), in: Capsule())
+        case .none:
+            EmptyView()
+        }
+    }
+
+    // MARK: - Receipts tile
 
     private var receiptsTile: some View {
         NavigationLink {
@@ -238,8 +374,13 @@ struct PhotosView: View {
         .padding(.horizontal, AppTheme.pagePadding)
     }
 
+    // MARK: - Library / folder / date filters
+
     private var libraryTabs: some View {
-        Picker("Photo View", selection: $libraryMode) {
+        Picker("Photo View", selection: Binding(
+            get: { PhotoLibraryMode(rawValue: libraryModeRaw) ?? .folders },
+            set: { libraryModeRaw = $0.rawValue }
+        )) {
             ForEach(PhotoLibraryMode.allCases) { mode in
                 Text(mode.rawValue).tag(mode)
             }
@@ -282,12 +423,113 @@ struct PhotosView: View {
         }
     }
 
+    private var dateFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(PhotoDateFilter.allCases) { option in
+                    Button {
+                        withAnimation(.smooth(duration: 0.2)) {
+                            dateFilterRaw = option.rawValue
+                        }
+                    } label: {
+                        Label(option.title, systemImage: option.systemImage)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(dateFilter == option ? .white : .primary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(dateFilter == option ? AppTheme.brand : AppTheme.surface, in: Capsule())
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(dateFilter == option ? Color.clear : AppTheme.border, lineWidth: 0.75)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, AppTheme.pagePadding)
+        }
+    }
+
+    // MARK: - Content
+
+    @ViewBuilder
+    private var photoContent: some View {
+        if photos.isEmpty {
+            EmptyStateView(
+                title: "No photos yet",
+                subtitle: "Capture jobsite progress, finishes and material deliveries.",
+                systemImage: "camera"
+            )
+            .padding(.top, 60)
+            .padding(.horizontal, AppTheme.pagePadding)
+
+            Button {
+                showingAddPhoto = true
+            } label: {
+                Label("Take first photo", systemImage: "camera.fill")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.horizontal, AppTheme.pagePadding)
+            .padding(.top, 8)
+        } else if scopedPhotos.isEmpty {
+            EmptyStateView(
+                title: hasSearchOrFilter ? "No matches" : "No photos in this view",
+                subtitle: hasSearchOrFilter
+                    ? "Clear the search or date filter to see all photos."
+                    : "Add a photo or change the date filter.",
+                systemImage: "magnifyingglass"
+            )
+            .padding(.top, 40)
+            .padding(.horizontal, AppTheme.pagePadding)
+
+            if hasSearchOrFilter {
+                Button("Clear filters") {
+                    searchQuery = ""
+                    dateFilterRaw = PhotoDateFilter.all.rawValue
+                    selectedFolder = "All"
+                }
+                .buttonStyle(.bordered)
+                .padding(.horizontal, AppTheme.pagePadding)
+                .padding(.top, 4)
+            }
+        } else if libraryMode == .allPhotos {
+            photoGrid(scopedPhotos)
+                .padding(.horizontal, AppTheme.pagePadding)
+                .padding(.bottom, 92)
+        } else if selectedFolder == "All" {
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(folderSections, id: \.name) { section in
+                    Button {
+                        withAnimation(.smooth(duration: 0.2)) {
+                            selectedFolder = section.name
+                        }
+                    } label: {
+                        PhotoFolderCard(name: section.name, photos: section.photos)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, AppTheme.pagePadding)
+            .padding(.bottom, 92)
+        } else {
+            photoGrid(displayedPhotos)
+                .padding(.horizontal, AppTheme.pagePadding)
+                .padding(.bottom, 92)
+        }
+    }
+
     private func photoGrid(_ visiblePhotos: [PhotoAttachment]) -> some View {
         LazyVGrid(columns: columns, spacing: 12) {
-            ForEach(visiblePhotos) { photo in
+            ForEach(Array(visiblePhotos.enumerated()), id: \.element.id) { index, photo in
                 PhotoGridTile(photo: photo)
                     .onTapGesture {
-                        selectedPhoto = photo
+                        viewerContext = PhotoViewerContext(
+                            photos: visiblePhotos,
+                            initialIndex: index,
+                            linkedItemTitle: { linkedItemTitle(for: $0) }
+                        )
                     }
                     .contextMenu {
                         Button {
@@ -312,6 +554,22 @@ struct PhotosView: View {
             }
         }
     }
+
+    // MARK: - Sort menu
+
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort", selection: $newestFirst) {
+                Label("Newest first", systemImage: "arrow.down").tag(true)
+                Label("Oldest first", systemImage: "arrow.up").tag(false)
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        .accessibilityLabel("Sort photos")
+    }
+
+    // MARK: - State plumbing
 
     private var taskPhotoBinding: Binding<TaskPhotoSeed?> {
         Binding(

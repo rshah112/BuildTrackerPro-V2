@@ -228,7 +228,7 @@ private extension ProjectExportScope {
     }
 }
 
-private struct ZipArchiveBuilder {
+struct ZipArchiveBuilder {
     private struct Entry {
         let path: String
         let data: Data

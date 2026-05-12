@@ -1,6 +1,42 @@
 import SwiftData
 import SwiftUI
 
+private enum TasksFilter: String, CaseIterable, Identifiable {
+    case all
+    case overdue
+    case open
+    case done
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "All"
+        case .overdue: "Overdue"
+        case .open: "Open"
+        case .done: "Done"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .all: "tray.full"
+        case .overdue: "exclamationmark.triangle.fill"
+        case .open: "circle"
+        case .done: "checkmark.circle"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .all: AppTheme.brand
+        case .overdue: AppTheme.negative
+        case .open: AppTheme.accent
+        case .done: AppTheme.positive
+        }
+    }
+}
+
 struct TasksView: View {
     @Environment(\.modelContext) private var modelContext
     let project: Project
@@ -14,6 +50,9 @@ struct TasksView: View {
     @State private var showingWalkthrough = false
     @State private var taskToEdit: ProjectTask?
     @State private var taskError: String?
+    @State private var searchText = ""
+
+    @AppStorage(AppSettingsKeys.tasksFilter) private var filterRaw = TasksFilter.all.rawValue
 
     init(project: Project) {
         self.project = project
@@ -22,6 +61,12 @@ struct TasksView: View {
         _vendors = Query(filter: #Predicate<Vendor> { $0.projectID == projectID }, sort: \.name)
         _items = Query(filter: #Predicate<BudgetLineItem> { $0.projectID == projectID }, sort: \.costCode)
         _photos = Query(filter: #Predicate<PhotoAttachment> { $0.projectID == projectID }, sort: \.createdAt, order: .reverse)
+    }
+
+    // MARK: - Derived state
+
+    private var filter: TasksFilter {
+        TasksFilter(rawValue: filterRaw) ?? .all
     }
 
     private var openTasks: [ProjectTask] {
@@ -36,50 +81,67 @@ struct TasksView: View {
         openTasks.filter(\.isOverdue)
     }
 
+    private func tasks(for filter: TasksFilter) -> [ProjectTask] {
+        switch filter {
+        case .all: return tasks
+        case .overdue: return overdueTasks
+        case .open: return openTasks
+        case .done: return doneTasks
+        }
+    }
+
+    private func count(for filter: TasksFilter) -> Int {
+        tasks(for: filter).count
+    }
+
+    private var filteredTasks: [ProjectTask] {
+        let scope = tasks(for: filter)
+        let query = searchText.trimmed.localizedLowercase
+        guard !query.isEmpty else { return scope }
+        return scope.filter { task in
+            if task.title.localizedLowercase.contains(query) { return true }
+            if task.notes.localizedLowercase.contains(query) { return true }
+            if let vendorID = task.vendorID, let vendor = vendors.first(where: { $0.id == vendorID }) {
+                return vendor.name.localizedLowercase.contains(query)
+            }
+            return false
+        }
+    }
+
+    private var hasActiveFilters: Bool {
+        filter != .all || !searchText.trimmed.isEmpty
+    }
+
+    // MARK: - Body
+
     var body: some View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Punch List")
                         .font(.title3.weight(.bold))
-                    Text("\(openTasks.count) open - \(overdueTasks.count) overdue")
+                    Text("\(openTasks.count) open · \(overdueTasks.count) overdue")
                         .font(.subheadline)
                         .foregroundStyle(overdueTasks.isEmpty ? .secondary : AppTheme.negative)
                 }
                 .padding(.vertical, 8)
             }
 
-            if tasks.isEmpty {
+            if !tasks.isEmpty {
                 Section {
-                    EmptyStateView(
-                        title: "No tasks yet",
-                        subtitle: "Add punch list items during walkthroughs or from photos.",
-                        systemImage: "checklist"
-                    )
-                    .padding(.vertical, 32)
+                    filterBar
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 4, trailing: 16))
+                        .listRowBackground(Color.clear)
                 }
             }
 
-            if !openTasks.isEmpty {
-                Section("Open") {
-                    ForEach(openTasks) { task in
-                        taskRow(task)
-                    }
-                }
-            }
-
-            if !doneTasks.isEmpty {
-                Section("Done") {
-                    ForEach(doneTasks) { task in
-                        taskRow(task)
-                    }
-                }
-            }
+            tasksSection
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(AppTheme.pageBackground)
         .navigationTitle("Tasks")
+        .searchable(text: $searchText, prompt: "Search title, notes, vendor")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -98,6 +160,106 @@ struct TasksView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(taskError ?? "")
+        }
+    }
+
+    private var filterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(TasksFilter.allCases) { option in
+                    Button {
+                        withAnimation(.smooth(duration: 0.2)) {
+                            filterRaw = option.rawValue
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: option.systemImage)
+                                .font(.caption.weight(.bold))
+                            Text(option.title)
+                                .font(.caption.weight(.bold))
+                            Text("\(count(for: option))")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(filter == option ? .white.opacity(0.78) : .secondary)
+                        }
+                        .foregroundStyle(filter == option ? .white : .primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(filter == option ? option.tint : AppTheme.surface, in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(filter == option ? Color.clear : AppTheme.border, lineWidth: 0.75)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    @ViewBuilder
+    private var tasksSection: some View {
+        if tasks.isEmpty {
+            Section {
+                VStack(spacing: 12) {
+                    EmptyStateView(
+                        title: "No tasks yet",
+                        subtitle: "Add punch list items during walkthroughs or from photos.",
+                        systemImage: "checklist"
+                    )
+                    Button {
+                        showingAddTask = true
+                    } label: {
+                        Label("Add first task", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+            }
+        } else if filteredTasks.isEmpty {
+            Section {
+                VStack(spacing: 12) {
+                    EmptyStateView(
+                        title: "No matches",
+                        subtitle: hasActiveFilters
+                            ? "Clear the filter or search to see all tasks."
+                            : "Try a different filter.",
+                        systemImage: "magnifyingglass"
+                    )
+                    if hasActiveFilters {
+                        Button("Clear filters") {
+                            filterRaw = TasksFilter.all.rawValue
+                            searchText = ""
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+            }
+        } else {
+            Section(filter.title) {
+                ForEach(filteredTasks) { task in
+                    taskRow(task)
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            Button {
+                                Haptics.lightTap()
+                                cycleStatus(for: task)
+                            } label: {
+                                Label(task.status == .done ? "Reopen" : "Advance", systemImage: task.status == .done ? "arrow.uturn.backward" : "checkmark")
+                            }
+                            .tint(task.status == .done ? AppTheme.warning : AppTheme.positive)
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                delete(task)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                }
+            }
         }
     }
 

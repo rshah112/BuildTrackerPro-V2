@@ -1,6 +1,51 @@
 import SwiftData
 import SwiftUI
 
+private enum ChangeOrderStatusFilter: String, CaseIterable, Identifiable {
+    case all
+    case pending
+    case approved
+    case paid
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "All"
+        case .pending: "Pending"
+        case .approved: "Approved"
+        case .paid: "Paid"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .all: "tray.full"
+        case .pending: "clock"
+        case .approved: "checkmark.circle"
+        case .paid: "checkmark.seal"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .all: AppTheme.brand
+        case .pending: AppTheme.info
+        case .approved: AppTheme.accent
+        case .paid: AppTheme.positive
+        }
+    }
+
+    func matches(_ status: ChangeOrderStatus) -> Bool {
+        switch self {
+        case .all: return true
+        case .pending: return status == .pending
+        case .approved: return status == .approved
+        case .paid: return status == .paid
+        }
+    }
+}
+
 struct ChangeOrdersView: View {
     @Environment(\.modelContext) private var modelContext
     let project: Project
@@ -11,6 +56,9 @@ struct ChangeOrdersView: View {
     @State private var showingEditChangeOrder = false
     @State private var changeOrderIDToEdit: UUID?
     @State private var changeOrders: [ChangeOrder] = []
+    @State private var searchText = ""
+
+    @AppStorage(AppSettingsKeys.changeOrdersStatusFilter) private var statusFilterRaw = ChangeOrderStatusFilter.all.rawValue
 
     init(project: Project) {
         self.project = project
@@ -19,70 +67,104 @@ struct ChangeOrdersView: View {
         _expenses = Query(filter: #Predicate<Expense> { $0.projectID == projectID }, sort: \.date, order: .reverse)
     }
 
+    // MARK: - Derived state
+
+    private var statusFilter: ChangeOrderStatusFilter {
+        ChangeOrderStatusFilter(rawValue: statusFilterRaw) ?? .all
+    }
+
+    private var pendingTotal: Double {
+        MoneyMath.sum(changeOrders.filter { $0.status == .pending }, by: \.amount)
+    }
+
+    private var approvedTotal: Double {
+        MoneyMath.sum(changeOrders.filter { $0.status == .approved }, by: \.amount)
+    }
+
+    private var paidTotal: Double {
+        MoneyMath.sum(changeOrders.filter { $0.status == .paid }, by: \.amount)
+    }
+
     private var totalOpen: Double {
         // "Open" = anything not yet paid (pending exposure + approved commitments).
-        changeOrders
-            .filter { $0.status != .paid }
-            .reduce(0) { $0 + $1.amount }
+        MoneyMath.dollars(MoneyMath.cents(pendingTotal) + MoneyMath.cents(approvedTotal))
     }
+
+    private var statusFilteredOrders: [ChangeOrder] {
+        guard statusFilter != .all else { return changeOrders }
+        return changeOrders.filter { statusFilter.matches($0.status) }
+    }
+
+    private var searchedOrders: [ChangeOrder] {
+        let query = searchText.trimmed.localizedLowercase
+        guard !query.isEmpty else { return statusFilteredOrders }
+        return statusFilteredOrders.filter { order in
+            order.title.localizedLowercase.contains(query) ||
+                order.categoryName.localizedLowercase.contains(query) ||
+                order.budgetLineItemTitle.localizedLowercase.contains(query) ||
+                order.notes.localizedLowercase.contains(query)
+        }
+    }
+
+    private var hasActiveFilters: Bool {
+        statusFilter != .all || !searchText.trimmed.isEmpty
+    }
+
+    private func statusCount(_ filter: ChangeOrderStatusFilter) -> Int {
+        switch filter {
+        case .all: return changeOrders.count
+        case .pending, .approved, .paid:
+            return changeOrders.filter { filter.matches($0.status) }.count
+        }
+    }
+
+    // MARK: - Body
 
     var body: some View {
         List {
             Section {
                 PremiumCard {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("Open Change Orders")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                            Text(totalOpen.currencyString)
-                                .font(.system(.title2, design: .rounded, weight: .bold))
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text("Open Change Orders")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                Text(totalOpen.currencyString)
+                                    .font(.system(.title2, design: .rounded, weight: .bold))
+                            }
+                            Spacer()
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.title2.weight(.semibold))
+                                .foregroundStyle(AppTheme.accent)
                         }
-                        Spacer()
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(AppTheme.accent)
+
+                        HStack(spacing: 8) {
+                            summaryChip("Pending", value: pendingTotal, tint: AppTheme.info)
+                            summaryChip("Approved", value: approvedTotal, tint: AppTheme.accent)
+                            summaryChip("Paid", value: paidTotal, tint: AppTheme.positive)
+                        }
                     }
                 }
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
                 .listRowBackground(Color.clear)
             }
 
-            Section("Change Orders") {
-                if changeOrders.isEmpty {
-                    EmptyStateView(
-                        title: "No change orders",
-                        subtitle: "Track pending, approved and paid changes.",
-                        systemImage: "arrow.triangle.2.circlepath"
-                    )
-                } else {
-                    ForEach(changeOrders.map(ChangeOrderRowSnapshot.init)) { row in
-                        ChangeOrderRow(row: row)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                editChangeOrder(withID: row.id)
-                            }
-                            .contextMenu {
-                                Button {
-                                    editChangeOrder(withID: row.id)
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-
-                                Button(role: .destructive) {
-                                    deleteChangeOrder(withID: row.id)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                    }
+            if !changeOrders.isEmpty {
+                Section {
+                    statusFilterBar
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 4, trailing: 16))
+                        .listRowBackground(Color.clear)
                 }
             }
+
+            ordersSection
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(AppTheme.pageBackground)
         .navigationTitle("Change Orders")
+        .searchable(text: $searchText, prompt: "Search title, category, notes")
         .primaryFloatingAction(title: "Change") {
             showingAddChangeOrder = true
         }
@@ -99,6 +181,121 @@ struct ChangeOrdersView: View {
         }
         .onAppear {
             refreshChangeOrders()
+        }
+    }
+
+    private func summaryChip(_ label: String, value: Double, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value.compactCurrencyString)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var statusFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(ChangeOrderStatusFilter.allCases) { filter in
+                    Button {
+                        withAnimation(.smooth(duration: 0.2)) {
+                            statusFilterRaw = filter.rawValue
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: filter.systemImage)
+                                .font(.caption.weight(.bold))
+                            Text(filter.title)
+                                .font(.caption.weight(.bold))
+                            Text("\(statusCount(filter))")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(statusFilter == filter ? .white.opacity(0.78) : .secondary)
+                        }
+                        .foregroundStyle(statusFilter == filter ? .white : .primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(statusFilter == filter ? filter.tint : AppTheme.surface, in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(statusFilter == filter ? Color.clear : AppTheme.border, lineWidth: 0.75)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    @ViewBuilder
+    private var ordersSection: some View {
+        if changeOrders.isEmpty {
+            Section("Change Orders") {
+                EmptyStateView(
+                    title: "No change orders",
+                    subtitle: "Track pending, approved and paid changes.",
+                    systemImage: "arrow.triangle.2.circlepath"
+                )
+            }
+        } else if searchedOrders.isEmpty {
+            Section("Change Orders") {
+                VStack(spacing: 12) {
+                    EmptyStateView(
+                        title: "No matches",
+                        subtitle: hasActiveFilters
+                            ? "Clear the status filter or search to see all change orders."
+                            : "Try a different filter.",
+                        systemImage: "magnifyingglass"
+                    )
+                    if hasActiveFilters {
+                        Button("Clear filters") {
+                            statusFilterRaw = ChangeOrderStatusFilter.all.rawValue
+                            searchText = ""
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            }
+        } else {
+            Section("Change Orders") {
+                ForEach(searchedOrders.map(ChangeOrderRowSnapshot.init)) { row in
+                    ChangeOrderRow(row: row)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            editChangeOrder(withID: row.id)
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                deleteChangeOrder(withID: row.id)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                        .contextMenu {
+                            Button {
+                                editChangeOrder(withID: row.id)
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+
+                            Button(role: .destructive) {
+                                deleteChangeOrder(withID: row.id)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                }
+            }
         }
     }
 

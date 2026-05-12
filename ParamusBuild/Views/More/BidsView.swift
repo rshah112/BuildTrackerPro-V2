@@ -2,6 +2,51 @@ import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
+private enum BidPackageStatusFilter: String, CaseIterable, Identifiable {
+    case all
+    case open
+    case awarded
+    case passed
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "All"
+        case .open: "Open"
+        case .awarded: "Awarded"
+        case .passed: "Passed"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .all: "tray.full"
+        case .open: "tray"
+        case .awarded: "checkmark.seal"
+        case .passed: "nosign"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .all: AppTheme.brand
+        case .open: AppTheme.accent
+        case .awarded: AppTheme.positive
+        case .passed: AppTheme.warning
+        }
+    }
+
+    func matches(_ status: BidPackageStatus) -> Bool {
+        switch self {
+        case .all: return true
+        case .open: return status == .open
+        case .awarded: return status == .awarded
+        case .passed: return status == .passed
+        }
+    }
+}
+
 struct BidsView: View {
     @Environment(\.modelContext) private var modelContext
     let project: Project
@@ -13,6 +58,9 @@ struct BidsView: View {
     @State private var showingAddPackage = false
     @State private var packageToEdit: BidPackage?
     @State private var errorMessage: String?
+    @State private var searchText = ""
+
+    @AppStorage(AppSettingsKeys.bidsStatusFilter) private var statusFilterRaw = BidPackageStatusFilter.all.rawValue
 
     init(project: Project) {
         self.project = project
@@ -22,13 +70,55 @@ struct BidsView: View {
         _vendors = Query(filter: #Predicate<Vendor> { $0.projectID == projectID }, sort: \.name)
     }
 
+    // MARK: - Derived state
+
+    private var statusFilter: BidPackageStatusFilter {
+        BidPackageStatusFilter(rawValue: statusFilterRaw) ?? .all
+    }
+
     private var openPackages: [BidPackage] {
         packages.filter { $0.status == .open }
     }
 
-    private var closedPackages: [BidPackage] {
-        packages.filter { $0.status != .open }
+    private var statusFilteredPackages: [BidPackage] {
+        guard statusFilter != .all else { return packages }
+        return packages.filter { statusFilter.matches($0.status) }
     }
+
+    private var searchedPackages: [BidPackage] {
+        let query = searchText.trimmed.localizedLowercase
+        guard !query.isEmpty else { return statusFilteredPackages }
+        return statusFilteredPackages.filter { package in
+            if package.scopeTitle.localizedLowercase.contains(query) { return true }
+            if package.notes.localizedLowercase.contains(query) { return true }
+            // Match any of the package's bids' vendor names so a quick "smith" finds the
+            // package that has the Smith bid in it.
+            let packageBids = bids.filter { $0.packageID == package.id }
+            return packageBids.contains { bid in
+                if bid.vendorName.localizedLowercase.contains(query) { return true }
+                if let vendorID = bid.vendorID,
+                   let vendor = vendors.first(where: { $0.id == vendorID }),
+                   vendor.name.localizedLowercase.contains(query)
+                {
+                    return true
+                }
+                return false
+            }
+        }
+    }
+
+    private var hasActiveFilters: Bool {
+        statusFilter != .all || !searchText.trimmed.isEmpty
+    }
+
+    private func statusCount(_ filter: BidPackageStatusFilter) -> Int {
+        switch filter {
+        case .all: return packages.count
+        case .open, .awarded, .passed: return packages.filter { filter.matches($0.status) }.count
+        }
+    }
+
+    // MARK: - Body
 
     var body: some View {
         List {
@@ -48,41 +138,25 @@ struct BidsView: View {
                             .foregroundStyle(AppTheme.accent)
                     }
                 }
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
                 .listRowBackground(Color.clear)
             }
 
-            if packages.isEmpty {
+            if !packages.isEmpty {
                 Section {
-                    EmptyStateView(
-                        title: "No bid packages",
-                        subtitle: "Create a scope, collect vendor bids, and compare them side by side before awarding.",
-                        systemImage: "shippingbox"
-                    )
-                    .padding(.vertical, 24)
+                    statusFilterBar
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 4, trailing: 16))
+                        .listRowBackground(Color.clear)
                 }
             }
 
-            if !openPackages.isEmpty {
-                Section("Open") {
-                    ForEach(openPackages) { package in
-                        packageRow(package)
-                    }
-                }
-            }
-
-            if !closedPackages.isEmpty {
-                Section("Completed") {
-                    ForEach(closedPackages) { package in
-                        packageRow(package)
-                    }
-                }
-            }
+            packagesSection
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(AppTheme.pageBackground)
         .navigationTitle("Bids")
+        .searchable(text: $searchText, prompt: "Search scope, notes, vendor")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showingAddPackage = true } label: { Image(systemName: "plus.circle.fill") }
@@ -92,6 +166,90 @@ struct BidsView: View {
         .sheet(isPresented: $showingAddPackage) { AddBidPackageView(project: project) }
         .sheet(item: $packageToEdit) { package in AddBidPackageView(project: project, package: package) }
         .alert("Bid Error", isPresented: errorBinding) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "") }
+    }
+
+    private var statusFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(BidPackageStatusFilter.allCases) { filter in
+                    Button {
+                        withAnimation(.smooth(duration: 0.2)) {
+                            statusFilterRaw = filter.rawValue
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: filter.systemImage)
+                                .font(.caption.weight(.bold))
+                            Text(filter.title)
+                                .font(.caption.weight(.bold))
+                            Text("\(statusCount(filter))")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(statusFilter == filter ? .white.opacity(0.78) : .secondary)
+                        }
+                        .foregroundStyle(statusFilter == filter ? .white : .primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(statusFilter == filter ? filter.tint : AppTheme.surface, in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(statusFilter == filter ? Color.clear : AppTheme.border, lineWidth: 0.75)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    @ViewBuilder
+    private var packagesSection: some View {
+        if packages.isEmpty {
+            Section {
+                VStack(spacing: 12) {
+                    EmptyStateView(
+                        title: "No bid packages",
+                        subtitle: "Create a scope, collect vendor bids, and compare them side by side before awarding.",
+                        systemImage: "shippingbox"
+                    )
+                    Button {
+                        showingAddPackage = true
+                    } label: {
+                        Label("Add first package", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+            }
+        } else if searchedPackages.isEmpty {
+            Section {
+                VStack(spacing: 12) {
+                    EmptyStateView(
+                        title: "No matches",
+                        subtitle: hasActiveFilters
+                            ? "Clear the status filter or search to see all packages."
+                            : "Try a different filter.",
+                        systemImage: "magnifyingglass"
+                    )
+                    if hasActiveFilters {
+                        Button("Clear filters") {
+                            statusFilterRaw = BidPackageStatusFilter.all.rawValue
+                            searchText = ""
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+            }
+        } else {
+            Section(statusFilter == .all ? "Packages" : statusFilter.title) {
+                ForEach(searchedPackages) { package in
+                    packageRow(package)
+                }
+            }
+        }
     }
 
     private var errorBinding: Binding<Bool> {
@@ -122,6 +280,13 @@ struct BidsView: View {
                 }
             }
             .padding(.vertical, 5)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                delete(package)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
         }
         .contextMenu {
             Button { packageToEdit = package } label: { Label("Edit", systemImage: "pencil") }
@@ -278,7 +443,7 @@ private struct BidPackageDetailView: View {
                     Text(displayVendor(for: bid))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
-                    Text("\(bid.lineItems.count) line items\(bid.fileName.isEmpty ? "" : " - \\(bid.fileName)")")
+                    Text("\(bid.lineItems.count) line items\(bid.fileName.isEmpty ? "" : " — \(bid.fileName)")")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -290,6 +455,24 @@ private struct BidPackageDetailView: View {
             .padding(.vertical, 5)
         }
         .buttonStyle(.plain)
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            if package.awardedBidID == nil {
+                Button {
+                    bidToAward = bid
+                    showingAwardActions = true
+                } label: {
+                    Label("Award", systemImage: "checkmark.seal")
+                }
+                .tint(AppTheme.positive)
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                delete(bid)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
         .contextMenu {
             if package.awardedBidID == nil {
                 Button { bidToAward = bid; showingAwardActions = true } label: { Label("Award", systemImage: "checkmark.seal") }
@@ -430,7 +613,10 @@ private struct BidComparisonView: View {
     }
 
     private func amount(for title: String, in bid: Bid) -> Double {
-        bid.lineItems.filter { $0.title.trimmed.caseInsensitiveCompare(title) == .orderedSame }.reduce(0) { $0 + $1.amount }
+        MoneyMath.sum(
+            bid.lineItems.filter { $0.title.trimmed.caseInsensitiveCompare(title) == .orderedSame },
+            by: \.amount
+        )
     }
 
     private func headerCell(_ text: String, width: CGFloat, alignment: Alignment = .leading) -> some View {
@@ -566,7 +752,11 @@ private struct AddBidView: View {
     }
 
     private var computedTotal: Double {
-        lineItems.reduce(0) { $0 + max(0, $1.amount) }
+        // Clamp each line at 0 then sum via cent-exact integer math.
+        let totalCents = lineItems.reduce(Int64(0)) { running, line in
+            running + max(Int64(0), MoneyMath.cents(line.amount))
+        }
+        return MoneyMath.dollars(totalCents)
     }
 
     private var effectiveAmount: Double {
