@@ -1,13 +1,22 @@
 import { useMemo, useState } from 'react'
-import type { BudgetLineItem, Expense } from '../../domain/types'
+import type { AllowanceSelection, BudgetLineItem, ChangeOrder, Expense } from '../../domain/types'
+import { useRows } from '../../data/hooks'
 import { balanceDue, effectiveAmountPaid } from '../../lib/expenseMath'
 import { fmt, sumBy } from '../../lib/money'
+import { useUpdateLineItem } from '../budget/useBudget'
 import { ExpenseForm } from './ExpenseForm'
+import { actualPatchesForExpenses, upsertExpense } from './recalculateLineItemActuals'
 import { useExpenses, useRemoveExpense } from './useExpenses'
 
 export function ExpenseList({ projectId, lineItems }: { projectId: string; lineItems: BudgetLineItem[] }) {
   const { data: expenses = [], isLoading, error } = useExpenses(projectId)
+  const { data: changeOrders = [], isLoading: ordersLoading } = useRows<ChangeOrder>('change_orders', { projectId })
+  const { data: allowanceSelections = [], isLoading: selectionsLoading } = useRows<AllowanceSelection>(
+    'allowance_selections',
+    { projectId },
+  )
   const removeExpense = useRemoveExpense()
+  const updateLineItem = useUpdateLineItem()
   const [editing, setEditing] = useState<Expense | 'new' | null>(null)
 
   const sorted = useMemo(
@@ -18,6 +27,16 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
   const paid = sumBy(expenses, effectiveAmountPaid)
   const outstanding = sumBy(expenses, balanceDue)
 
+  const syncActuals = async (nextExpenses: Expense[]) => {
+    const patches = actualPatchesForExpenses({ lineItems, expenses: nextExpenses, changeOrders, allowanceSelections })
+    await Promise.all(patches.map((patch) => updateLineItem.mutateAsync({ id: patch.id, patch: { actual: patch.actual } })))
+  }
+
+  const removeAndSync = async (expense: Expense) => {
+    await removeExpense.mutateAsync(expense.id)
+    await syncActuals(expenses.filter((e) => e.id !== expense.id))
+  }
+
   if (editing) {
     return (
       <section>
@@ -26,12 +45,13 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
           projectId={projectId}
           lineItems={lineItems}
           initial={editing === 'new' ? undefined : editing}
+          onSaved={(saved) => syncActuals(upsertExpense(expenses, saved))}
           onDone={() => setEditing(null)}
         />
       </section>
     )
   }
-  if (isLoading) return <div className="loading">Loading expenses...</div>
+  if (isLoading || ordersLoading || selectionsLoading) return <div className="loading">Loading expenses...</div>
   if (error) return <p role="alert">Couldn't load expenses: {(error as Error).message}</p>
 
   return (
@@ -62,8 +82,9 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
             <div className="card-actions">
               <span className={e.isPaid ? 'status paid' : 'status open'}>{e.isPaid ? 'Paid' : 'Open'}</span>
               <strong>{fmt(e.amount)}</strong>
+              {e.receiptObjectKey && <span className="status">Receipt</span>}
               <button className="secondary" onClick={() => setEditing(e)}>Edit</button>
-              <button className="danger" onClick={() => removeExpense.mutate(e.id)}>Delete</button>
+              <button className="danger" onClick={() => removeAndSync(e)}>Delete</button>
             </div>
           </li>
         ))}

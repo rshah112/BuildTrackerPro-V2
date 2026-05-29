@@ -2,6 +2,7 @@ import { useState, type ChangeEvent, type FormEvent } from 'react'
 import type { BudgetLineItem, Expense } from '../../domain/types'
 import { balanceDue } from '../../lib/expenseMath'
 import { fmt } from '../../lib/money'
+import { uploadBlob } from '../../lib/r2'
 import { useCreateExpense, useUpdateExpense } from './useExpenses'
 
 type Draft = Partial<Omit<Expense, 'id' | 'owner'>>
@@ -36,14 +37,17 @@ export function ExpenseForm({
   projectId,
   lineItems,
   initial,
+  onSaved,
   onDone,
 }: {
   projectId: string
   lineItems: BudgetLineItem[]
   initial?: Expense
+  onSaved: (expense: Expense) => Promise<void>
   onDone: () => void
 }) {
   const [d, setD] = useState<Draft>(initial ?? blank(projectId))
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const create = useCreateExpense()
   const update = useUpdateExpense()
   const busy = create.isPending || update.isPending
@@ -87,6 +91,7 @@ export function ExpenseForm({
     e.preventDefault()
     const amount = d.amount ?? 0
     const isPaid = d.isPaid ?? false
+    const receiptObjectKey = receiptFile ? (await uploadBlob(receiptFile, 'receipt')).key : d.receiptObjectKey ?? null
     const payload: Draft = {
       ...d,
       projectId,
@@ -97,10 +102,12 @@ export function ExpenseForm({
       budgetLineItemTitle: selectedLineItem?.title ?? d.budgetLineItemTitle ?? '',
       categoryName: selectedLineItem?.categoryName ?? d.categoryName ?? '',
       roomTag: selectedLineItem?.roomTag ?? d.roomTag ?? '',
-      receiptObjectKey: d.receiptObjectKey ?? null,
+      receiptObjectKey,
     }
-    if (initial) await update.mutateAsync({ id: initial.id, patch: payload })
-    else await create.mutateAsync(payload)
+    const saved = initial
+      ? await update.mutateAsync({ id: initial.id, patch: payload })
+      : await create.mutateAsync(payload)
+    await onSaved(saved)
     onDone()
   }
 
@@ -133,6 +140,17 @@ export function ExpenseForm({
           <label>Payment method<input value={d.paymentMethod ?? ''} onChange={text('paymentMethod')} /></label>
           <label>Reference<input value={d.paymentReference ?? ''} onChange={text('paymentReference')} /></label>
         </>
+      )}
+      <label>
+        Receipt
+        <input
+          type="file"
+          accept="image/*,application/pdf"
+          onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
+        />
+      </label>
+      {(receiptFile || d.receiptObjectKey) && (
+        <p className="muted">{receiptFile ? receiptFile.name : 'Receipt attached'}</p>
       )}
       <label>Notes<textarea value={d.notes ?? ''} onChange={text('notes')} /></label>
       <p className="muted">Balance due: {fmt(balance)}</p>
