@@ -44,3 +44,6 @@ export function diff(a: number, b: number): number {
 export function roundedToCents(v: number): number {
   return dollars(cents(v))
 }
+
+const FMT = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+export const fmt = (v: number) => FMT.format(v)

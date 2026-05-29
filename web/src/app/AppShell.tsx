@@ -1,8 +1,9 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, Link } from 'react-router-dom'
 
 const tabs = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/budget', label: 'Budget', end: false },
+  { to: '/expenses', label: 'Expenses', end: false },
   { to: '/photos', label: 'Photos', end: false },
   { to: '/more', label: 'More', end: false },
 ]
@@ -10,6 +11,10 @@ const tabs = [
 export function AppShell() {
   return (
     <div className="app-shell">
+      <header className="app-header">
+        <span className="brand">HomeBuild Pro</span>
+        <Link to="/projects" className="header-link">Projects</Link>
+      </header>
       <main className="app-main">
         <Outlet />
       </main>

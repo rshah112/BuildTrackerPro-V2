@@ -21,6 +21,7 @@ Package.resolved
 
 # Claude local
 .claude/settings.local.json
+.claude/worktrees/
 
 # Project local
 .idea/
