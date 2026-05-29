@@ -1,0 +1,3 @@
+-- The local test user is created via the Supabase admin API (proper bcrypt hashing)
+-- in scripts/seed-user.mjs, not here, because hand-rolling auth.users rows is brittle.
+-- Run: node --env-file=.env scripts/seed-user.mjs

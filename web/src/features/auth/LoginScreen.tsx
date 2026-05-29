@@ -1,7 +1,10 @@
 import { useState, type FormEvent } from 'react'
+import { Navigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useSession } from './useSession'
 
 export function LoginScreen() {
+  const { session } = useSession()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -15,6 +18,8 @@ export function LoginScreen() {
     if (signInError) setError(signInError.message)
     setSubmitting(false)
   }
+
+  if (session) return <Navigate to="/" replace />
 
   return (
     <form onSubmit={onSubmit} aria-label="Sign in" className="login">
