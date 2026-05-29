@@ -2,7 +2,8 @@
 // Conventions: UUIDs and dates are strings (ISO-8601 for dates); money is a number
 // of dollars (see lib/money.ts); the native `.externalStorage` Data? blob fields
 // become `*ObjectKey` columns holding the R2 object key (or null). Field names are
-// camelCase; the data layer maps to/from snake_case Postgres columns.
+// camelCase with `Id`/`Ids` suffixes (not `ID`) so the snake_case mapper produces
+// clean column names (budgetLineItemId -> budget_line_item_id).
 
 import type {
   ProjectStatus,
@@ -46,7 +47,7 @@ export interface Project {
 export interface BudgetCategory {
   id: UUID
   owner: UUID
-  projectID: UUID
+  projectId: UUID
   name: string
   sortOrder: number
   targetBudget: number
@@ -56,7 +57,7 @@ export interface BudgetCategory {
 export interface BudgetLineItem {
   id: UUID
   owner: UUID
-  projectID: UUID
+  projectId: UUID
   costCode: string
   title: string
   categoryName: string
@@ -74,7 +75,7 @@ export interface BudgetLineItem {
 export interface Expense {
   id: UUID
   owner: UUID
-  projectID: UUID
+  projectId: UUID
   amount: number
   amountPaid: number
   vendorName: string
@@ -87,7 +88,7 @@ export interface Expense {
   paymentReference: string
   categoryName: string
   roomTag: string
-  budgetLineItemID: UUID | null
+  budgetLineItemId: UUID | null
   budgetLineItemTitle: string
   notes: string
   isPaid: boolean
@@ -97,7 +98,7 @@ export interface Expense {
 export interface Vendor {
   id: UUID
   owner: UUID
-  projectID: UUID
+  projectId: UUID
   name: string
   trade: string
   phone: string
@@ -108,13 +109,13 @@ export interface Vendor {
 export interface ChangeOrder {
   id: UUID
   owner: UUID
-  projectID: UUID
+  projectId: UUID
   title: string
   amount: number
   status: ChangeOrderStatus
   notes: string
   categoryName: string
-  budgetLineItemID: UUID | null
+  budgetLineItemId: UUID | null
   budgetLineItemTitle: string
   createdAt: ISODateString
   expectedPaymentDate: ISODateString | null
@@ -123,25 +124,25 @@ export interface ChangeOrder {
 export interface PhotoAttachment {
   id: UUID
   owner: UUID
-  projectID: UUID
+  projectId: UUID
   imageObjectKey: string | null
   createdAt: ISODateString
   roomTag: string
   phaseTag: string
   categoryName: string
-  budgetLineItemID: UUID | null
+  budgetLineItemId: UUID | null
   notes: string
 }
 
 export interface ProjectDocument {
   id: UUID
   owner: UUID
-  projectID: UUID
+  projectId: UUID
   fileName: string
   kind: ProjectDocumentKind
   status: ProjectDocumentStatus
   notes: string
-  budgetLineItemID: UUID | null
+  budgetLineItemId: UUID | null
   budgetLineItemTitle: string
   uploadedAt: ISODateString
   fileObjectKey: string | null
@@ -150,13 +151,13 @@ export interface ProjectDocument {
 export interface ProjectTask {
   id: UUID
   owner: UUID
-  projectID: UUID
+  projectId: UUID
   title: string
   status: ProjectTaskStatus
   dueDate: ISODateString | null
-  vendorID: UUID | null
-  budgetLineItemID: UUID | null
-  photoIDs: UUID[]
+  vendorId: UUID | null
+  budgetLineItemId: UUID | null
+  photoIds: UUID[]
   notes: string
   createdAt: ISODateString
   completedAt: ISODateString | null
@@ -165,11 +166,11 @@ export interface ProjectTask {
 export interface BidPackage {
   id: UUID
   owner: UUID
-  projectID: UUID
+  projectId: UUID
   scopeTitle: string
   dueDate: ISODateString | null
   status: BidPackageStatus
-  awardedBidID: UUID | null
+  awardedBidId: UUID | null
   createdAt: ISODateString
   notes: string
 }
@@ -183,9 +184,9 @@ export interface BidLine {
 export interface Bid {
   id: UUID
   owner: UUID
-  projectID: UUID
-  packageID: UUID
-  vendorID: UUID | null
+  projectId: UUID
+  packageId: UUID
+  vendorId: UUID | null
   vendorName: string
   amount: number
   fileObjectKey: string | null
@@ -199,8 +200,8 @@ export interface Bid {
 export interface AllowanceSelection {
   id: UUID
   owner: UUID
-  projectID: UUID
-  lineItemID: UUID
+  projectId: UUID
+  lineItemId: UUID
   selectionDate: ISODateString
   vendor: string
   amount: number
