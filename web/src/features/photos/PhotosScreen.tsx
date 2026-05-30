@@ -1,8 +1,112 @@
+import { useState } from 'react'
+import { Plus, Trash2, Camera } from 'lucide-react'
+import type { PhotoAttachment } from '../../domain/types'
+import { roomsForTemplate } from '../../domain/roomCatalog'
+import { ScreenHeader } from '../../app/ScreenHeader'
+import { Button } from '../../components/ui/Button'
+import { Sheet } from '../../components/ui/Sheet'
+import { EmptyState } from '../../components/ui/Feedback'
+import { useToast } from '../../components/ui/Toast'
+import { useCurrentProject } from '../projects/currentProject'
+import { useProjects } from '../projects/useProjects'
+import { useCategories } from '../budget/useBudget'
+import { usePhotos, useRemovePhoto } from './usePhotos'
+import { PhotoThumb } from './PhotoThumb'
+import { PhotoForm } from './PhotoForm'
+
 export function PhotosScreen() {
+  const { projectId } = useCurrentProject()
+  const { data: photos = [], isLoading } = usePhotos(projectId!)
+  const { data: projects = [] } = useProjects()
+  const { data: categories = [] } = useCategories(projectId!)
+  const remove = useRemovePhoto()
+  const toast = useToast()
+  const [editing, setEditing] = useState<PhotoAttachment | 'new' | null>(null)
+
+  if (!projectId) return null
+
+  const project = projects.find((p) => p.id === projectId)
+  const rooms = roomsForTemplate(project?.templateType ?? 'customHome')
+  const catNames = categories.map((c) => c.name)
+
+  const byRoom = new Map<string, PhotoAttachment[]>()
+  for (const ph of photos) {
+    const room = ph.roomTag || 'General'
+    byRoom.set(room, [...(byRoom.get(room) ?? []), ph])
+  }
+  const orderedRooms = [...byRoom.keys()].sort()
+
+  const del = async (ph: PhotoAttachment) => {
+    await remove.mutateAsync(ph.id)
+    toast.success('Photo deleted')
+  }
+
   return (
     <section>
-      <h1>Photos</h1>
-      <p>Job-site photo log lands in Wave 2.</p>
+      <ScreenHeader
+        title="Photos"
+        trailing={
+          photos.length > 0 ? (
+            <Button size="sm" leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+              Add photo
+            </Button>
+          ) : undefined
+        }
+      />
+
+      {isLoading && <div className="loading">Loading photos…</div>}
+
+      {!isLoading && photos.length === 0 ? (
+        <EmptyState
+          icon={Camera}
+          title="No photos yet"
+          body="Document the build by room and phase. Each photo can tie to a budget category."
+          action={
+            <Button leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+              Add photo
+            </Button>
+          }
+        />
+      ) : (
+        orderedRooms.map((room) => (
+          <div key={room}>
+            <h2 className="section-label">{room}</h2>
+            <div className="photo-grid">
+              {byRoom.get(room)!.map((ph) => (
+                <div key={ph.id} className="photo-cell">
+                  <button
+                    className="photo-open"
+                    onClick={() => setEditing(ph)}
+                    aria-label={`Photo: ${ph.notes || room}`}
+                  >
+                    <PhotoThumb objectKey={ph.imageObjectKey} alt={ph.notes || room} />
+                  </button>
+                  <button className="photo-del" onClick={() => del(ph)} aria-label="Delete photo">
+                    <Trash2 size={15} aria-hidden />
+                  </button>
+                  {ph.phaseTag && <span className="photo-phase">{ph.phaseTag}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+
+      <Sheet
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        title={editing === 'new' ? 'Add photo' : 'Edit photo'}
+      >
+        {editing !== null && (
+          <PhotoForm
+            projectId={projectId}
+            rooms={rooms}
+            categories={catNames}
+            initial={editing === 'new' ? undefined : editing}
+            onDone={() => setEditing(null)}
+          />
+        )}
+      </Sheet>
     </section>
   )
 }
