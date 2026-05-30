@@ -76,7 +76,10 @@ export function TaskForm({
             {(p) => <input type="date" {...p} value={dateValue(d.dueDate)} onChange={date('dueDate')} />}
           </Field>
         </div>
-        <Field label="Vendor">
+        <Field
+          label="Vendor"
+          hint={vendors.length === 0 ? 'No vendors yet — add them in Vendors first.' : undefined}
+        >
           {(p) => (
             <Select {...p} value={d.vendorId ?? ''} onChange={text('vendorId')}>
               <option value="">Unassigned</option>
@@ -88,7 +91,10 @@ export function TaskForm({
             </Select>
           )}
         </Field>
-        <Field label="Budget line">
+        <Field
+          label="Budget line"
+          hint={lineItems.length === 0 ? 'No budget line items yet — add them in Budget first.' : undefined}
+        >
           {(p) => (
             <Select {...p} value={d.budgetLineItemId ?? ''} onChange={text('budgetLineItemId')}>
               <option value="">Unassigned</option>

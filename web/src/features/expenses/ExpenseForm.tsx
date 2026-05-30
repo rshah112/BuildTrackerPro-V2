@@ -127,13 +127,28 @@ export function ExpenseForm({
             {(p) => <input type="date" {...p} value={dateValue(d.date)} onChange={date('date')} required />}
           </Field>
         </div>
-        <Field label="Due date">
-          {(p) => <input type="date" {...p} value={dateValue(d.dueDate)} onChange={date('dueDate')} />}
-        </Field>
+        <div className="form-grid">
+          <Field label="Due date">
+            {(p) => <input type="date" {...p} value={dateValue(d.dueDate)} onChange={date('dueDate')} />}
+          </Field>
+          <Field label="Expected payment" hint="When you expect to pay (drives cash flow). Defaults to the due date.">
+            {(p) => (
+              <input
+                type="date"
+                {...p}
+                value={dateValue(d.expectedPaymentDate)}
+                onChange={date('expectedPaymentDate')}
+              />
+            )}
+          </Field>
+        </div>
       </Form.Section>
 
       <Form.Section title="Allocation">
-        <Field label="Budget line">
+        <Field
+          label="Budget line"
+          hint={lineItems.length === 0 ? 'No budget line items yet — add them in Budget first.' : undefined}
+        >
           {(p) => (
             <Select {...p} value={d.budgetLineItemId ?? ''} onChange={chooseLineItem}>
               <option value="">Unassigned</option>

@@ -74,7 +74,10 @@ export function ChangeOrderForm({
             </Select>
           )}
         </Field>
-        <Field label="Budget line">
+        <Field
+          label="Budget line"
+          hint={lineItems.length === 0 ? 'No budget line items yet — add them in Budget first.' : undefined}
+        >
           {(p) => (
             <Select {...p} value={d.budgetLineItemId ?? ''} onChange={chooseLineItem}>
               <option value="">Unassigned</option>

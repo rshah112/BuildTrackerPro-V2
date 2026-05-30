@@ -67,11 +67,17 @@ export function VendorsScreen() {
                     {v.email ? ` · ${v.email}` : ''}
                   </span>
                 </div>
-                <div className="vendor-row-icons">
-                  {v.phone && <Phone size={15} className="muted" aria-hidden />}
-                  {v.email && <Mail size={15} className="muted" aria-hidden />}
-                </div>
               </button>
+              {v.phone && (
+                <a className="expense-row-del" href={`tel:${v.phone}`} aria-label={`Call ${v.name}`}>
+                  <Phone size={17} aria-hidden />
+                </a>
+              )}
+              {v.email && (
+                <a className="expense-row-del" href={`mailto:${v.email}`} aria-label={`Email ${v.name}`}>
+                  <Mail size={17} aria-hidden />
+                </a>
+              )}
               <button className="expense-row-del" onClick={() => del(v)} aria-label="Delete vendor">
                 <Trash2 size={17} aria-hidden />
               </button>

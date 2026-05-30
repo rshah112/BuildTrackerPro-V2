@@ -101,7 +101,10 @@ export function PhotoForm({
             )}
           </Field>
         </div>
-        <Field label="Category">
+        <Field
+          label="Category"
+          hint={categories.length === 0 ? 'No budget categories yet — add them in Budget to tag photos.' : undefined}
+        >
           {(p) => (
             <Select {...p} value={d.categoryName} onChange={text('categoryName')}>
               <option value="">—</option>
