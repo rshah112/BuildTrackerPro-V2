@@ -12,6 +12,16 @@
 * {
   box-sizing: border-box;
 }
+/* Remove the 300ms tap delay on interactive controls (mobile/PWA). */
+button,
+a,
+.btn,
+.tab,
+.segment,
+.list-row,
+[role='button'] {
+  touch-action: manipulation;
+}
 body {
   margin: 0;
   background: var(--bg);
@@ -212,11 +222,15 @@ textarea {
 }
 .password-toggle {
   position: absolute;
-  right: 0.35rem;
+  right: 0.25rem;
   top: 50%;
   transform: translateY(-50%);
   display: inline-flex;
-  padding: 0.45rem;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
