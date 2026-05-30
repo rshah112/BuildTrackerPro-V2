@@ -1,7 +1,13 @@
 # BuildTrackerPro PWA — Deployment Runbook
 
-The whole app is built and tested locally. This is the one part that needs you, because
-it requires creating free accounts. ~10–15 minutes, one time.
+> **Status (2026-05-30): LIVE.** Deployed at **https://buildtrackerpro.vercel.app**
+> (Vercel project `rshah112s-projects/buildtrackerpro`, root dir `web/`). Backend is the
+> shared `Smart_Home_Hub` Supabase project, `buildtracker` schema. Login `rajrulz@aol.com`
+> is created and confirmed. Core app (auth + budget loop) needs no Vercel env vars — the
+> public Supabase URL + anon key are baked into the build (`src/lib/supabase.ts`).
+> **Only remaining optional step:** Cloudflare R2 for receipt/photo uploads (§2 + §3 env).
+
+The sections below are the original one-time setup notes, kept for reference / re-deploys.
 
 ## 1. Supabase (database + auth)
 
@@ -53,22 +59,26 @@ To re-apply or push future migrations from `web/`:
    ]
    ```
 
-## 3. Vercel (hosting)
+## 3. Vercel (hosting) — done
 
-1. Import the GitHub repo at https://vercel.com (connect `rshah112/BuildTrackerPro-V2`).
-2. **Root Directory = `web/`**, Framework = Vite (auto-detected via `vercel.json`).
-3. Add Environment Variables (Production):
-   | Key | Value |
-   |---|---|
-   | `VITE_SUPABASE_URL` | from step 1 |
-   | `VITE_SUPABASE_ANON_KEY` | from step 1 |
-   | `SUPABASE_SERVICE_ROLE` | from step 1 |
-   | `R2_ACCOUNT_ID` | from step 2 |
-   | `R2_ACCESS_KEY_ID` | from step 2 |
-   | `R2_SECRET_ACCESS_KEY` | from step 2 |
-   | `R2_BUCKET` | from step 2 |
-   Do **not** set `VITE_R2_LOCAL` in production (it forces the local stub).
-4. Deploy.
+Already deployed as `rshah112s-projects/buildtrackerpro`. To re-deploy from `web/`:
+```bash
+cd web
+npx vercel deploy --prod --scope rshah112s-projects
+```
+`web/.vercelignore` keeps the local `.env` out of the upload so the build uses the
+baked-in production Supabase config. `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are
+**not** required as Vercel env vars (they're the build fallback).
+
+**Only needed for receipt/photo uploads (R2):** add these Vercel env vars, then redeploy:
+| Key | Value |
+|---|---|
+| `SUPABASE_SERVICE_ROLE` | Smart_Home_Hub service_role key (§1) |
+| `R2_ACCOUNT_ID` | from §2 |
+| `R2_ACCESS_KEY_ID` | from §2 |
+| `R2_SECRET_ACCESS_KEY` | from §2 |
+| `R2_BUCKET` | from §2 |
+Do **not** set `VITE_R2_LOCAL` in production (it forces the local stub).
 
 ## 4. Install on iPhone
 
