@@ -9,7 +9,7 @@ import { fmtDate } from '../../lib/date'
 import { EditorSheet } from '../../components/ui/EditorSheet'
 import { useEditor } from '../../components/ui/useEditor'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
-import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
+import { EmptyState, ListState } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
 import { useVendors } from '../vendors/useVendors'
@@ -74,24 +74,25 @@ export function TasksScreen() {
         }
       />
 
-      {error && <p role="alert" className="error-banner">Couldn’t load tasks: {(error as Error).message}</p>}
-      {isLoading && <ListSkeleton />}
-
-      {!isLoading && tasks.length === 0 ? (
-        <EmptyState
-          icon={ListTodo}
-          title="No tasks yet"
-          body="Track to-dos, who's responsible, and what they tie back to in the budget."
-          action={
-            <Button leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
-              Add task
-            </Button>
-          }
-        />
-      ) : (
-        !isLoading && (
-          <>
-            <div className="list-toolbar">
+      <ListState
+        error={error}
+        isLoading={isLoading}
+        isEmpty={tasks.length === 0}
+        errorLabel="Couldn’t load tasks"
+        empty={
+          <EmptyState
+            icon={ListTodo}
+            title="No tasks yet"
+            body="Track to-dos, who's responsible, and what they tie back to in the budget."
+            action={
+              <Button leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
+                Add task
+              </Button>
+            }
+          />
+        }
+      >
+        <div className="list-toolbar">
               <SegmentedControl<Filter>
                 ariaLabel="Filter tasks"
                 value={filter}
@@ -130,9 +131,7 @@ export function TasksScreen() {
                 </li>
               ))}
             </ul>
-          </>
-        )
-      )}
+      </ListState>
 
       <EditorSheet editor={editor} newTitle="New task" editTitle="Edit task">
         {(initial) => (

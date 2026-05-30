@@ -10,7 +10,7 @@ import { Stat } from '../../components/ui/Stat'
 import { EditorSheet } from '../../components/ui/EditorSheet'
 import { useEditor } from '../../components/ui/useEditor'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
-import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
+import { EmptyState, ListState } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
 import { useLineItems } from '../budget/useBudget'
@@ -65,24 +65,25 @@ export function ChangeOrdersScreen() {
         }
       />
 
-      {error && <p role="alert" className="error-banner">Couldn’t load change orders: {(error as Error).message}</p>}
-      {isLoading && <ListSkeleton />}
-
-      {!isLoading && orders.length === 0 ? (
-        <EmptyState
-          icon={FileEdit}
-          title="No change orders yet"
-          body="Track scope changes from pending through approved to paid; approved and paid orders flow into your budget."
-          action={
-            <Button leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
-              Add change order
-            </Button>
-          }
-        />
-      ) : (
-        !isLoading && (
-          <>
-            <div className="metric-grid compact">
+      <ListState
+        error={error}
+        isLoading={isLoading}
+        isEmpty={orders.length === 0}
+        errorLabel="Couldn’t load change orders"
+        empty={
+          <EmptyState
+            icon={FileEdit}
+            title="No change orders yet"
+            body="Track scope changes from pending through approved to paid; approved and paid orders flow into your budget."
+            action={
+              <Button leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
+                Add change order
+              </Button>
+            }
+          />
+        }
+      >
+        <div className="metric-grid compact">
               <Stat label="Pending" value={fmt(pendingTotal)} />
               <Stat label="Approved" value={fmt(approvedTotal)} />
               <Stat label="Paid" value={fmt(paidTotal)} />
@@ -121,9 +122,7 @@ export function ChangeOrdersScreen() {
                 </li>
               ))}
             </ul>
-          </>
-        )
-      )}
+      </ListState>
 
       <EditorSheet editor={editor} newTitle="New change order" editTitle="Edit change order">
         {(initial) => (

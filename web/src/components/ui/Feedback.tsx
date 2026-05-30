@@ -62,6 +62,37 @@ export function ListSkeleton({ rows = 4, height = '64px' }: { rows?: number; hei
   )
 }
 
+/** The error → loading → empty → content branching every list screen repeats, in one
+ *  place. Place it BELOW the ScreenHeader so the header stays put in all states. An error
+ *  shows a banner (and does NOT fall through to the empty state, so a failed load never
+ *  masquerades as "nothing here"). */
+export function ListState({
+  error,
+  isLoading,
+  isEmpty,
+  errorLabel,
+  empty,
+  children,
+}: {
+  error?: unknown
+  isLoading: boolean
+  isEmpty: boolean
+  errorLabel: string
+  empty: ReactNode
+  children: ReactNode
+}) {
+  if (error) {
+    return (
+      <p role="alert" className="error-banner">
+        {errorLabel}: {(error as Error).message}
+      </p>
+    )
+  }
+  if (isLoading) return <ListSkeleton />
+  if (isEmpty) return <>{empty}</>
+  return <>{children}</>
+}
+
 export function Spinner({ size = 20, label }: { size?: number; label?: string }) {
   return (
     <span className="spinner" role={label ? 'status' : undefined} aria-label={label}>

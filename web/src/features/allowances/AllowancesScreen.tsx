@@ -7,7 +7,7 @@ import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { EditorSheet } from '../../components/ui/EditorSheet'
 import { useEditor } from '../../components/ui/useEditor'
-import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
+import { EmptyState, ListState } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useConfirm } from '../../components/ui/Confirm'
 import { useCurrentProject } from '../projects/currentProject'
@@ -64,27 +64,32 @@ export function AllowancesScreen() {
         }
       />
 
-      {error && <p role="alert" className="error-banner">Couldn’t load allowances: {(error as Error).message}</p>}
-      {isLoading && <ListSkeleton />}
-
-      {!isLoading && allowanceLineItems.length === 0 ? (
-        <EmptyState
-          icon={Sparkles}
-          title="No allowance line items"
-          body="Mark a budget line item as an allowance (in Budget) first — then record your finish selections against it here."
-        />
-      ) : !isLoading && selections.length === 0 ? (
-        <EmptyState
-          icon={Sparkles}
-          title="No allowance selections yet"
-          body="Record the finishes you've chosen against allowance line items to see where you're over or under."
-          action={
-            <Button leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
-              Add selection
-            </Button>
-          }
-        />
-      ) : (
+      <ListState
+        error={error}
+        isLoading={isLoading}
+        isEmpty={allowanceLineItems.length === 0 || selections.length === 0}
+        errorLabel="Couldn’t load allowances"
+        empty={
+          allowanceLineItems.length === 0 ? (
+            <EmptyState
+              icon={Sparkles}
+              title="No allowance line items"
+              body="Mark a budget line item as an allowance (in Budget) first — then record your finish selections against it here."
+            />
+          ) : (
+            <EmptyState
+              icon={Sparkles}
+              title="No allowance selections yet"
+              body="Record the finishes you've chosen against allowance line items to see where you're over or under."
+              action={
+                <Button leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
+                  Add selection
+                </Button>
+              }
+            />
+          )
+        }
+      >
         <ul className="card-list">
           {selections.map((s) => (
             <li key={s.id} className="expense-row">
@@ -107,7 +112,7 @@ export function AllowancesScreen() {
             </li>
           ))}
         </ul>
-      )}
+      </ListState>
 
       <EditorSheet editor={editor} newTitle="New allowance selection" editTitle="Edit allowance selection">
         {(initial) => (

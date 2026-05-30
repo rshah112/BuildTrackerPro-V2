@@ -4,7 +4,7 @@ import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { EditorSheet } from '../../components/ui/EditorSheet'
 import { useEditor } from '../../components/ui/useEditor'
-import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
+import { EmptyState, ListState } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
 import { useVendors, useRemoveVendor } from './useVendors'
@@ -37,21 +37,24 @@ export function VendorsScreen() {
         }
       />
 
-      {error && <p role="alert" className="error-banner">Couldn’t load vendors: {(error as Error).message}</p>}
-      {isLoading && <ListSkeleton />}
-
-      {!isLoading && vendors.length === 0 ? (
-        <EmptyState
-          icon={Contact}
-          title="No vendors yet"
-          body="Keep your subs and suppliers — trade, phone, and email — in one place."
-          action={
-            <Button leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
-              Add vendor
-            </Button>
-          }
-        />
-      ) : (
+      <ListState
+        error={error}
+        isLoading={isLoading}
+        isEmpty={vendors.length === 0}
+        errorLabel="Couldn’t load vendors"
+        empty={
+          <EmptyState
+            icon={Contact}
+            title="No vendors yet"
+            body="Keep your subs and suppliers — trade, phone, and email — in one place."
+            action={
+              <Button leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
+                Add vendor
+              </Button>
+            }
+          />
+        }
+      >
         <ul className="card-list">
           {vendors.map((v) => (
             <li key={v.id} className="expense-row">
@@ -75,7 +78,7 @@ export function VendorsScreen() {
             </li>
           ))}
         </ul>
-      )}
+      </ListState>
 
       <EditorSheet editor={editor} newTitle="New vendor" editTitle="Edit vendor">
         {(initial) => <VendorForm projectId={projectId} initial={initial} onDone={editor.close} />}
