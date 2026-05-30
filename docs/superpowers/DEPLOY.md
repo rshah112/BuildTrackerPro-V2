@@ -5,19 +5,32 @@ it requires creating free accounts. ~10–15 minutes, one time.
 
 ## 1. Supabase (database + auth)
 
-1. Create a project at https://supabase.com (free tier).
-2. From **Project Settings → API**, copy:
-   - Project URL → `VITE_SUPABASE_URL`
-   - `anon` / publishable key → `VITE_SUPABASE_ANON_KEY`
-   - `service_role` / secret key → `SUPABASE_SERVICE_ROLE` (server-only, never in the client)
-3. Push the schema from `web/`:
+To stay under the free-tier 2-project cap, BuildTracker **shares the existing
+`Smart_Home_Hub` project** (ref `wzbtxwnvplpnwmavfdwx`) instead of getting its own.
+All BuildTracker tables live in a dedicated **`buildtracker` schema**, fully isolated
+from Smart Home Hub's `public` schema. The client targets it via
+`createClient(..., { db: { schema: 'buildtracker' } })` in `src/lib/supabase.ts`.
+
+The schema is **already applied** to the remote project (migrations
+`0001_schema` / `0002_rls` / `0003_grants`) and exposed to the Data API via
+`ALTER ROLE authenticator SET pgrst.db_schemas = 'public, graphql_public, buildtracker'`.
+To re-apply or push future migrations from `web/`:
    ```bash
    cd web
-   supabase link --project-ref <your-project-ref>
-   supabase db push        # applies migrations/0001_schema.sql + 0002_rls.sql
+   supabase link --project-ref wzbtxwnvplpnwmavfdwx
+   supabase db push        # applies migrations/0001..0003
    ```
-4. Create your single login: **Authentication → Users → Add user** (set email + password,
+   If a future migration adds tables, run `notify pgrst, 'reload schema';` (SQL editor)
+   so PostgREST picks them up.
+
+1. From **Project Settings → API** of the `Smart_Home_Hub` project, copy:
+   - Project URL (`https://wzbtxwnvplpnwmavfdwx.supabase.co`) → `VITE_SUPABASE_URL`
+   - `anon` / publishable key → `VITE_SUPABASE_ANON_KEY`
+   - `service_role` / secret key → `SUPABASE_SERVICE_ROLE` (server-only, never in the client)
+2. Create your single login: **Authentication → Users → Add user** (set email + password,
    mark email confirmed). Or run `node --env-file=.env.production scripts/seed-user.mjs`.
+   (Auth users are shared across both apps in this project — that's fine; row access is
+   still scoped per-user by RLS.)
 
 ## 2. Cloudflare R2 (photos / receipts / documents)
 

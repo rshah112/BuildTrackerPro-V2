@@ -3,6 +3,8 @@
 -- policy is uniform: owner = auth.uid() for read, and owner must equal auth.uid()
 -- on any row written.
 
+set search_path to buildtracker;
+
 alter table projects enable row level security;
 create policy projects_sel on projects for select using (owner = auth.uid());
 create policy projects_ins on projects for insert with check (owner = auth.uid());

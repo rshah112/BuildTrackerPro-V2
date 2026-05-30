@@ -5,6 +5,13 @@
 -- (budget_line_item_id, vendor_id, package_id, line_item_id, awarded_bid_id) are
 -- intentionally NOT foreign keys — native resolves them in app code with title
 -- fallbacks, so we keep them as plain columns.
+--
+-- Everything lives in a dedicated `buildtracker` schema so this app can share a
+-- Supabase project with others (e.g. Smart_Home_Hub's `public`) without colliding.
+-- `set search_path` keeps the table DDL below unqualified; auth.* stays explicit.
+
+create schema if not exists buildtracker;
+set search_path to buildtracker;
 
 create table projects (
   id uuid primary key default gen_random_uuid(),
