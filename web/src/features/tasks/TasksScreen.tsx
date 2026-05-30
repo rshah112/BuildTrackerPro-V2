@@ -89,7 +89,7 @@ export function TasksScreen() {
       ) : (
         !isLoading && (
           <>
-            <div style={{ margin: '0.5rem 0 0.75rem' }}>
+            <div className="list-toolbar">
               <SegmentedControl<Filter>
                 ariaLabel="Filter tasks"
                 value={filter}
