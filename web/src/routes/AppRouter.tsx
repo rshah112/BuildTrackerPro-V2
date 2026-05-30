@@ -14,6 +14,8 @@ import { ChangeOrdersScreen } from '../features/changeOrders/ChangeOrdersScreen'
 import { AllowancesScreen } from '../features/allowances/AllowancesScreen'
 import { TasksScreen } from '../features/tasks/TasksScreen'
 import { BidsScreen } from '../features/bids/BidsScreen'
+import { CashFlowScreen } from '../features/cashflow/CashFlowScreen'
+import { ExportScreen } from '../features/export/ExportScreen'
 
 export function AppRouter() {
   return (
@@ -39,6 +41,8 @@ export function AppRouter() {
           <Route path="/allowances" element={<RequireProject><AllowancesScreen /></RequireProject>} />
           <Route path="/tasks" element={<RequireProject><TasksScreen /></RequireProject>} />
           <Route path="/bids" element={<RequireProject><BidsScreen /></RequireProject>} />
+          <Route path="/cashflow" element={<RequireProject><CashFlowScreen /></RequireProject>} />
+          <Route path="/export" element={<RequireProject><ExportScreen /></RequireProject>} />
           <Route path="/more" element={<MoreScreen />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

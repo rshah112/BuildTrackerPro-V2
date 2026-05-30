@@ -19,6 +19,7 @@ import { useLineItems } from '../budget/useBudget'
 import { useCurrentProject } from '../projects/currentProject'
 import { useProjects } from '../projects/useProjects'
 import { useExpenses } from '../expenses/useExpenses'
+import { nextFourteenDaysDue } from '../cashflow/cashFlow'
 
 type Tone = 'brand' | 'warn' | 'danger'
 function healthTone(used: number, limit: number): Tone {
@@ -75,6 +76,7 @@ export function DashboardScreen() {
   const nearLimitItems = lineItems.filter((li) => lineItemHealth(li) === 'nearLimit')
   const openExpenses = expenses.filter((e) => !e.isPaid)
   const pendingOrders = changeOrders.filter((c) => c.status === 'pending')
+  const due14 = nextFourteenDaysDue(expenses, changeOrders, new Date().toISOString())
   const recentExpenses = [...expenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
 
   // Spend by category (top 5 by actual).
@@ -197,6 +199,9 @@ export function DashboardScreen() {
             </li>
             <li>
               <strong>{pendingOrders.length}</strong> pending change orders
+            </li>
+            <li>
+              <strong>{fmt(due14)}</strong> due in the next 14 days
             </li>
             <li>
               <strong>{fmt(allowanceRisk)}</strong> allowance overage
