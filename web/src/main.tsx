@@ -5,13 +5,16 @@ import './index.css'
 import App from './App.tsx'
 import { queryClient } from './lib/queryClient.ts'
 import { initTheme } from './lib/theme.ts'
+import { ToastProvider } from './components/ui/Toast.tsx'
 
 initTheme()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
+      <ToastProvider>
+        <App />
+      </ToastProvider>
     </QueryClientProvider>
   </StrictMode>,
 )

@@ -222,3 +222,211 @@
 .segment-icon {
   display: inline-flex;
 }
+
+/* ---- Overlay / Sheet / Modal ---- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-sheet);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.overlay-centered {
+  justify-content: center;
+  align-items: center;
+  padding: var(--space-4);
+}
+.overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  animation: fade-in var(--dur) var(--ease-out);
+}
+.sheet-panel,
+.modal-panel {
+  position: relative;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  max-height: 92dvh;
+}
+.sheet-panel {
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: sheet-up var(--dur) var(--ease-out);
+}
+.modal-panel {
+  width: 100%;
+  max-width: 460px;
+  border-radius: var(--radius-lg);
+  animation: modal-pop var(--dur) var(--ease-spring);
+}
+.sheet-grabber {
+  width: 36px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+  margin: 0.5rem auto 0;
+}
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-2);
+}
+.sheet-title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-bold);
+}
+.sheet-close {
+  display: inline-flex;
+  padding: 0.35rem;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.sheet-body {
+  padding: var(--space-2) var(--space-4) var(--space-4);
+  overflow-y: auto;
+}
+.sheet-footer {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ---- Toast ---- */
+.toast-stack {
+  position: fixed;
+  left: 50%;
+  bottom: calc(5rem + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: max-content;
+  max-width: min(92vw, 420px);
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: var(--shadow-lg);
+  animation: toast-in var(--dur) var(--ease-spring);
+}
+.toast-success {
+  background: var(--color-success);
+  color: #fff;
+}
+.toast-error {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+/* ---- Empty state ---- */
+.empty-state {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 0.4rem;
+  padding: var(--space-10) var(--space-4);
+  color: var(--color-text-muted);
+}
+.empty-icon {
+  display: inline-flex;
+  padding: 0.9rem;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  margin-bottom: 0.25rem;
+}
+.empty-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+.empty-body {
+  margin: 0;
+  max-width: 32ch;
+}
+.empty-action {
+  margin-top: var(--space-3);
+}
+
+/* ---- Skeleton / Spinner ---- */
+.skeleton {
+  display: block;
+  background: linear-gradient(
+    100deg,
+    var(--color-surface-2) 30%,
+    var(--color-border) 50%,
+    var(--color-surface-2) 70%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--radius-sm);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+.spinner-glyph {
+  animation: spin 0.7s linear infinite;
+  color: var(--color-brand);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes modal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay-backdrop,
+  .sheet-panel,
+  .modal-panel,
+  .toast,
+  .skeleton,
+  .btn,
+  .spinner-glyph,
+  .btn-spinner {
+    animation: none;
+    transition: none;
+  }
+}
