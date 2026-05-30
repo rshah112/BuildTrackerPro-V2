@@ -4,7 +4,7 @@ import { PROJECT_STATUSES, PROJECT_PRIORITIES, PROJECT_TEMPLATE_TYPES } from '..
 import { Field } from '../../components/ui/Field'
 import { Select } from '../../components/ui/Select'
 import { CurrencyField } from '../../components/ui/CurrencyField'
-import { Button } from '../../components/ui/Button'
+import { Form } from '../../components/ui/Form'
 import { useCreateProject, useUpdateProject } from './useProjects'
 
 type Draft = Partial<Project>
@@ -61,8 +61,8 @@ export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: (c
   }
 
   return (
-    <form onSubmit={submit} className="form">
-      <div className="form-section">
+    <Form onSubmit={submit}>
+      <Form.Section>
         <Field label="Name">
           {(p) => <input {...p} value={d.name ?? ''} onChange={text('name')} required autoFocus />}
         </Field>
@@ -104,10 +104,9 @@ export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: (c
             </Select>
           )}
         </Field>
-      </div>
+      </Form.Section>
 
-      <h3 className="form-section-title">Budget</h3>
-      <div className="form-section">
+      <Form.Section title="Budget">
         <CurrencyField
           label="Construction budget"
           value={d.constructionBudget ?? 0}
@@ -119,10 +118,9 @@ export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: (c
           onChange={money('contingencyBudget')}
         />
         <CurrencyField label="Purchase price" value={d.purchasePrice ?? 0} onChange={money('purchasePrice')} />
-      </div>
+      </Form.Section>
 
-      <h3 className="form-section-title">Structure</h3>
-      <div className="form-section">
+      <Form.Section title="Structure">
         <div className="form-grid">
           <Field label="Square footage">
             {(p) => (
@@ -157,10 +155,9 @@ export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: (c
             <input {...p} value={d.proposedBuildDimensions ?? ''} onChange={text('proposedBuildDimensions')} />
           )}
         </Field>
-      </div>
+      </Form.Section>
 
-      <h3 className="form-section-title">Dates</h3>
-      <div className="form-section">
+      <Form.Section title="Dates">
         <div className="form-grid">
           <Field label="Start date">
             {(p) => <input type="date" {...p} value={dateValue(d.startDate)} onChange={date('startDate')} />}
@@ -171,26 +168,18 @@ export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: (c
             )}
           </Field>
         </div>
-      </div>
+      </Form.Section>
 
-      <h3 className="form-section-title">Notes</h3>
-      <div className="form-section">
+      <Form.Section title="Notes">
         <Field label="Scope summary">
           {(p) => <textarea {...p} value={d.scopeSummary ?? ''} onChange={text('scopeSummary')} />}
         </Field>
         <Field label="Warranty notes">
           {(p) => <textarea {...p} value={d.warrantyNotes ?? ''} onChange={text('warrantyNotes')} />}
         </Field>
-      </div>
+      </Form.Section>
 
-      <div className="form-actions form-actions-sticky">
-        <Button type="submit" loading={busy} fullWidth>
-          Save
-        </Button>
-        <Button type="button" variant="secondary" onClick={() => onDone()}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+      <Form.Actions busy={busy} onCancel={() => onDone()} />
+    </Form>
   )
 }

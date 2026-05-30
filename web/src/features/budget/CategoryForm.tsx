@@ -2,7 +2,7 @@ import { useState, type FormEvent, type ChangeEvent } from 'react'
 import type { BudgetCategory, ChangeOrder, Expense } from '../../domain/types'
 import { Field } from '../../components/ui/Field'
 import { CurrencyField } from '../../components/ui/CurrencyField'
-import { Button } from '../../components/ui/Button'
+import { Form } from '../../components/ui/Form'
 import { useCreateCategory, useUpdateCategory, useLineItems, useUpdateLineItem } from './useBudget'
 import { useExpenses, useUpdateExpense } from '../expenses/useExpenses'
 import { useChangeOrders, useUpdateChangeOrder } from '../changeOrders/useChangeOrders'
@@ -67,8 +67,8 @@ export function CategoryForm({
   }
 
   return (
-    <form onSubmit={submit} className="form">
-      <div className="form-section">
+    <Form onSubmit={submit}>
+      <Form.Section>
         <Field label="Name">
           {(p) => <input {...p} value={d.name} onChange={text('name')} required autoFocus />}
         </Field>
@@ -77,15 +77,8 @@ export function CategoryForm({
           value={d.targetBudget}
           onChange={(v) => setD((p) => ({ ...p, targetBudget: v }))}
         />
-      </div>
-      <div className="form-actions form-actions-sticky">
-        <Button type="submit" loading={busy} fullWidth>
-          Save
-        </Button>
-        <Button type="button" variant="secondary" onClick={onDone}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+      </Form.Section>
+      <Form.Actions busy={busy} onCancel={onDone} />
+    </Form>
   )
 }

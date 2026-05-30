@@ -1,7 +1,7 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react'
 import type { Vendor } from '../../domain/types'
 import { Field } from '../../components/ui/Field'
-import { Button } from '../../components/ui/Button'
+import { Form } from '../../components/ui/Form'
+import { useEntityForm } from '../../lib/useEntityForm'
 import { useCreateVendor, useUpdateVendor } from './useVendors'
 
 type Draft = Partial<Omit<Vendor, 'id' | 'owner'>>
@@ -24,24 +24,17 @@ export function VendorForm({
   initial?: Vendor
   onDone: () => void
 }) {
-  const [d, setD] = useState<Draft>(initial ?? blank(projectId))
-  const create = useCreateVendor()
-  const update = useUpdateVendor()
-  const busy = create.isPending || update.isPending
-
-  const text = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setD((p) => ({ ...p, [k]: e.target.value }))
-
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    if (initial) await update.mutateAsync({ id: initial.id, patch: d })
-    else await create.mutateAsync({ ...d, projectId })
-    onDone()
-  }
+  const { d, text, busy, submit } = useEntityForm<Vendor, Draft>({
+    initial,
+    blank: blank(projectId),
+    create: useCreateVendor(),
+    update: useUpdateVendor(),
+    onDone,
+  })
 
   return (
-    <form onSubmit={submit} className="form">
-      <div className="form-section">
+    <Form onSubmit={submit}>
+      <Form.Section>
         <Field label="Name">
           {(p) => <input {...p} value={d.name ?? ''} onChange={text('name')} required autoFocus />}
         </Field>
@@ -55,15 +48,8 @@ export function VendorForm({
           </Field>
         </div>
         <Field label="Notes">{(p) => <textarea {...p} value={d.notes ?? ''} onChange={text('notes')} />}</Field>
-      </div>
-      <div className="form-actions form-actions-sticky">
-        <Button type="submit" loading={busy} fullWidth>
-          Save
-        </Button>
-        <Button type="button" variant="secondary" onClick={onDone}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+      </Form.Section>
+      <Form.Actions busy={busy} onCancel={onDone} />
+    </Form>
   )
 }

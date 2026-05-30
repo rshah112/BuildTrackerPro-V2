@@ -1,9 +1,9 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react'
 import type { BidPackage } from '../../domain/types'
 import { BID_PACKAGE_STATUSES } from '../../domain/enums'
 import { Field } from '../../components/ui/Field'
 import { Select } from '../../components/ui/Select'
-import { Button } from '../../components/ui/Button'
+import { Form } from '../../components/ui/Form'
+import { useEntityForm } from '../../lib/useEntityForm'
 import { useCreateBidPackage, useUpdateBidPackage } from './useBids'
 
 type Draft = Partial<Omit<BidPackage, 'id' | 'owner' | 'createdAt'>>
@@ -28,26 +28,17 @@ export function BidPackageForm({
   initial?: BidPackage
   onDone: () => void
 }) {
-  const [d, setD] = useState<Draft>(initial ?? blank(projectId))
-  const create = useCreateBidPackage()
-  const update = useUpdateBidPackage()
-  const busy = create.isPending || update.isPending
-
-  const text = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    setD((p) => ({ ...p, [k]: e.target.value }))
-  const date = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement>) =>
-    setD((p) => ({ ...p, [k]: e.target.value || null }))
-
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    if (initial) await update.mutateAsync({ id: initial.id, patch: d })
-    else await create.mutateAsync(d)
-    onDone()
-  }
+  const { d, text, date, busy, submit } = useEntityForm<BidPackage, Draft>({
+    initial,
+    blank: blank(projectId),
+    create: useCreateBidPackage(),
+    update: useUpdateBidPackage(),
+    onDone,
+  })
 
   return (
-    <form onSubmit={submit} className="form">
-      <div className="form-section">
+    <Form onSubmit={submit}>
+      <Form.Section>
         <Field label="Scope">
           {(p) => <input {...p} value={d.scopeTitle ?? ''} onChange={text('scopeTitle')} required autoFocus />}
         </Field>
@@ -70,15 +61,8 @@ export function BidPackageForm({
           </Field>
         </div>
         <Field label="Notes">{(p) => <textarea {...p} value={d.notes ?? ''} onChange={text('notes')} />}</Field>
-      </div>
-      <div className="form-actions form-actions-sticky">
-        <Button type="submit" loading={busy} fullWidth>
-          Save
-        </Button>
-        <Button type="button" variant="secondary" onClick={onDone}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+      </Form.Section>
+      <Form.Actions busy={busy} onCancel={onDone} />
+    </Form>
   )
 }

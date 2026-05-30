@@ -1,8 +1,8 @@
-import { useState, type FormEvent, type ChangeEvent } from 'react'
 import type { BudgetLineItem } from '../../domain/types'
 import { Field } from '../../components/ui/Field'
 import { CurrencyField } from '../../components/ui/CurrencyField'
-import { Button } from '../../components/ui/Button'
+import { Form } from '../../components/ui/Form'
+import { useEntityForm } from '../../lib/useEntityForm'
 import { useCreateLineItem, useUpdateLineItem } from './useBudget'
 
 type Draft = Partial<Omit<BudgetLineItem, 'id' | 'owner' | 'createdAt'>>
@@ -33,25 +33,18 @@ export function LineItemForm({
   initial?: BudgetLineItem
   onDone: () => void
 }) {
-  const [d, setD] = useState<Draft>(initial ?? blank(projectId, categoryName))
-  const create = useCreateLineItem()
-  const update = useUpdateLineItem()
-  const busy = create.isPending || update.isPending
-
-  const text = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setD((p) => ({ ...p, [k]: e.target.value }))
+  const { d, setD, text, busy, submit } = useEntityForm<BudgetLineItem, Draft>({
+    initial,
+    blank: blank(projectId, categoryName),
+    create: useCreateLineItem(),
+    update: useUpdateLineItem(),
+    onDone,
+  })
   const money = (k: keyof Draft) => (v: number) => setD((p) => ({ ...p, [k]: v }))
 
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    if (initial) await update.mutateAsync({ id: initial.id, patch: d })
-    else await create.mutateAsync(d)
-    onDone()
-  }
-
   return (
-    <form onSubmit={submit} className="form">
-      <div className="form-section">
+    <Form onSubmit={submit}>
+      <Form.Section>
         <Field label="Title">
           {(p) => <input {...p} value={d.title ?? ''} onChange={text('title')} required autoFocus />}
         </Field>
@@ -79,15 +72,8 @@ export function LineItemForm({
           />
         )}
         <Field label="Notes">{(p) => <textarea {...p} value={d.notes ?? ''} onChange={text('notes')} />}</Field>
-      </div>
-      <div className="form-actions form-actions-sticky">
-        <Button type="submit" loading={busy} fullWidth>
-          Save
-        </Button>
-        <Button type="button" variant="secondary" onClick={onDone}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+      </Form.Section>
+      <Form.Actions busy={busy} onCancel={onDone} />
+    </Form>
   )
 }

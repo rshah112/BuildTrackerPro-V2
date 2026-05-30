@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react'
+import { useState, type ChangeEvent } from 'react'
 import type { BudgetLineItem, Expense } from '../../domain/types'
 import { balanceDue } from '../../lib/expenseMath'
 import { fmt } from '../../lib/money'
@@ -7,6 +7,8 @@ import { Field } from '../../components/ui/Field'
 import { Select } from '../../components/ui/Select'
 import { CurrencyField } from '../../components/ui/CurrencyField'
 import { Button } from '../../components/ui/Button'
+import { Form } from '../../components/ui/Form'
+import { useEntityForm } from '../../lib/useEntityForm'
 import { resolvePaidAmount } from './paidAmount'
 import { useCreateExpense, useUpdateExpense } from './useExpenses'
 
@@ -51,14 +53,40 @@ export function ExpenseForm({
   onSaved: (expense: Expense) => Promise<void>
   onDone: () => void
 }) {
-  const [d, setD] = useState<Draft>(initial ?? blank(projectId))
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
   // Once the user edits "Amount paid", honor their literal value (incl. $0) instead of
   // re-deriving the full-amount default on every render.
   const [paidTouched, setPaidTouched] = useState(false)
-  const create = useCreateExpense()
-  const update = useUpdateExpense()
-  const busy = create.isPending || update.isPending
+
+  const { d, setD, text, date, busy, submit } = useEntityForm<Expense, Draft>({
+    initial,
+    blank: blank(projectId),
+    create: useCreateExpense(),
+    update: useUpdateExpense(),
+    onSaved,
+    onDone,
+    transform: async (draft) => {
+      const amount = draft.amount ?? 0
+      const isPaid = draft.isPaid ?? false
+      const selected = lineItems.find((li) => li.id === draft.budgetLineItemId)
+      const receiptObjectKey = receiptFile
+        ? (await uploadBlob(receiptFile, 'receipt')).key
+        : draft.receiptObjectKey ?? null
+      return {
+        ...draft,
+        projectId,
+        amount,
+        // If they explicitly set the paid amount (incl. $0), keep it; else default to full.
+        amountPaid: isPaid ? (paidTouched ? draft.amountPaid ?? 0 : resolvePaidAmount(true, draft.amountPaid ?? 0, amount)) : 0,
+        paidDate: isPaid ? draft.paidDate || today() : null,
+        budgetLineItemId: draft.budgetLineItemId || null,
+        budgetLineItemTitle: selected?.title ?? draft.budgetLineItemTitle ?? '',
+        categoryName: selected?.categoryName ?? draft.categoryName ?? '',
+        roomTag: selected?.roomTag ?? draft.roomTag ?? '',
+        receiptObjectKey,
+      }
+    },
+  })
 
   const openReceipt = async () => {
     if (!d.receiptObjectKey) return
@@ -66,12 +94,6 @@ export function ExpenseForm({
     if (url) window.open(url, '_blank', 'noopener')
   }
 
-  const text = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    setD((p) => ({ ...p, [k]: e.target.value }))
-  const date = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement>) =>
-    setD((p) => ({ ...p, [k]: e.target.value || null }))
-
-  const selectedLineItem = lineItems.find((li) => li.id === d.budgetLineItemId)
   // Display value: once touched, show exactly what they typed (allows $0); until then,
   // default a paid expense to the full amount.
   const paidValue = paidTouched
@@ -90,34 +112,9 @@ export function ExpenseForm({
     }))
   }
 
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    const amount = d.amount ?? 0
-    const isPaid = d.isPaid ?? false
-    const receiptObjectKey = receiptFile ? (await uploadBlob(receiptFile, 'receipt')).key : d.receiptObjectKey ?? null
-    const payload: Draft = {
-      ...d,
-      projectId,
-      amount,
-      // If they explicitly set the paid amount (incl. $0), keep it; else default to full.
-      amountPaid: isPaid ? (paidTouched ? d.amountPaid ?? 0 : resolvePaidAmount(true, d.amountPaid ?? 0, amount)) : 0,
-      paidDate: isPaid ? d.paidDate || today() : null,
-      budgetLineItemId: d.budgetLineItemId || null,
-      budgetLineItemTitle: selectedLineItem?.title ?? d.budgetLineItemTitle ?? '',
-      categoryName: selectedLineItem?.categoryName ?? d.categoryName ?? '',
-      roomTag: selectedLineItem?.roomTag ?? d.roomTag ?? '',
-      receiptObjectKey,
-    }
-    const saved = initial
-      ? await update.mutateAsync({ id: initial.id, patch: payload })
-      : await create.mutateAsync(payload)
-    await onSaved(saved)
-    onDone()
-  }
-
   return (
-    <form onSubmit={submit} className="form">
-      <div className="form-section">
+    <Form onSubmit={submit}>
+      <Form.Section>
         <Field label="Vendor">
           {(p) => <input {...p} value={d.vendorName ?? ''} onChange={text('vendorName')} required autoFocus />}
         </Field>
@@ -133,10 +130,9 @@ export function ExpenseForm({
         <Field label="Due date">
           {(p) => <input type="date" {...p} value={dateValue(d.dueDate)} onChange={date('dueDate')} />}
         </Field>
-      </div>
+      </Form.Section>
 
-      <h3 className="form-section-title">Allocation</h3>
-      <div className="form-section">
+      <Form.Section title="Allocation">
         <Field label="Budget line">
           {(p) => (
             <Select {...p} value={d.budgetLineItemId ?? ''} onChange={chooseLineItem}>
@@ -155,10 +151,9 @@ export function ExpenseForm({
           </Field>
           <Field label="Room tag">{(p) => <input {...p} value={d.roomTag ?? ''} onChange={text('roomTag')} />}</Field>
         </div>
-      </div>
+      </Form.Section>
 
-      <h3 className="form-section-title">Payment</h3>
-      <div className="form-section">
+      <Form.Section title="Payment">
         <label className="checkbox-row">
           <input
             type="checkbox"
@@ -193,10 +188,9 @@ export function ExpenseForm({
           </>
         )}
         <p className="muted">Balance due: {fmt(balance)}</p>
-      </div>
+      </Form.Section>
 
-      <h3 className="form-section-title">Receipt &amp; notes</h3>
-      <div className="form-section">
+      <Form.Section title="Receipt & notes">
         <Field label="Receipt">
           {(p) => (
             <input
@@ -218,16 +212,9 @@ export function ExpenseForm({
           </div>
         )}
         <Field label="Notes">{(p) => <textarea {...p} value={d.notes ?? ''} onChange={text('notes')} />}</Field>
-      </div>
+      </Form.Section>
 
-      <div className="form-actions form-actions-sticky">
-        <Button type="submit" loading={busy} fullWidth>
-          Save expense
-        </Button>
-        <Button type="button" variant="secondary" onClick={onDone}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+      <Form.Actions busy={busy} onCancel={onDone} saveLabel="Save expense" />
+    </Form>
   )
 }

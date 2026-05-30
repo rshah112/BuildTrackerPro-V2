@@ -1,10 +1,11 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react'
+import type { ChangeEvent } from 'react'
 import type { BudgetLineItem, ChangeOrder } from '../../domain/types'
 import { CHANGE_ORDER_STATUSES } from '../../domain/enums'
 import { Field } from '../../components/ui/Field'
 import { Select } from '../../components/ui/Select'
 import { CurrencyField } from '../../components/ui/CurrencyField'
-import { Button } from '../../components/ui/Button'
+import { Form } from '../../components/ui/Form'
+import { useEntityForm } from '../../lib/useEntityForm'
 import { useCreateChangeOrder, useUpdateChangeOrder } from './useChangeOrders'
 
 type Draft = Partial<Omit<ChangeOrder, 'id' | 'owner' | 'createdAt'>>
@@ -36,15 +37,14 @@ export function ChangeOrderForm({
   onSaved: (saved: ChangeOrder) => Promise<void>
   onDone: () => void
 }) {
-  const [d, setD] = useState<Draft>(initial ?? blank(projectId))
-  const create = useCreateChangeOrder()
-  const update = useUpdateChangeOrder()
-  const busy = create.isPending || update.isPending
-
-  const text = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    setD((p) => ({ ...p, [k]: e.target.value }))
-  const date = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement>) =>
-    setD((p) => ({ ...p, [k]: e.target.value || null }))
+  const { d, setD, set, text, date, busy, submit } = useEntityForm<ChangeOrder, Draft>({
+    initial,
+    blank: blank(projectId),
+    create: useCreateChangeOrder(),
+    update: useUpdateChangeOrder(),
+    onSaved,
+    onDone,
+  })
 
   const chooseLineItem = (e: ChangeEvent<HTMLSelectElement>) => {
     const item = lineItems.find((li) => li.id === e.target.value)
@@ -56,22 +56,13 @@ export function ChangeOrderForm({
     }))
   }
 
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    const saved = initial
-      ? await update.mutateAsync({ id: initial.id, patch: d })
-      : await create.mutateAsync(d)
-    await onSaved(saved)
-    onDone()
-  }
-
   return (
-    <form onSubmit={submit} className="form">
-      <div className="form-section">
+    <Form onSubmit={submit}>
+      <Form.Section>
         <Field label="Title">
           {(p) => <input {...p} value={d.title ?? ''} onChange={text('title')} required autoFocus />}
         </Field>
-        <CurrencyField label="Amount" value={d.amount ?? 0} onChange={(v) => setD((p) => ({ ...p, amount: v }))} />
+        <CurrencyField label="Amount" value={d.amount ?? 0} onChange={(v) => set('amount', v)} />
         <Field label="Status">
           {(p) => (
             <Select {...p} value={d.status} onChange={text('status')}>
@@ -106,15 +97,8 @@ export function ChangeOrderForm({
           )}
         </Field>
         <Field label="Notes">{(p) => <textarea {...p} value={d.notes ?? ''} onChange={text('notes')} />}</Field>
-      </div>
-      <div className="form-actions form-actions-sticky">
-        <Button type="submit" loading={busy} fullWidth>
-          Save
-        </Button>
-        <Button type="button" variant="secondary" onClick={onDone}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+      </Form.Section>
+      <Form.Actions busy={busy} onCancel={onDone} />
+    </Form>
   )
 }

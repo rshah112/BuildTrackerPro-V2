@@ -1,9 +1,9 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react'
 import type { BudgetLineItem, ProjectTask, Vendor } from '../../domain/types'
 import { PROJECT_TASK_STATUSES } from '../../domain/enums'
 import { Field } from '../../components/ui/Field'
 import { Select } from '../../components/ui/Select'
-import { Button } from '../../components/ui/Button'
+import { Form } from '../../components/ui/Form'
+import { useEntityForm } from '../../lib/useEntityForm'
 import { useCreateTask, useUpdateTask } from './useTasks'
 
 type Draft = Partial<Omit<ProjectTask, 'id' | 'owner' | 'createdAt'>>
@@ -36,34 +36,27 @@ export function TaskForm({
   initial?: ProjectTask
   onDone: () => void
 }) {
-  const [d, setD] = useState<Draft>(initial ?? blank(projectId))
-  const create = useCreateTask()
-  const update = useUpdateTask()
-  const busy = create.isPending || update.isPending
-
-  const text = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    setD((p) => ({ ...p, [k]: e.target.value }))
-  const date = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement>) =>
-    setD((p) => ({ ...p, [k]: e.target.value || null }))
-
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    const status = d.status ?? 'todo'
-    const payload: Draft = {
-      ...d,
-      projectId,
-      vendorId: d.vendorId || null,
-      budgetLineItemId: d.budgetLineItemId || null,
-      completedAt: status === 'done' ? d.completedAt || now() : null,
-    }
-    if (initial) await update.mutateAsync({ id: initial.id, patch: payload })
-    else await create.mutateAsync(payload)
-    onDone()
-  }
+  const { d, text, date, busy, submit } = useEntityForm<ProjectTask, Draft>({
+    initial,
+    blank: blank(projectId),
+    create: useCreateTask(),
+    update: useUpdateTask(),
+    onDone,
+    transform: (draft) => {
+      const status = draft.status ?? 'todo'
+      return {
+        ...draft,
+        projectId,
+        vendorId: draft.vendorId || null,
+        budgetLineItemId: draft.budgetLineItemId || null,
+        completedAt: status === 'done' ? draft.completedAt || now() : null,
+      }
+    },
+  })
 
   return (
-    <form onSubmit={submit} className="form">
-      <div className="form-section">
+    <Form onSubmit={submit}>
+      <Form.Section>
         <Field label="Title">
           {(p) => <input {...p} value={d.title ?? ''} onChange={text('title')} required autoFocus />}
         </Field>
@@ -108,15 +101,8 @@ export function TaskForm({
           )}
         </Field>
         <Field label="Notes">{(p) => <textarea {...p} value={d.notes ?? ''} onChange={text('notes')} />}</Field>
-      </div>
-      <div className="form-actions form-actions-sticky">
-        <Button type="submit" loading={busy} fullWidth>
-          Save
-        </Button>
-        <Button type="button" variant="secondary" onClick={onDone}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+      </Form.Section>
+      <Form.Actions busy={busy} onCancel={onDone} />
+    </Form>
   )
 }

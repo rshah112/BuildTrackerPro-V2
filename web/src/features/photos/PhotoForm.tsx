@@ -4,7 +4,7 @@ import { PHASE_TAGS } from '../../domain/roomCatalog'
 import { uploadBlob } from '../../lib/r2'
 import { Field } from '../../components/ui/Field'
 import { Select } from '../../components/ui/Select'
-import { Button } from '../../components/ui/Button'
+import { Form } from '../../components/ui/Form'
 import { useCreatePhoto, useUpdatePhoto } from './usePhotos'
 
 type Draft = Partial<Omit<PhotoAttachment, 'id' | 'owner' | 'createdAt'>>
@@ -62,8 +62,8 @@ export function PhotoForm({
   }
 
   return (
-    <form onSubmit={submit} className="form">
-      <div className="form-section">
+    <Form onSubmit={submit}>
+      <Form.Section>
         <Field label="Photo" error={err ?? undefined}>
           {(p) => (
             <input
@@ -114,15 +114,8 @@ export function PhotoForm({
           )}
         </Field>
         <Field label="Notes">{(p) => <textarea {...p} value={d.notes ?? ''} onChange={text('notes')} />}</Field>
-      </div>
-      <div className="form-actions form-actions-sticky">
-        <Button type="submit" loading={busy} fullWidth>
-          Save photo
-        </Button>
-        <Button type="button" variant="secondary" onClick={onDone}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+      </Form.Section>
+      <Form.Actions busy={busy} onCancel={onDone} saveLabel="Save photo" />
+    </Form>
   )
 }
