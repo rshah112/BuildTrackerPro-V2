@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
+import { useProjects } from './useProjects'
 
 // The native app is multi-project (Portfolio + per-project views). The PWA mirrors
 // that: a selected "current project" scopes the Dashboard/Budget/Photos tabs.
@@ -30,9 +31,19 @@ export function useCurrentProject(): CurrentProject {
   return ctx
 }
 
-/** Gate for project-scoped screens: bounce to the portfolio when nothing is selected. */
+/** Gate for project-scoped screens. Single-project (the common case for one build)
+ *  auto-selects so the app opens straight to the dashboard; with 0 or several
+ *  projects it bounces to the portfolio to choose. */
 export function RequireProject({ children }: { children: ReactNode }) {
-  const { projectId } = useCurrentProject()
-  if (!projectId) return <Navigate to="/projects" replace />
-  return <>{children}</>
+  const { projectId, setProjectId } = useCurrentProject()
+  const { data: projects = [], isLoading } = useProjects()
+  const active = projects.filter((p) => !p.deletedAt)
+
+  useEffect(() => {
+    if (!projectId && active.length === 1) setProjectId(active[0].id)
+  }, [projectId, active, setProjectId])
+
+  if (projectId) return <>{children}</>
+  if (isLoading || active.length === 1) return <div className="loading">Loading…</div>
+  return <Navigate to="/projects" replace />
 }
