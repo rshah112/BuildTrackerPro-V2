@@ -706,6 +706,9 @@
   font-size: var(--text-lg);
   font-weight: var(--font-weight-semibold);
 }
+.budget-cat-titlerow strong {
+  font-family: var(--font-display);
+}
 .budget-cat-figures {
   font-size: var(--text-sm);
 }
@@ -717,23 +720,26 @@
 .progress.thin {
   height: 0.4rem;
 }
-.fill-brand {
+/* Qualified with .progress so these tone fills out-specify the legacy
+   ".progress span { background: var(--accent) }" default — otherwise every bar
+   renders brand-orange and the health colors (danger/near-limit/healthy) never show. */
+.progress .fill-brand {
   display: block;
   height: 100%;
   background: var(--color-brand);
 }
-.fill-danger,
-.fill-overBudget {
+.progress .fill-danger,
+.progress .fill-overBudget {
   display: block;
   height: 100%;
   background: var(--color-danger);
 }
-.fill-nearLimit {
+.progress .fill-nearLimit {
   display: block;
   height: 100%;
   background: var(--color-warn);
 }
-.fill-healthy {
+.progress .fill-healthy {
   display: block;
   height: 100%;
   background: var(--color-success);
@@ -1049,6 +1055,28 @@
 .confirm-message {
   margin: 0;
   color: var(--color-text-muted);
+}
+
+/* Content region below a SegmentedControl tab switcher. */
+.tab-panel {
+  margin-top: var(--space-4);
+}
+
+/* Filter/action bar above a list: segmented control + a trailing action. Wraps to
+   stack on narrow screens. */
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin: var(--space-4) 0 var(--space-3);
+}
+.list-toolbar > :first-child {
+  flex: 1;
+  min-width: 200px;
+}
+.list-toolbar > .btn {
+  flex-shrink: 0;
 }
 
 /* ---- SectionCard (titled panel) ---- */

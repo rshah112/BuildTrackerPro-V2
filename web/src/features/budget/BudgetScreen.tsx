@@ -103,7 +103,7 @@ export function BudgetScreen() {
       />
 
       {tab === 'budget' && (
-        <div style={{ marginTop: '1rem' }}>
+        <div className="tab-panel">
           {categories.length === 0 ? (
             <EmptyState
               icon={FolderPlus}
@@ -221,7 +221,7 @@ export function BudgetScreen() {
       )}
 
       {tab === 'expenses' && (
-        <div style={{ marginTop: '1rem' }}>
+        <div className="tab-panel">
           <ExpenseList projectId={projectId} lineItems={lineItems} />
         </div>
       )}

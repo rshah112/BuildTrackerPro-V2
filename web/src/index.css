@@ -366,6 +366,13 @@ textarea {
 .metric-grid.compact {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
+/* Compact KPI strip stays 3-up even on mobile; tighten so larger figures fit. */
+.metric-grid.compact .metric-card {
+  padding: 0.7rem 0.8rem;
+}
+.metric-grid.compact .metric-card strong {
+  font-size: var(--text-lg);
+}
 .metric-card,
 .panel {
   background: var(--color-surface);
@@ -435,9 +442,6 @@ textarea {
   }
   .card-actions {
     justify-content: flex-start;
-  }
-  .metric-grid.compact {
-    grid-template-columns: 1fr;
   }
   .tab {
     font-size: 0.72rem;

@@ -5,6 +5,7 @@ import { balanceDue, effectiveAmountPaid } from '../../lib/expenseMath'
 import { fmt, sumBy } from '../../lib/money'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
+import { Stat } from '../../components/ui/Stat'
 import { Sheet } from '../../components/ui/Sheet'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState } from '../../components/ui/Feedback'
@@ -58,34 +59,23 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
   return (
     <>
       <div className="metric-grid compact">
-        <div className="metric-card">
-          <span>Invoiced</span>
-          <strong>{fmt(total)}</strong>
-        </div>
-        <div className="metric-card">
-          <span>Paid</span>
-          <strong>{fmt(paid)}</strong>
-        </div>
-        <div className="metric-card">
-          <span>Open</span>
-          <strong>{fmt(outstanding)}</strong>
-        </div>
+        <Stat label="Invoiced" value={fmt(total)} />
+        <Stat label="Paid" value={fmt(paid)} />
+        <Stat label="Open" value={fmt(outstanding)} />
       </div>
 
       {expenses.length > 0 && (
-        <div className="row-between" style={{ margin: '1rem 0 0.75rem' }}>
-          <div style={{ flex: 1, maxWidth: 320 }}>
-            <SegmentedControl<Filter>
-              ariaLabel="Filter expenses"
-              value={filter}
-              onChange={setFilter}
-              segments={[
-                { value: 'all', label: 'All' },
-                { value: 'open', label: 'Open' },
-                { value: 'paid', label: 'Paid' },
-              ]}
-            />
-          </div>
+        <div className="list-toolbar">
+          <SegmentedControl<Filter>
+            ariaLabel="Filter expenses"
+            value={filter}
+            onChange={setFilter}
+            segments={[
+              { value: 'all', label: 'All' },
+              { value: 'open', label: 'Open' },
+              { value: 'paid', label: 'Paid' },
+            ]}
+          />
           <Button size="sm" leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
             Add expense
           </Button>
