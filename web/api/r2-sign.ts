@@ -23,8 +23,17 @@ function r2Client(): S3Client {
 async function userIdFromRequest(req: Request): Promise<string | null> {
   const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '')
   if (!token) return null
-  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? ''
-  const key = process.env.SUPABASE_SERVICE_ROLE ?? ''
+  // getUser(jwt) validates the caller's login token; the public anon key suffices —
+  // no secret service-role key needed. Falls back to the baked prod Supabase config
+  // (mirrors src/lib/supabase.ts), so uploads work with only the 4 R2_* vars set.
+  const url =
+    process.env.SUPABASE_URL ??
+    process.env.VITE_SUPABASE_URL ??
+    'https://wzbtxwnvplpnwmavfdwx.supabase.co'
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE ??
+    process.env.SUPABASE_ANON_KEY ??
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6YnR4d252cGxwbndtYXZmZHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1Njk2MzEsImV4cCI6MjA5NTE0NTYzMX0.P1BlgrtVK3CpRLjcZsZugB-78_HO4GFSUXplCtbbBAY'
   const supa = createClient(url, key)
   const { data, error } = await supa.auth.getUser(token)
   if (error || !data.user) return null
