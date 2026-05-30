@@ -77,7 +77,7 @@ export async function restoreBackup(json: string): Promise<string> {
     packageId: remap(pkgMap, r.packageId) ?? (r.packageId as string),
     vendorId: remap(vendorMap, r.vendorId),
   }))
-  for (const pkg of (file.bidPackages ?? []) as Row[]) {
+  for (const pkg of (file.bidPackages ?? []) as unknown as Row[]) {
     const newPkg = remap(pkgMap, pkg.id)
     const newBid = remap(bidMap, pkg.awardedBidId)
     if (newPkg && newBid) await table('bid_packages').update(newPkg, { awardedBidId: newBid } as never)
