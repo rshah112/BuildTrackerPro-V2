@@ -31,10 +31,13 @@ export function setTheme(pref: ThemePref): void {
   applyTheme(pref)
 }
 
+let systemListenerBound = false
+
 /** Apply the stored preference and keep following the OS while pref === 'system'. */
 export function initTheme(): void {
   applyTheme(getStoredTheme())
-  if (typeof matchMedia === 'undefined') return
+  if (typeof matchMedia === 'undefined' || systemListenerBound) return
+  systemListenerBound = true
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (getStoredTheme() === 'system') applyTheme('system')
   })

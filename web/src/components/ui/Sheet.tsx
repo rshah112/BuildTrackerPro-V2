@@ -15,6 +15,22 @@ interface SheetProps {
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
+// Ref-counted body scroll lock so stacked sheets don't unlock the body when only
+// one of them closes.
+let lockCount = 0
+let savedOverflow = ''
+function lockScroll() {
+  if (lockCount === 0) {
+    savedOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+  }
+  lockCount++
+}
+function unlockScroll() {
+  lockCount = Math.max(0, lockCount - 1)
+  if (lockCount === 0) document.body.style.overflow = savedOverflow
+}
+
 /** iOS-style bottom sheet (or centered modal). Portals to <body>, traps focus, locks
  *  scroll, and dismisses on backdrop click / Escape. */
 export function Sheet({ open, onClose, title, children, footer, centered = false }: SheetProps) {
@@ -24,12 +40,12 @@ export function Sheet({ open, onClose, title, children, footer, centered = false
   useEffect(() => {
     if (!open) return
     restoreRef.current = document.activeElement as HTMLElement | null
-    const { body } = document
-    const prevOverflow = body.style.overflow
-    body.style.overflow = 'hidden'
+    lockScroll()
 
     const panel = panelRef.current
-    panel?.querySelector<HTMLElement>(FOCUSABLE)?.focus()
+    // Focus the first focusable child, else the panel itself (it has tabIndex=-1).
+    const firstFocusable = panel?.querySelector<HTMLElement>(FOCUSABLE)
+    ;(firstFocusable ?? panel)?.focus()
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -39,11 +55,17 @@ export function Sheet({ open, onClose, title, children, footer, centered = false
       }
       if (e.key !== 'Tab' || !panel) return
       const items = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE))
-      if (items.length === 0) return
+      if (items.length === 0) {
+        // Nothing focusable inside — keep focus on the panel rather than letting
+        // it escape to the page behind the modal.
+        e.preventDefault()
+        panel.focus()
+        return
+      }
       const first = items[0]
       const last = items[items.length - 1]
       const active = document.activeElement
-      if (e.shiftKey && active === first) {
+      if (e.shiftKey && (active === first || active === panel)) {
         e.preventDefault()
         last.focus()
       } else if (!e.shiftKey && active === last) {
@@ -54,8 +76,9 @@ export function Sheet({ open, onClose, title, children, footer, centered = false
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('keydown', onKeyDown)
-      body.style.overflow = prevOverflow
-      restoreRef.current?.focus?.()
+      unlockScroll()
+      // Best effort — no-ops if the trigger has since unmounted.
+      if (restoreRef.current?.isConnected) restoreRef.current.focus?.()
     }
   }, [open, onClose])
 
@@ -70,6 +93,7 @@ export function Sheet({ open, onClose, title, children, footer, centered = false
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        tabIndex={-1}
       >
         {!centered && <div className="sheet-grabber" aria-hidden />}
         {title && (

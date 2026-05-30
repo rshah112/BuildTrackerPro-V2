@@ -23,6 +23,7 @@ export function CurrentProjectProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={{ projectId, setProjectId }}>{children}</Ctx.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useCurrentProject(): CurrentProject {
   const ctx = useContext(Ctx)
   if (!ctx) throw new Error('useCurrentProject must be used within CurrentProjectProvider')

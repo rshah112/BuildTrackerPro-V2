@@ -3,6 +3,7 @@ import type { BudgetLineItem, Expense } from '../../domain/types'
 import { balanceDue } from '../../lib/expenseMath'
 import { fmt } from '../../lib/money'
 import { uploadBlob } from '../../lib/r2'
+import { resolvePaidAmount } from './paidAmount'
 import { useCreateExpense, useUpdateExpense } from './useExpenses'
 
 type Draft = Partial<Omit<Expense, 'id' | 'owner'>>
@@ -60,9 +61,10 @@ export function ExpenseForm({
     setD((p) => ({ ...p, [k]: e.target.value || null }))
 
   const selectedLineItem = lineItems.find((li) => li.id === d.budgetLineItemId)
+  const paidValue = resolvePaidAmount(d.isPaid ?? false, d.amountPaid ?? 0, d.amount ?? 0)
   const balance = balanceDue({
     amount: d.amount ?? 0,
-    amountPaid: d.amountPaid ?? 0,
+    amountPaid: paidValue,
     isPaid: d.isPaid ?? false,
   })
 
@@ -96,7 +98,7 @@ export function ExpenseForm({
       ...d,
       projectId,
       amount,
-      amountPaid: isPaid ? d.amountPaid ?? amount : 0,
+      amountPaid: resolvePaidAmount(isPaid, d.amountPaid ?? 0, amount),
       paidDate: isPaid ? d.paidDate || today() : null,
       budgetLineItemId: d.budgetLineItemId || null,
       budgetLineItemTitle: selectedLineItem?.title ?? d.budgetLineItemTitle ?? '',
@@ -135,7 +137,7 @@ export function ExpenseForm({
       </label>
       {d.isPaid && (
         <>
-          <label>Amount paid<input type="number" step="0.01" min="0" value={d.amountPaid ?? 0} onChange={num('amountPaid')} /></label>
+          <label>Amount paid<input type="number" step="0.01" min="0" value={paidValue} onChange={num('amountPaid')} /></label>
           <label>Paid date<input type="date" value={dateValue(d.paidDate)} onChange={date('paidDate')} /></label>
           <label>Payment method<input value={d.paymentMethod ?? ''} onChange={text('paymentMethod')} /></label>
           <label>Reference<input value={d.paymentReference ?? ''} onChange={text('paymentReference')} /></label>

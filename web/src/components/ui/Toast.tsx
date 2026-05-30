@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { CheckCircle2, AlertCircle, Info } from 'lucide-react'
 
@@ -44,28 +44,35 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [dismiss],
   )
 
-  const api = useRef<ToastApi>({
-    show,
-    success: (m: string) => show(m, 'success'),
-    error: (m: string) => show(m, 'error'),
-  })
-  // keep closure fresh
-  api.current.show = show
-  api.current.success = (m: string) => show(m, 'success')
-  api.current.error = (m: string) => show(m, 'error')
+  // Stable api object (reference never changes) — no ref-mutation-in-render.
+  const api = useMemo<ToastApi>(
+    () => ({
+      show,
+      success: (m: string) => show(m, 'success'),
+      error: (m: string) => show(m, 'error'),
+    }),
+    [show],
+  )
 
-  useEffect(() => () => timers.current.forEach(clearTimeout), [])
+  useEffect(() => {
+    const active = timers.current
+    return () => active.forEach(clearTimeout)
+  }, [])
 
   return (
-    <ToastCtx.Provider value={api.current}>
+    <ToastCtx.Provider value={api}>
       {children}
       {typeof document !== 'undefined' &&
         createPortal(
-          <div className="toast-stack" role="region" aria-label="Notifications">
+          <div className="toast-stack" aria-live="polite" aria-relevant="additions">
             {items.map((t) => {
               const Glyph = ICONS[t.tone]
               return (
-                <div key={t.id} className={`toast toast-${t.tone}`} role="status">
+                <div
+                  key={t.id}
+                  className={`toast toast-${t.tone}`}
+                  role={t.tone === 'error' ? 'alert' : 'status'}
+                >
                   <Glyph size={18} aria-hidden />
                   <span>{t.message}</span>
                 </div>
@@ -78,6 +85,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useToast(): ToastApi {
   const ctx = useContext(ToastCtx)
   if (!ctx) throw new Error('useToast must be used within ToastProvider')
