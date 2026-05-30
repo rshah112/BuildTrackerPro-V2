@@ -1,6 +1,6 @@
 # PWA Wave 2 — Design System & UX Overhaul Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.
+> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans. Steps use checkbox (`- [x]`) syntax.
 
 **Goal:** Turn the barebones prototype into an app that feels like a polished, native iOS application. Establish a token-driven design system + a small set of bespoke React primitives, then re-skin every existing screen on top of it — so the remaining feature waves (Media, Change Orders, Tasks, …) inherit the polish instead of accumulating more rough UI.
 
@@ -39,31 +39,31 @@
 
 ### Task 5: Re-skin Projects + Project form
 **Files:** rewrite `src/features/projects/{ProjectsScreen,ProjectForm}.tsx`; create `src/components/ui/CurrencyField.tsx` (+ test)
-- [ ] Project cards: name, address, status pill, budget + spend progress bar, chevron. Trash/restore in a sheet/confirm. `ProjectForm` opened in a `Sheet`, **sectioned** (Basics / Budget / Structure / Dates / Notes) with `CurrencyField` (formatted `$` input over cents) for money fields.
-- [ ] Keep accessible labels (`Name`, `Construction budget`, button `New project`/`Save`) so e2e passes. Test `CurrencyField`. Run test + e2e. Commit.
+- [x] Project cards: name, address, status pill, budget + spend progress bar, chevron. Trash/restore in a sheet/confirm. `ProjectForm` opened in a `Sheet`, **sectioned** (Basics / Budget / Structure / Dates / Notes) with `CurrencyField` (formatted `$` input over cents) for money fields.
+- [x] Keep accessible labels (`Name`, `Construction budget`, button `New project`/`Save`) so e2e passes. Test `CurrencyField`. Run test + e2e. Commit.
 
 ### Task 6: Re-skin Budget screen
 **Files:** rewrite `src/features/budget/{BudgetScreen,CategoryForm,LineItemForm}.tsx`; reuse `HealthPill`
-- [ ] Grouped inset list: category header with roll-up (budget vs actual + mini progress), disclosure to line items each showing title, `HealthPill`, budget/actual, per-line progress in health color. Category/line-item forms in sheets. Empty states via `EmptyState`.
-- [ ] Preserve `Add category` / `+ Line item` / `Title` / `Budget` accessible names. Run test + e2e. Commit.
+- [x] Grouped inset list: category header with roll-up (budget vs actual + mini progress), disclosure to line items each showing title, `HealthPill`, budget/actual, per-line progress in health color. Category/line-item forms in sheets. Empty states via `EmptyState`.
+- [x] Preserve `Add category` / `+ Line item` / `Title` / `Budget` accessible names. Run test + e2e. Commit.
 
 ### Task 7: Re-skin Expenses
 **Files:** rewrite `src/features/expenses/{ExpenseList,ExpenseForm}.tsx`
-- [ ] Summary tiles (invoiced/paid/open), `SegmentedControl` filter (All/Open/Paid), list rows (vendor, date, category, amount, paid/open badge, receipt glyph). `ExpenseForm` in a `Sheet`, sectioned, `CurrencyField` for amount/amount-paid, line-item select. Toast on save/delete.
-- [ ] Preserve `Add expense` / `Vendor` / `Amount` / `Budget line` / `Amount paid` / `Save expense` names. Run test + e2e. Commit.
+- [x] Summary tiles (invoiced/paid/open), `SegmentedControl` filter (All/Open/Paid), list rows (vendor, date, category, amount, paid/open badge, receipt glyph). `ExpenseForm` in a `Sheet`, sectioned, `CurrencyField` for amount/amount-paid, line-item select. Toast on save/delete.
+- [x] Preserve `Add expense` / `Vendor` / `Amount` / `Budget line` / `Amount paid` / `Save expense` names. Run test + e2e. Commit.
 
 ### Task 8: Dashboard redesign + data-viz
 **Files:** rewrite `src/features/dashboard/DashboardScreen.tsx`; create `src/components/charts/{Donut,BarRow,Sparkline}.tsx` + `charts.test.ts`
-- [ ] Hand-rolled SVG charts: `Donut` (budget used vs remaining, health-tinted), `BarRow` (spend by category), `Sparkline`/area (spend-over-time from expense dates). Hero health summary card, metric tiles, attention list, recent activity. Loading → `Skeleton`s.
-- [ ] Unit-test chart geometry (arc fractions sum to 1; bar widths clamp 0–100%; sparkline points map to viewBox). Run tests. Commit.
+- [x] Hand-rolled SVG charts: `Donut` (budget used vs remaining, health-tinted), `BarRow` (spend by category), `Sparkline`/area (spend-over-time from expense dates). Hero health summary card, metric tiles, attention list, recent activity. Loading → `Skeleton`s.
+- [x] Unit-test chart geometry (arc fractions sum to 1; bar widths clamp 0–100%; sparkline points map to viewBox). Run tests. Commit.
 
 ### Task 9: Motion + PWA-native polish
 **Files:** create `src/lib/{useInstallPrompt,usePullToRefresh}.ts`, `src/components/ui/PageTransition.tsx`; update `src/main.tsx`, `vite.config.ts` PWA manifest, `bin/gen-icons` output / `public/` icons
-- [ ] Route + sheet enter/exit transitions (CSS-driven, respect `prefers-reduced-motion`); skeleton shimmer. `usePullToRefresh` (TanStack `invalidate` on overscroll). `useInstallPrompt` (capture `beforeinstallprompt`, show an install affordance in More). Refine manifest (maskable icon, `theme_color` per scheme, splash); verify `display: standalone`.
-- [ ] Run `npm run test`. Commit.
+- [x] Route + sheet enter/exit transitions (CSS-driven, respect `prefers-reduced-motion`); skeleton shimmer. `usePullToRefresh` (TanStack `invalidate` on overscroll). `useInstallPrompt` (capture `beforeinstallprompt`, show an install affordance in More). Refine manifest (maskable icon, `theme_color` per scheme, splash); verify `display: standalone`.
+- [x] Run `npm run test`. Commit.
 
 ### Task 10: Verify + ship
-- [ ] Full `npm run test` + `npm run e2e` green; `npm run build` clean; visual pass on key screens (light + dark) via Playwright screenshots. Deploy (`cd web && npx vercel deploy --prod --scope rshah112s-projects`). Commit.
+- [x] Full `npm run test` + `npm run e2e` green; `npm run build` clean; visual pass on key screens (light + dark) via Playwright screenshots. Deploy (`cd web && npx vercel deploy --prod --scope rshah112s-projects`). Commit.
 
 ## Self-Review
 - Addresses Raj's brief (UI/UX overhaul, iOS-native, custom system, all four big lifts) before resuming feature waves; the system in T1–T3 is what Waves 3–5 will build on.
