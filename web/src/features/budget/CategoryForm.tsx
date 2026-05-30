@@ -1,5 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ChangeEvent } from 'react'
 import type { BudgetCategory } from '../../domain/types'
+import { Field } from '../../components/ui/Field'
+import { CurrencyField } from '../../components/ui/CurrencyField'
+import { Button } from '../../components/ui/Button'
 import { useCreateCategory, useUpdateCategory } from './useBudget'
 
 type Draft = { name: string; targetBudget: number; sortOrder: number; systemImage: string }
@@ -26,10 +29,8 @@ export function CategoryForm({
   const update = useUpdateCategory()
   const busy = create.isPending || update.isPending
 
-  const text = (k: keyof Draft) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const text = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement>) =>
     setD((p) => ({ ...p, [k]: e.target.value }))
-  const num = (k: keyof Draft) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setD((p) => ({ ...p, [k]: e.target.value === '' ? 0 : Number(e.target.value) }))
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -39,18 +40,24 @@ export function CategoryForm({
   }
 
   return (
-    <form onSubmit={submit} className="form form-inline">
-      <label>
-        Name
-        <input value={d.name} onChange={text('name')} required autoFocus />
-      </label>
-      <label>
-        Target budget
-        <input type="number" step="0.01" value={d.targetBudget} onChange={num('targetBudget')} />
-      </label>
-      <div className="form-actions">
-        <button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
-        <button type="button" className="secondary" onClick={onDone}>Cancel</button>
+    <form onSubmit={submit} className="form">
+      <div className="form-section">
+        <Field label="Name">
+          {(p) => <input {...p} value={d.name} onChange={text('name')} required autoFocus />}
+        </Field>
+        <CurrencyField
+          label="Target budget"
+          value={d.targetBudget}
+          onChange={(v) => setD((p) => ({ ...p, targetBudget: v }))}
+        />
+      </div>
+      <div className="form-actions form-actions-sticky">
+        <Button type="submit" loading={busy} fullWidth>
+          Save
+        </Button>
+        <Button type="button" variant="secondary" onClick={onDone}>
+          Cancel
+        </Button>
       </div>
     </form>
   )
