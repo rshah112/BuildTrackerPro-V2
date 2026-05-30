@@ -4,6 +4,9 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 import App from './App.tsx'
 import { queryClient } from './lib/queryClient.ts'
+import { initTheme } from './lib/theme.ts'
+
+initTheme()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

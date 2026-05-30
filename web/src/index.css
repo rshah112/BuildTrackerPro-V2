@@ -1,17 +1,11 @@
-:root {
-  --bg: #f7f7f8;
-  --surface: #ffffff;
-  --text: #1c1b1f;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --accent: #c2410c;
-  --accent-contrast: #ffffff;
-  --danger: #b91c1c;
+@import './styles/tokens.css';
 
-  font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+:root {
+  font: 16px/1.5 var(--font-sans);
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -19,6 +13,9 @@
 }
 body {
   margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  transition: background var(--dur) var(--ease-in-out), color var(--dur) var(--ease-in-out);
 }
 #root {
   min-height: 100dvh;
@@ -181,12 +178,13 @@ textarea {
   color: var(--muted);
 }
 .secondary {
-  background: #f3f4f6;
+  background: var(--color-surface-2);
   color: var(--text);
+  border: 1px solid var(--color-border);
 }
 .danger {
-  background: #fee2e2;
-  color: var(--danger);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
 }
 .card-list,
 .nested-list,
@@ -226,13 +224,13 @@ textarea {
 .nested-item {
   padding: 0.7rem;
   border-radius: 8px;
-  background: #fafafa;
+  background: var(--color-surface-2);
 }
 .sub-tabs {
   display: inline-flex;
   gap: 0.25rem;
   padding: 0.25rem;
-  background: #f3f4f6;
+  background: var(--color-surface-2);
   border-radius: 10px;
 }
 .sub-tab {
@@ -310,7 +308,7 @@ textarea {
 .progress {
   height: 0.75rem;
   overflow: hidden;
-  background: #f3f4f6;
+  background: var(--color-surface-2);
   border-radius: 999px;
 }
 .progress span {
@@ -323,19 +321,19 @@ textarea {
   align-items: center;
   border-radius: 999px;
   padding: 0.2rem 0.55rem;
-  background: #f3f4f6;
+  background: var(--color-surface-2);
   color: var(--muted);
   font-size: 0.8rem;
   font-weight: 700;
   text-transform: capitalize;
 }
 .status.paid {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--color-success-bg);
+  color: var(--color-success);
 }
 .status.open {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--color-warn-bg);
+  color: var(--color-warn);
 }
 
 @media (max-width: 700px) {

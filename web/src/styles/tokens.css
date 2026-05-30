@@ -1,0 +1,146 @@
+/* Design tokens — the single source of visual truth. Light values on :root,
+   dark overrides on :root[data-theme='dark']. theme.ts sets data-theme to the
+   resolved light|dark (so CSS never needs a media query). Legacy aliases at the
+   bottom keep pre-Wave-2 component classes working and dark-aware. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Brand — construction orange */
+  --brand-50: #fff4ed;
+  --brand-100: #ffe6d5;
+  --brand-300: #ffb088;
+  --brand-500: #ea580c;
+  --brand-600: #c2410c;
+  --brand-700: #9a3412;
+
+  /* Neutral ramp */
+  --neutral-0: #ffffff;
+  --neutral-50: #f7f7f8;
+  --neutral-100: #ececef;
+  --neutral-200: #e2e2e7;
+  --neutral-300: #cfcfd6;
+  --neutral-400: #a8a8b0;
+  --neutral-500: #8a8a92;
+  --neutral-600: #636369;
+  --neutral-700: #45454a;
+  --neutral-800: #2c2c2e;
+  --neutral-900: #1c1c1e;
+  --neutral-950: #0c0c0d;
+
+  /* Semantic surfaces / text */
+  --color-bg: #f2f2f7;
+  --color-surface: var(--neutral-0);
+  --color-surface-2: var(--neutral-50);
+  --color-surface-raised: var(--neutral-0);
+  --color-text: #1c1c1e;
+  --color-text-muted: #6b6b72;
+  --color-text-faint: var(--neutral-400);
+  --color-border: #e3e3e8;
+  --color-border-strong: var(--neutral-300);
+
+  --color-brand: var(--brand-500);
+  --color-brand-hover: var(--brand-600);
+  --color-brand-contrast: #ffffff;
+  --color-brand-tint: var(--brand-50);
+
+  --color-success: #1a7f37;
+  --color-success-bg: #dcfce7;
+  --color-warn: #b45309;
+  --color-warn-bg: #fef3c7;
+  --color-danger: #c81e1e;
+  --color-danger-bg: #fde4e4;
+  --color-info: #2563eb;
+  --color-info-bg: #dbeafe;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(20, 20, 24, 0.06), 0 1px 1px rgba(20, 20, 24, 0.04);
+  --shadow-md: 0 4px 14px rgba(20, 20, 24, 0.08);
+  --shadow-lg: 0 16px 40px rgba(20, 20, 24, 0.18);
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-full: 999px;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto,
+    system-ui, sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.125rem;
+  --font-weight-medium: 550;
+  --font-weight-semibold: 650;
+  --font-weight-bold: 760;
+
+  /* Motion */
+  --dur-fast: 150ms;
+  --dur: 240ms;
+  --dur-slow: 360ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* Layers */
+  --z-header: 10;
+  --z-tabbar: 20;
+  --z-sheet: 50;
+  --z-toast: 60;
+
+  /* Legacy aliases (pre-Wave-2 classes) */
+  --bg: var(--color-bg);
+  --surface: var(--color-surface);
+  --text: var(--color-text);
+  --muted: var(--color-text-muted);
+  --border: var(--color-border);
+  --accent: var(--color-brand);
+  --accent-contrast: var(--color-brand-contrast);
+  --danger: var(--color-danger);
+}
+
+:root[data-theme='dark'] {
+  --color-bg: #000000;
+  --color-surface: #1c1c1e;
+  --color-surface-2: #2c2c2e;
+  --color-surface-raised: #2c2c2e;
+  --color-text: #f5f5f7;
+  --color-text-muted: #9a9aa2;
+  --color-text-faint: #6b6b72;
+  --color-border: #38383a;
+  --color-border-strong: #48484a;
+
+  --color-brand: #ff7a45;
+  --color-brand-hover: #ff9466;
+  --color-brand-contrast: #1c1c1e;
+  --color-brand-tint: rgba(255, 122, 69, 0.16);
+
+  --color-success: #4ade80;
+  --color-success-bg: rgba(74, 222, 128, 0.16);
+  --color-warn: #fbbf24;
+  --color-warn-bg: rgba(251, 191, 36, 0.16);
+  --color-danger: #ff6b6b;
+  --color-danger-bg: rgba(255, 107, 107, 0.16);
+  --color-info: #60a5fa;
+  --color-info-bg: rgba(96, 165, 250, 0.16);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
