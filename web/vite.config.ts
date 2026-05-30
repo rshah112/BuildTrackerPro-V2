@@ -28,6 +28,24 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Pin the stable core libs into one long-cached `vendor` chunk so app-code
+        // changes don't bust them. Deliberately exclude xlsx/jspdf so they stay in
+        // their on-demand (dynamic-import) chunks rather than the eager vendor bundle.
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return
+          if (
+            /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler|@tanstack|@supabase|lucide-react)[\\/]/.test(
+              id,
+            )
+          )
+            return 'vendor'
+        },
+      },
+    },
+  },
   test: {
     // Default env is node (fast; most suites render to string or are pure).
     // Interactive component tests opt into jsdom with `// @vitest-environment jsdom`.

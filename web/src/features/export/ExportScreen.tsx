@@ -5,9 +5,12 @@ import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
-import { downloadWorkbook } from './workbook'
-import { downloadInsightsPdf } from './insightsPdf'
 import { downloadBackup, restoreBackup } from './backup'
+
+// xlsx (~430KB) and jspdf (~350KB) are loaded on demand the first time the user actually
+// exports, not when the Export screen mounts — keeping them out of every other chunk.
+const loadWorkbook = () => import('./workbook').then((m) => m.downloadWorkbook)
+const loadInsightsPdf = () => import('./insightsPdf').then((m) => m.downloadInsightsPdf)
 
 export function ExportScreen() {
   const { projectId } = useCurrentProject()
@@ -56,7 +59,7 @@ export function ExportScreen() {
           fullWidth
           loading={busy === 'xlsx'}
           leadingIcon={<FileSpreadsheet size={18} />}
-          onClick={() => run('xlsx', () => downloadWorkbook(projectId), 'Excel workbook downloaded')}
+          onClick={() => run('xlsx', async () => (await loadWorkbook())(projectId), 'Excel workbook downloaded')}
         >
           Export Excel workbook
         </Button>
@@ -65,7 +68,7 @@ export function ExportScreen() {
           fullWidth
           loading={busy === 'pdf'}
           leadingIcon={<FileText size={18} />}
-          onClick={() => run('pdf', () => downloadInsightsPdf(projectId), 'PDF report downloaded')}
+          onClick={() => run('pdf', async () => (await loadInsightsPdf())(projectId), 'PDF report downloaded')}
         >
           Export PDF report
         </Button>

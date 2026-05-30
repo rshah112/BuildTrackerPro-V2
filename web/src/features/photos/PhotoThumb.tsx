@@ -1,38 +1,13 @@
-import { useEffect, useState } from 'react'
 import { ImageOff } from 'lucide-react'
-import { signedDownloadUrl } from '../../lib/r2'
+import { usePhotoUrl } from './usePhotoUrl'
 
-/** Resolves a signed/object URL for an R2 object key and renders the image. */
+/** Resolves a signed/object URL for an R2 object key and renders the image. The URL is
+ *  fetched through a react-query cache keyed by objectKey, so repeated thumbnails and
+ *  re-navigations reuse one signed URL instead of re-signing on every mount. */
 export function PhotoThumb({ objectKey, alt }: { objectKey: string | null; alt: string }) {
-  const [url, setUrl] = useState<string | null>(null)
-  const [failed, setFailed] = useState(false)
+  const { data: url, isLoading, isError } = usePhotoUrl(objectKey)
 
-  useEffect(() => {
-    if (!objectKey) return
-    let active = true
-    let created: string | null = null
-    signedDownloadUrl(objectKey)
-      .then((u) => {
-        if (!active) {
-          if (u && u.startsWith('blob:')) URL.revokeObjectURL(u)
-          return
-        }
-        if (u) {
-          created = u
-          setUrl(u)
-        } else setFailed(true)
-      })
-      .catch(() => {
-        if (active) setFailed(true)
-      })
-    return () => {
-      active = false
-      // Local mode returns an object URL; release it to avoid a leak.
-      if (created && created.startsWith('blob:')) URL.revokeObjectURL(created)
-    }
-  }, [objectKey])
-
-  if (!objectKey || failed) {
+  if (!objectKey || isError || (!isLoading && !url)) {
     return (
       <div className="photo-thumb photo-thumb-missing" aria-label={alt}>
         <ImageOff size={22} aria-hidden />

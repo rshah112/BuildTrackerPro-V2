@@ -1,9 +1,10 @@
-import { useCallback } from 'react'
+import { Suspense, useCallback } from 'react'
 import { Outlet, Link } from 'react-router-dom'
 import { FolderKanban } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { TabBar } from './TabBar'
 import { PageTransition } from '../components/ui/PageTransition'
+import { ListSkeleton } from '../components/ui/Feedback'
 import { useToast } from '../components/ui/Toast'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
 
@@ -32,7 +33,9 @@ export function AppShell() {
       </header>
       <main className="app-main" id="main">
         <PageTransition>
-          <Outlet />
+          <Suspense fallback={<ListSkeleton />}>
+            <Outlet />
+          </Suspense>
         </PageTransition>
       </main>
       <TabBar />
