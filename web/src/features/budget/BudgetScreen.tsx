@@ -10,6 +10,7 @@ import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useConfirm } from '../../components/ui/Confirm'
 import { useToast } from '../../components/ui/Toast'
+import { useRestoreRow } from '../../data/hooks'
 import { useCurrentProject } from '../projects/currentProject'
 import { useCategories, useRemoveCategory, useLineItems, useRemoveLineItem } from './useBudget'
 
@@ -44,6 +45,8 @@ export function BudgetScreen() {
   const { data: lineItems = [], isLoading: itemsLoading, error: itemsError } = useLineItems(projectId!)
   const removeCategory = useRemoveCategory()
   const removeLineItem = useRemoveLineItem()
+  const restoreCategory = useRestoreRow('budget_categories')
+  const restoreLineItem = useRestoreRow('budget_line_items')
   const confirm = useConfirm()
   const toast = useToast()
 
@@ -68,15 +71,15 @@ export function BudgetScreen() {
       toast.show(`Remove this category’s ${itemCount} line item${itemCount === 1 ? '' : 's'} before deleting it.`)
       return
     }
-    if (await confirm({ title: 'Delete category?', message: `“${cat.name}” will be removed.`, destructive: true })) {
+    if (await confirm({ title: 'Delete category?', message: `“${cat.name}” will be moved to Trash.`, destructive: true })) {
       await removeCategory.mutateAsync(cat.id)
-      toast.success('Category deleted')
+      toast.success('Category moved to Trash', { action: { label: 'Undo', onClick: () => restoreCategory.mutate(cat.id) } })
     }
   }
   const deleteLineItem = async (li: BudgetLineItem) => {
-    if (await confirm({ title: 'Delete line item?', message: `“${li.title}” will be removed.`, destructive: true })) {
+    if (await confirm({ title: 'Delete line item?', message: `“${li.title}” will be moved to Trash.`, destructive: true })) {
       await removeLineItem.mutateAsync(li.id)
-      toast.success('Line item deleted')
+      toast.success('Line item moved to Trash', { action: { label: 'Undo', onClick: () => restoreLineItem.mutate(li.id) } })
     }
   }
 

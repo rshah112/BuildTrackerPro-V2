@@ -13,6 +13,7 @@ import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useConfirm } from '../../components/ui/Confirm'
+import { useRestoreRow } from '../../data/hooks'
 import { useSyncActuals } from '../budget/useSyncActuals'
 import { ExpenseForm } from './ExpenseForm'
 import { upsertExpense } from './recalculateLineItemActuals'
@@ -32,6 +33,7 @@ function payStatus(e: Expense): { label: string; tone: 'success' | 'warn'; open:
 export function ExpenseList({ projectId, lineItems }: { projectId: string; lineItems: BudgetLineItem[] }) {
   const { data: expenses = [], isLoading, error } = useExpenses(projectId)
   const removeExpense = useRemoveExpense()
+  const restore = useRestoreRow('expenses')
   const syncActuals = useSyncActuals(projectId)
   const toast = useToast()
   const confirm = useConfirm()
@@ -61,7 +63,15 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
     if (!(await confirm({ title: 'Delete expense?', message: `${expense.vendorName || 'This expense'} will be removed.`, destructive: true }))) return
     await removeExpense.mutateAsync(expense.id)
     await syncActuals({ expenses: expenses.filter((e) => e.id !== expense.id) })
-    toast.success('Expense deleted')
+    toast.success('Expense moved to Trash', {
+      action: {
+        label: 'Undo',
+        onClick: async () => {
+          await restore.mutateAsync(expense.id)
+          await syncActuals({ expenses }) // pre-delete list still includes this expense
+        },
+      },
+    })
   }
 
   if (isLoading) return <ListSkeleton />

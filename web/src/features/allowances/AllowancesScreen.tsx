@@ -14,6 +14,7 @@ import { useCurrentProject } from '../projects/currentProject'
 import { useLineItems } from '../budget/useBudget'
 import { useSyncActuals } from '../budget/useSyncActuals'
 import { useExpenses } from '../expenses/useExpenses'
+import { useRestoreRow } from '../../data/hooks'
 import { useAllowances, useRemoveAllowance } from './useAllowances'
 import { AllowanceForm } from './AllowanceForm'
 
@@ -27,6 +28,7 @@ export function AllowancesScreen() {
   const { data: expenses = [] } = useExpenses(projectId!)
   const { data: selections = [], isLoading, error } = useAllowances(projectId!)
   const remove = useRemoveAllowance()
+  const restore = useRestoreRow('allowance_selections')
   const syncActuals = useSyncActuals(projectId!)
   const toast = useToast()
   const confirm = useConfirm()
@@ -47,7 +49,15 @@ export function AllowancesScreen() {
     if (!(await confirm({ title: 'Delete selection?', message: `${titleOf(s.lineItemId)} selection will be removed.`, destructive: true }))) return
     await remove.mutateAsync(s.id)
     await syncActuals({ allowanceSelections: selections.filter((x) => x.id !== s.id) })
-    toast.success('Allowance selection deleted')
+    toast.success('Allowance selection moved to Trash', {
+      action: {
+        label: 'Undo',
+        onClick: async () => {
+          await restore.mutateAsync(s.id)
+          await syncActuals({ allowanceSelections: selections })
+        },
+      },
+    })
   }
 
   return (

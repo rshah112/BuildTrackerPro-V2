@@ -9,7 +9,7 @@ import { Button } from '../../components/ui/Button'
 import { Badge, type BadgeTone } from '../../components/ui/Badge'
 import { Sheet } from '../../components/ui/Sheet'
 import { EmptyState, Skeleton } from '../../components/ui/Feedback'
-import { useProjects, useUpdateProject } from './useProjects'
+import { useProjects, useTrashedProjects, useUpdateProject } from './useProjects'
 import { useCurrentProject } from './currentProject'
 import { ProjectForm } from './ProjectForm'
 
@@ -21,14 +21,12 @@ const STATUS_TONE: Record<ProjectStatus, BadgeTone> = {
 }
 
 export function ProjectsScreen() {
-  const { data: projects = [], isLoading, error } = useProjects()
+  const { data: active = [], isLoading, error } = useProjects()
+  const { data: trashed = [] } = useTrashedProjects()
   const update = useUpdateProject()
   const { setProjectId } = useCurrentProject()
   const navigate = useNavigate()
   const [editing, setEditing] = useState<Project | 'new' | null>(null)
-
-  const active = projects.filter((p) => !p.deletedAt)
-  const trashed = projects.filter((p) => p.deletedAt)
 
   const open = (p: Project) => {
     setProjectId(p.id)

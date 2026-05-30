@@ -7,6 +7,7 @@ import { useEditor } from '../../components/ui/useEditor'
 import { EmptyState, ListState } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
+import { useRestoreRow } from '../../data/hooks'
 import { useVendors, useRemoveVendor } from './useVendors'
 import { VendorForm } from './VendorForm'
 
@@ -14,6 +15,7 @@ export function VendorsScreen() {
   const { projectId } = useCurrentProject()
   const { data: vendors = [], isLoading, error } = useVendors(projectId!)
   const remove = useRemoveVendor()
+  const restore = useRestoreRow('vendors')
   const toast = useToast()
   const editor = useEditor<Vendor>()
 
@@ -21,7 +23,7 @@ export function VendorsScreen() {
 
   const del = async (v: Vendor) => {
     await remove.mutateAsync(v.id)
-    toast.success('Vendor deleted')
+    toast.success('Vendor moved to Trash', { action: { label: 'Undo', onClick: () => restore.mutate(v.id) } })
   }
 
   return (

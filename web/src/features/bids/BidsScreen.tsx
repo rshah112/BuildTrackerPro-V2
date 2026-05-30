@@ -10,6 +10,7 @@ import { Sheet } from '../../components/ui/Sheet'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useConfirm } from '../../components/ui/Confirm'
+import { useRestoreRow } from '../../data/hooks'
 import { useCurrentProject } from '../projects/currentProject'
 import { useVendors } from '../vendors/useVendors'
 import {
@@ -34,6 +35,8 @@ export function BidsScreen() {
   const removePackage = useRemoveBidPackage()
   const updateBid = useUpdateBid()
   const removeBid = useRemoveBid()
+  const restorePackage = useRestoreRow('bid_packages')
+  const restoreBid = useRestoreRow('bids')
   const toast = useToast()
   const confirm = useConfirm()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -71,13 +74,21 @@ export function BidsScreen() {
     const children = bidsFor(pkg.id)
     const msg =
       children.length > 0
-        ? `“${pkg.scopeTitle}” and its ${children.length} bid(s) will be removed.`
-        : `“${pkg.scopeTitle}” will be removed.`
+        ? `“${pkg.scopeTitle}” and its ${children.length} bid(s) will be moved to Trash.`
+        : `“${pkg.scopeTitle}” will be moved to Trash.`
     if (!(await confirm({ title: 'Delete bid package?', message: msg, destructive: true }))) return
     // No FK cascade — remove child bids first so they don't orphan.
     await Promise.all(children.map((b) => removeBid.mutateAsync(b.id)))
     await removePackage.mutateAsync(pkg.id)
-    toast.success('Bid package deleted')
+    toast.success('Bid package moved to Trash', {
+      action: {
+        label: 'Undo',
+        onClick: async () => {
+          await Promise.all(children.map((b) => restoreBid.mutateAsync(b.id)))
+          await restorePackage.mutateAsync(pkg.id)
+        },
+      },
+    })
   }
 
   const deleteBid = async (pkg: BidPackage, bid: Bid) => {
@@ -87,7 +98,7 @@ export function BidsScreen() {
       await updatePackage.mutateAsync({ id: pkg.id, patch: { status: 'open', awardedBidId: null } })
     }
     await removeBid.mutateAsync(bid.id)
-    toast.success('Bid deleted')
+    toast.success('Bid moved to Trash', { action: { label: 'Undo', onClick: () => restoreBid.mutate(bid.id) } })
   }
 
   return (

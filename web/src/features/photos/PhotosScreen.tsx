@@ -10,6 +10,7 @@ import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
 import { useProjects } from '../projects/useProjects'
 import { useCategories } from '../budget/useBudget'
+import { useRestoreRow } from '../../data/hooks'
 import { usePhotos, useRemovePhoto } from './usePhotos'
 import { PhotoThumb } from './PhotoThumb'
 import { PhotoForm } from './PhotoForm'
@@ -20,6 +21,7 @@ export function PhotosScreen() {
   const { data: projects = [] } = useProjects()
   const { data: categories = [] } = useCategories(projectId!)
   const remove = useRemovePhoto()
+  const restore = useRestoreRow('photo_attachments')
   const toast = useToast()
   const editor = useEditor<PhotoAttachment>()
 
@@ -38,7 +40,7 @@ export function PhotosScreen() {
 
   const del = async (ph: PhotoAttachment) => {
     await remove.mutateAsync(ph.id)
-    toast.success('Photo deleted')
+    toast.success('Photo moved to Trash', { action: { label: 'Undo', onClick: () => restore.mutate(ph.id) } })
   }
 
   return (

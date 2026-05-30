@@ -360,6 +360,18 @@
   background: #c81e1e;
   color: #fff;
 }
+.toast-action {
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  white-space: nowrap;
+}
 
 /* ---- Empty state ---- */
 .empty-state {

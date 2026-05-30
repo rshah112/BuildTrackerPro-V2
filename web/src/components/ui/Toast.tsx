@@ -3,14 +3,22 @@ import { createPortal } from 'react-dom'
 import { CheckCircle2, AlertCircle, Info } from 'lucide-react'
 
 type ToastTone = 'success' | 'error' | 'info'
+interface ToastAction {
+  label: string
+  onClick: () => void
+}
+interface ToastOptions {
+  action?: ToastAction
+}
 interface ToastItem {
   id: number
   message: string
   tone: ToastTone
+  action?: ToastAction
 }
 interface ToastApi {
-  show: (message: string, tone?: ToastTone) => void
-  success: (message: string) => void
+  show: (message: string, tone?: ToastTone, opts?: ToastOptions) => void
+  success: (message: string, opts?: ToastOptions) => void
   error: (message: string) => void
 }
 
@@ -33,12 +41,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const show = useCallback(
-    (message: string, tone: ToastTone = 'info') => {
+    (message: string, tone: ToastTone = 'info', opts?: ToastOptions) => {
       const id = ++seq.current
-      setItems((prev) => [...prev, { id, message, tone }])
+      setItems((prev) => [...prev, { id, message, tone, action: opts?.action }])
       timers.current.set(
         id,
-        setTimeout(() => dismiss(id), DURATION),
+        // Actionable toasts (e.g. Undo) linger a bit longer so they're tappable.
+        setTimeout(() => dismiss(id), opts?.action ? DURATION + 2300 : DURATION),
       )
     },
     [dismiss],
@@ -48,7 +57,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const api = useMemo<ToastApi>(
     () => ({
       show,
-      success: (m: string) => show(m, 'success'),
+      success: (m: string, opts?: ToastOptions) => show(m, 'success', opts),
       error: (m: string) => show(m, 'error'),
     }),
     [show],
@@ -75,6 +84,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 >
                   <Glyph size={18} aria-hidden />
                   <span>{t.message}</span>
+                  {t.action && (
+                    <button
+                      type="button"
+                      className="toast-action"
+                      onClick={() => {
+                        t.action?.onClick()
+                        dismiss(t.id)
+                      }}
+                    >
+                      {t.action.label}
+                    </button>
+                  )}
                 </div>
               )
             })}

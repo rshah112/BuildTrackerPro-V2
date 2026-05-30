@@ -14,6 +14,7 @@ import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
 import { useVendors } from '../vendors/useVendors'
 import { useLineItems } from '../budget/useBudget'
+import { useRestoreRow } from '../../data/hooks'
 import { useTasks, useUpdateTask, useRemoveTask } from './useTasks'
 import { TaskForm } from './TaskForm'
 
@@ -38,6 +39,7 @@ export function TasksScreen() {
   const { data: lineItems = [] } = useLineItems(projectId!)
   const update = useUpdateTask()
   const remove = useRemoveTask()
+  const restore = useRestoreRow('project_tasks')
   const toast = useToast()
   const editor = useEditor<ProjectTask>()
   const [filter, setFilter] = useState<Filter>('all')
@@ -58,7 +60,7 @@ export function TasksScreen() {
   }
   const del = async (t: ProjectTask) => {
     await remove.mutateAsync(t.id)
-    toast.success('Task deleted')
+    toast.success('Task moved to Trash', { action: { label: 'Undo', onClick: () => restore.mutate(t.id) } })
   }
 
   return (

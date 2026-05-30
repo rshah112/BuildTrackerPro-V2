@@ -15,6 +15,7 @@ import { EditorSheet } from '../../components/ui/EditorSheet'
 import { useEditor } from '../../components/ui/useEditor'
 import { useToast } from '../../components/ui/Toast'
 import { useConfirm } from '../../components/ui/Confirm'
+import { useRestoreRow } from '../../data/hooks'
 import { useCurrentProject } from '../projects/currentProject'
 import { useLineItems } from '../budget/useBudget'
 import { useDocuments, useRemoveDocument, DOCUMENT_KIND_LABEL, REQUIRED_DOCUMENT_KINDS } from './useDocuments'
@@ -37,6 +38,7 @@ export function DocumentsScreen() {
   const { data: documents = [], isLoading, error } = useDocuments(projectId!)
   const { data: lineItems = [] } = useLineItems(projectId!)
   const remove = useRemoveDocument()
+  const restore = useRestoreRow('project_documents')
   const toast = useToast()
   const confirm = useConfirm()
   const editor = useEditor<ProjectDocument>()
@@ -74,9 +76,9 @@ export function DocumentsScreen() {
   }
 
   const del = async (doc: ProjectDocument) => {
-    if (!(await confirm({ title: 'Delete document?', message: `${doc.fileName} will be removed.`, destructive: true }))) return
+    if (!(await confirm({ title: 'Delete document?', message: `${doc.fileName} will be moved to Trash.`, destructive: true }))) return
     await remove.mutateAsync(doc.id)
-    toast.success('Document deleted')
+    toast.success('Document moved to Trash', { action: { label: 'Undo', onClick: () => restore.mutate(doc.id) } })
   }
 
   if (!projectId) return null

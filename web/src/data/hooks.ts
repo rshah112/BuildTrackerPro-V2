@@ -1,13 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { table } from './table'
+import { table, type TrashMode } from './table'
 
-// Generic TanStack Query hooks over a mapped table. Query key is [name, filter];
-// any mutation invalidates the whole [name] prefix so lists refetch.
+// Generic TanStack Query hooks over a mapped table. Query key is [name, filter, trashed];
+// any mutation invalidates the whole [name] prefix so lists (active + trashed) refetch.
 
-export function useRows<T>(name: string, filter?: Record<string, unknown>) {
+export function useRows<T>(name: string, filter?: Record<string, unknown>, opts?: { trashed?: TrashMode }) {
+  const trashed = opts?.trashed ?? 'exclude'
   return useQuery({
-    queryKey: [name, filter ?? null],
-    queryFn: () => table<T>(name).list(filter),
+    queryKey: [name, filter ?? null, trashed],
+    queryFn: () => table<T>(name).list(filter, { trashed }),
   })
 }
 
@@ -27,10 +28,29 @@ export function useUpdateRow<T>(name: string) {
   })
 }
 
+/** Soft-delete (sets deleted_at). The row moves to Trash, recoverable via useRestoreRow. */
 export function useRemoveRow(name: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => table(name).remove(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [name] }),
+  })
+}
+
+/** Undo a soft-delete (clears deleted_at). */
+export function useRestoreRow(name: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => table(name).restore(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [name] }),
+  })
+}
+
+/** Permanent delete (Trash → "Delete forever"). */
+export function usePurgeRow(name: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => table(name).purge(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: [name] }),
   })
 }

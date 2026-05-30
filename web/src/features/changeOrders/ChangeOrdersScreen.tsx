@@ -15,6 +15,7 @@ import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
 import { useLineItems } from '../budget/useBudget'
 import { useSyncActuals } from '../budget/useSyncActuals'
+import { useRestoreRow } from '../../data/hooks'
 import { useChangeOrders, useRemoveChangeOrder } from './useChangeOrders'
 import { ChangeOrderForm } from './ChangeOrderForm'
 
@@ -34,6 +35,7 @@ export function ChangeOrdersScreen() {
   const { data: lineItems = [] } = useLineItems(projectId!)
   const { data: orders = [], isLoading, error } = useChangeOrders(projectId!)
   const remove = useRemoveChangeOrder()
+  const restore = useRestoreRow('change_orders')
   const syncActuals = useSyncActuals(projectId!)
   const toast = useToast()
   const editor = useEditor<ChangeOrder>()
@@ -49,7 +51,15 @@ export function ChangeOrdersScreen() {
   const removeAndSync = async (o: ChangeOrder) => {
     await remove.mutateAsync(o.id)
     await syncActuals({ changeOrders: orders.filter((x) => x.id !== o.id) })
-    toast.success('Change order deleted')
+    toast.success('Change order moved to Trash', {
+      action: {
+        label: 'Undo',
+        onClick: async () => {
+          await restore.mutateAsync(o.id)
+          await syncActuals({ changeOrders: orders })
+        },
+      },
+    })
   }
 
   return (

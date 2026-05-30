@@ -18,6 +18,7 @@ import {
   Info,
   Grid2x2,
   Receipt,
+  Trash2,
   type LucideIcon,
 } from 'lucide-react'
 import { signOut } from '../auth/useSession'
@@ -40,6 +41,7 @@ const PROJECT_LINKS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/rooms', label: 'By room', icon: Grid2x2 },
   { to: '/cashflow', label: 'Cash flow', icon: CalendarClock },
   { to: '/export', label: 'Export & backup', icon: FileDown },
+  { to: '/trash', label: 'Trash', icon: Trash2 },
 ]
 
 export function MoreScreen() {
