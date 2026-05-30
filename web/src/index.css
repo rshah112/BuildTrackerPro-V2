@@ -149,31 +149,91 @@ textarea {
 }
 
 /* Login */
-.login {
-  max-width: 360px;
-  margin: 12vh auto 0;
-  padding: 1.5rem;
+.login-screen {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(env(safe-area-inset-top) + var(--space-6)) var(--space-4)
+    calc(env(safe-area-inset-bottom) + var(--space-6));
+  background-color: var(--color-bg);
+  background-image: var(--blueprint-grid);
+  background-size: var(--blueprint-size) var(--blueprint-size);
+}
+.login-card {
+  width: 100%;
+  max-width: 380px;
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  gap: var(--space-4);
+  padding: var(--space-8) var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
 }
-.login h1 {
+.login-brand {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
   text-align: center;
-  color: var(--accent);
+  margin-bottom: var(--space-2);
 }
-.login label {
-  display: block;
-  font-size: 0.85rem;
-  color: var(--muted);
-  font-weight: 600;
+.login-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--text-lg);
+  letter-spacing: -0.02em;
 }
-.login [role='alert'] {
-  color: var(--danger);
+.login-card h1 {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--text-2xl);
+}
+.login-tagline {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-wrap: balance;
+}
+.password-field {
+  position: relative;
+}
+.password-field input {
+  padding-right: 2.8rem;
+}
+.password-toggle {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  padding: 0.45rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.password-toggle:hover {
+  color: var(--color-text);
+}
+.login-error {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius-md);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
 }
 .loading {
   padding: 2rem;
