@@ -31,8 +31,8 @@ test('budget loop: project → category → line item → expense → dashboard'
   await page.getByLabel('Construction budget').fill('100000')
   await page.getByRole('button', { name: 'Save' }).click()
 
-  // Open it → scopes the project-bound tabs and lands on the dashboard.
-  await page.getByRole('button', { name: projectName }).click()
+  // Creating a project now auto-selects it and lands on its dashboard.
+  await expect(page).toHaveURL(/\/$/)
   await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible()
 
   // --- Add a category ---

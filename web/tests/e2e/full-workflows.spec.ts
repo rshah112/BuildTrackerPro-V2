@@ -18,7 +18,7 @@ test('ops workflows: vendor, task, bid award/unaward, export', async ({ page }) 
   await page.getByRole('button', { name: 'New project' }).click()
   await page.getByLabel('Name', { exact: true }).fill(projectName)
   await page.getByRole('button', { name: 'Save' }).click()
-  await page.getByRole('button', { name: projectName }).click()
+  await expect(page).toHaveURL(/\/$/)
   await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible()
 
   // --- Vendor ---

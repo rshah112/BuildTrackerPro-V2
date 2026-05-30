@@ -47,9 +47,11 @@ export function TasksScreen() {
 
   const toggleDone = (t: ProjectTask) => {
     const done = t.status === 'done'
+    // Un-completing a task drops it back to in-progress (you were clearly working it),
+    // not all the way to to-do.
     update.mutate({
       id: t.id,
-      patch: { status: done ? 'todo' : 'done', completedAt: done ? null : new Date().toISOString() },
+      patch: { status: done ? 'inProgress' : 'done', completedAt: done ? null : new Date().toISOString() },
     })
   }
   const del = async (t: ProjectTask) => {

@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx'
 import { lineItemHealth, variance } from '../../lib/budgetMath'
 import { diff, sumBy } from '../../lib/money'
 import { effectiveAmountPaid } from '../../lib/expenseMath'
-import { cashFlowPayments } from '../cashflow/cashFlow'
+import { cashFlowPayments, localToday } from '../cashflow/cashFlow'
 import { loadProjectExport, downloadBlob, safeFileName, type ProjectExport } from './exportData'
 
 const dateOnly = (v?: string | null) => (v ? v.slice(0, 10) : '')
@@ -115,7 +115,7 @@ function buildWorkbook(d: ProjectExport): XLSX.WorkBook {
     Awarded: b.awardedAt ? 'Yes' : '',
   })))
 
-  const cf = cashFlowPayments(d.expenses, d.changeOrders, new Date().toISOString())
+  const cf = cashFlowPayments(d.expenses, d.changeOrders, localToday())
   append('Cash Flow (14d)', cf.map((p) => ({
     Date: p.expectedDate,
     Item: p.title,

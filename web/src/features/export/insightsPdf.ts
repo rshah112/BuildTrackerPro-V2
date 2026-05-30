@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { diff, fmt, sumBy } from '../../lib/money'
 import { lineItemHealth } from '../../lib/budgetMath'
-import { nextFourteenDaysDue } from '../cashflow/cashFlow'
+import { nextFourteenDaysDue, localToday } from '../cashflow/cashFlow'
 import { loadProjectExport, downloadBlob, safeFileName } from './exportData'
 
 export async function downloadInsightsPdf(projectId: string): Promise<void> {
@@ -43,7 +43,7 @@ export async function downloadInsightsPdf(projectId: string): Promise<void> {
       ['Committed', fmt(committedTotal)],
       ['Variance (actual − budget)', fmt(diff(actualTotal, budgetTotal))],
       ['Budget used', `${usedPct}%`],
-      ['Due next 14 days', fmt(nextFourteenDaysDue(d.expenses, d.changeOrders, new Date().toISOString()))],
+      ['Due next 14 days', fmt(nextFourteenDaysDue(d.expenses, d.changeOrders, localToday()))],
     ],
     styles: { fontSize: 10 },
     columnStyles: { 0: { fontStyle: 'bold', cellWidth: 70 } },

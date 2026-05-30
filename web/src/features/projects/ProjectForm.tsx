@@ -32,7 +32,7 @@ const blank: Draft = {
 
 const dateValue = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : '')
 
-export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: () => void }) {
+export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: (createdId?: string) => void }) {
   const [d, setD] = useState<Draft>(initial ?? blank)
   const create = useCreateProject()
   const update = useUpdateProject()
@@ -51,9 +51,13 @@ export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: ()
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (initial) await update.mutateAsync({ id: initial.id, patch: d })
-    else await create.mutateAsync(d)
-    onDone()
+    if (initial) {
+      await update.mutateAsync({ id: initial.id, patch: d })
+      onDone()
+    } else {
+      const created = await create.mutateAsync(d)
+      onDone((created as Project | undefined)?.id)
+    }
   }
 
   return (
@@ -183,7 +187,7 @@ export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: ()
         <Button type="submit" loading={busy} fullWidth>
           Save
         </Button>
-        <Button type="button" variant="secondary" onClick={onDone}>
+        <Button type="button" variant="secondary" onClick={() => onDone()}>
           Cancel
         </Button>
       </div>

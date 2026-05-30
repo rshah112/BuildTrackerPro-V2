@@ -19,7 +19,7 @@ test('change order: create project → add change order → it appears', async (
   await page.getByRole('button', { name: 'New project' }).click()
   await page.getByLabel('Name', { exact: true }).fill(projectName)
   await page.getByRole('button', { name: 'Save' }).click()
-  await page.getByRole('button', { name: projectName }).click()
+  await expect(page).toHaveURL(/\/$/)
   await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible()
 
   await page.getByRole('link', { name: 'More' }).click()

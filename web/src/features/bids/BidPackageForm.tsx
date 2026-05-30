@@ -52,14 +52,16 @@ export function BidPackageForm({
           {(p) => <input {...p} value={d.scopeTitle ?? ''} onChange={text('scopeTitle')} required autoFocus />}
         </Field>
         <div className="form-grid">
-          <Field label="Status">
+          <Field label="Status" hint="Award a bid to mark this package awarded.">
             {(p) => (
-              <Select {...p} value={d.status} onChange={text('status')}>
-                {BID_PACKAGE_STATUSES.map((s) => (
+              <Select {...p} value={d.status === 'awarded' ? 'open' : d.status} onChange={text('status')}>
+                {/* 'awarded' is set by awarding a bid, not chosen manually. */}
+                {BID_PACKAGE_STATUSES.filter((s) => s !== 'awarded').map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
                 ))}
+                {d.status === 'awarded' && <option value="awarded">awarded</option>}
               </Select>
             )}
           </Field>

@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
 import { EmptyState } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
+import { useConfirm } from '../../components/ui/Confirm'
 import { useCurrentProject } from '../projects/currentProject'
 import { useLineItems } from '../budget/useBudget'
 import { useSyncActuals } from '../budget/useSyncActuals'
@@ -27,17 +28,22 @@ export function AllowancesScreen() {
   const remove = useRemoveAllowance()
   const syncActuals = useSyncActuals(projectId!)
   const toast = useToast()
+  const confirm = useConfirm()
   const [editing, setEditing] = useState<AllowanceSelection | 'new' | null>(null)
 
   if (!projectId) return null
 
+  // Selections can only be made against allowance line items.
+  const allowanceLineItems = lineItems.filter((li) => li.isAllowance)
   const titleOf = (id: string) => {
     const li = lineItems.find((l) => l.id === id)
     return li ? `${li.categoryName} / ${li.title}` : 'Line item'
   }
   const overage = allowanceOverage(lineItems, selections, expenses)
+  const overageLabel = overage > 0 ? `${fmt(overage)} over allowance` : 'Within allowance'
 
   const removeAndSync = async (s: AllowanceSelection) => {
+    if (!(await confirm({ title: 'Delete selection?', message: `${titleOf(s.lineItemId)} selection will be removed.`, destructive: true }))) return
     await remove.mutateAsync(s.id)
     await syncActuals({ allowanceSelections: selections.filter((x) => x.id !== s.id) })
     toast.success('Allowance selection deleted')
@@ -47,7 +53,7 @@ export function AllowancesScreen() {
     <section>
       <ScreenHeader
         title="Allowances"
-        subtitle={selections.length > 0 ? `${fmt(overage)} over allowance` : undefined}
+        subtitle={selections.length > 0 ? overageLabel : undefined}
         trailing={
           selections.length > 0 ? (
             <Button size="sm" leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
@@ -60,7 +66,13 @@ export function AllowancesScreen() {
       {error && <p role="alert">Couldn’t load allowances: {(error as Error).message}</p>}
       {isLoading && <div className="loading">Loading allowances…</div>}
 
-      {!isLoading && selections.length === 0 ? (
+      {!isLoading && allowanceLineItems.length === 0 ? (
+        <EmptyState
+          icon={Sparkles}
+          title="No allowance line items"
+          body="Mark a budget line item as an allowance (in Budget) first — then record your finish selections against it here."
+        />
+      ) : !isLoading && selections.length === 0 ? (
         <EmptyState
           icon={Sparkles}
           title="No allowance selections yet"
@@ -104,7 +116,7 @@ export function AllowancesScreen() {
         {editing !== null && (
           <AllowanceForm
             projectId={projectId}
-            lineItems={lineItems}
+            lineItems={allowanceLineItems}
             initial={editing === 'new' ? undefined : editing}
             onSaved={async (saved) => {
               await syncActuals({ allowanceSelections: upsert(selections, saved) })

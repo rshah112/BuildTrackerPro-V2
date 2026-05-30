@@ -9,6 +9,7 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge'
 import { Sheet } from '../../components/ui/Sheet'
 import { EmptyState } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
+import { useConfirm } from '../../components/ui/Confirm'
 import { useCurrentProject } from '../projects/currentProject'
 import { useVendors } from '../vendors/useVendors'
 import {
@@ -34,6 +35,7 @@ export function BidsScreen() {
   const updateBid = useUpdateBid()
   const removeBid = useRemoveBid()
   const toast = useToast()
+  const confirm = useConfirm()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [pkgEditing, setPkgEditing] = useState<BidPackage | 'new' | null>(null)
   const [bidEditing, setBidEditing] = useState<{ packageId: string; bid?: Bid } | null>(null)
@@ -63,6 +65,29 @@ export function BidsScreen() {
     await updateBid.mutateAsync({ id: bid.id, patch: { awardedAt: null } })
     await updatePackage.mutateAsync({ id: pkg.id, patch: { status: 'open', awardedBidId: null } })
     toast.success('Award removed')
+  }
+
+  const deletePackage = async (pkg: BidPackage) => {
+    const children = bidsFor(pkg.id)
+    const msg =
+      children.length > 0
+        ? `“${pkg.scopeTitle}” and its ${children.length} bid(s) will be removed.`
+        : `“${pkg.scopeTitle}” will be removed.`
+    if (!(await confirm({ title: 'Delete bid package?', message: msg, destructive: true }))) return
+    // No FK cascade — remove child bids first so they don't orphan.
+    await Promise.all(children.map((b) => removeBid.mutateAsync(b.id)))
+    await removePackage.mutateAsync(pkg.id)
+    toast.success('Bid package deleted')
+  }
+
+  const deleteBid = async (pkg: BidPackage, bid: Bid) => {
+    if (!(await confirm({ title: 'Delete bid?', message: `${bid.vendorName || 'This bid'} will be removed.`, destructive: true }))) return
+    // If this was the awarded bid, reset the package so it isn't stuck 'awarded'.
+    if (pkg.awardedBidId === bid.id) {
+      await updatePackage.mutateAsync({ id: pkg.id, patch: { status: 'open', awardedBidId: null } })
+    }
+    await removeBid.mutateAsync(bid.id)
+    toast.success('Bid deleted')
   }
 
   return (
@@ -131,7 +156,7 @@ export function BidsScreen() {
                     size="sm"
                     variant="ghost"
                     leadingIcon={<Trash2 size={14} />}
-                    onClick={() => removePackage.mutate(pkg.id)}
+                    onClick={() => deletePackage(pkg)}
                   >
                     Delete
                   </Button>
@@ -169,7 +194,7 @@ export function BidsScreen() {
                               <Button size="sm" variant="ghost" onClick={() => setBidEditing({ packageId: pkg.id, bid: b })}>
                                 Edit
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={() => removeBid.mutate(b.id)}>
+                              <Button size="sm" variant="ghost" onClick={() => deleteBid(pkg, b)}>
                                 Delete
                               </Button>
                             </span>

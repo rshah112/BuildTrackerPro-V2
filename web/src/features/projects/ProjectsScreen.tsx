@@ -138,7 +138,17 @@ export function ProjectsScreen() {
         title={editing === 'new' ? 'New project' : 'Edit project'}
       >
         {editing !== null && (
-          <ProjectForm initial={editing === 'new' ? undefined : editing} onDone={() => setEditing(null)} />
+          <ProjectForm
+            initial={editing === 'new' ? undefined : editing}
+            onDone={(createdId) => {
+              setEditing(null)
+              // A newly created project becomes the active one and opens its dashboard.
+              if (createdId) {
+                setProjectId(createdId)
+                navigate('/')
+              }
+            }}
+          />
         )}
       </Sheet>
     </section>

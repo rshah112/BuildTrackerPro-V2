@@ -140,6 +140,9 @@ export function BudgetScreen() {
                           <span className={over ? 'danger-text' : 'muted'}>
                             {fmt(actual)} <span className="muted">/ {fmt(budget)}</span>
                           </span>
+                          {cat.targetBudget > 0 && (
+                            <span className="muted"> · target {fmt(cat.targetBudget)}</span>
+                          )}
                         </div>
                         <div className="progress thin">
                           <span
