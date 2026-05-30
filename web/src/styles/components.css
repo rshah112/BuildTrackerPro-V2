@@ -1047,6 +1047,37 @@
   }
 }
 
+/* ---- Native view transitions (React Router `viewTransition`) ----
+   Cross-fades page content on top-level tab navigation and project → dashboard.
+   The fixed header/tab bar are pinned with their own view-transition-name so they
+   stay put instead of flickering inside the root snapshot. Unsupported browsers
+   fall back to the keyed .page-transition fade. */
+.app-header {
+  view-transition-name: app-header;
+}
+.tab-bar {
+  view-transition-name: app-tabbar;
+}
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) {
+    animation: vt-fade 150ms ease-in both reverse;
+  }
+  ::view-transition-new(root) {
+    animation: vt-fade 220ms ease-out both;
+  }
+  @keyframes vt-fade {
+    from {
+      opacity: 0;
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}
+
 /* ---- Confirm dialog ---- */
 .confirm-body {
   display: grid;

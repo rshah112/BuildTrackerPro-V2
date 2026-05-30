@@ -32,7 +32,7 @@ export function ProjectsScreen() {
 
   const open = (p: Project) => {
     setProjectId(p.id)
-    navigate('/')
+    navigate('/', { viewTransition: true })
   }
 
   return (

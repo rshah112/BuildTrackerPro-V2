@@ -17,6 +17,7 @@ export function TabBar() {
           key={to}
           to={to}
           end={end}
+          viewTransition
           className={({ isActive }) => (isActive ? 'tab active' : 'tab')}
         >
           <Glyph className="tab-icon" size={23} aria-hidden />
