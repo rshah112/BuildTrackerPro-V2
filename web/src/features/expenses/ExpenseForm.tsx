@@ -3,6 +3,10 @@ import type { BudgetLineItem, Expense } from '../../domain/types'
 import { balanceDue } from '../../lib/expenseMath'
 import { fmt } from '../../lib/money'
 import { uploadBlob } from '../../lib/r2'
+import { Field } from '../../components/ui/Field'
+import { Select } from '../../components/ui/Select'
+import { CurrencyField } from '../../components/ui/CurrencyField'
+import { Button } from '../../components/ui/Button'
 import { resolvePaidAmount } from './paidAmount'
 import { useCreateExpense, useUpdateExpense } from './useExpenses'
 
@@ -55,18 +59,12 @@ export function ExpenseForm({
 
   const text = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setD((p) => ({ ...p, [k]: e.target.value }))
-  const num = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement>) =>
-    setD((p) => ({ ...p, [k]: e.target.value === '' ? 0 : Number(e.target.value) }))
   const date = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement>) =>
     setD((p) => ({ ...p, [k]: e.target.value || null }))
 
   const selectedLineItem = lineItems.find((li) => li.id === d.budgetLineItemId)
   const paidValue = resolvePaidAmount(d.isPaid ?? false, d.amountPaid ?? 0, d.amount ?? 0)
-  const balance = balanceDue({
-    amount: d.amount ?? 0,
-    amountPaid: paidValue,
-    isPaid: d.isPaid ?? false,
-  })
+  const balance = balanceDue({ amount: d.amount ?? 0, amountPaid: paidValue, isPaid: d.isPaid ?? false })
 
   const chooseLineItem = (e: ChangeEvent<HTMLSelectElement>) => {
     const item = lineItems.find((li) => li.id === e.target.value)
@@ -76,16 +74,6 @@ export function ExpenseForm({
       budgetLineItemTitle: item?.title ?? '',
       categoryName: item?.categoryName ?? p.categoryName ?? '',
       roomTag: item?.roomTag ?? p.roomTag ?? '',
-    }))
-  }
-
-  const togglePaid = (e: ChangeEvent<HTMLInputElement>) => {
-    const isPaid = e.target.checked
-    setD((p) => ({
-      ...p,
-      isPaid,
-      amountPaid: isPaid && (p.amountPaid ?? 0) === 0 ? p.amount ?? 0 : p.amountPaid ?? 0,
-      paidDate: isPaid ? p.paidDate || today() : null,
     }))
   }
 
@@ -114,51 +102,107 @@ export function ExpenseForm({
   }
 
   return (
-    <form onSubmit={submit} className="form form-inline">
-      <label>Vendor<input value={d.vendorName ?? ''} onChange={text('vendorName')} required autoFocus /></label>
-      <label>Amount<input type="number" step="0.01" min="0" value={d.amount ?? 0} onChange={num('amount')} /></label>
-      <label>Invoice #<input value={d.invoiceNumber ?? ''} onChange={text('invoiceNumber')} /></label>
-      <label>Date<input type="date" value={dateValue(d.date)} onChange={date('date')} required /></label>
-      <label>Due date<input type="date" value={dateValue(d.dueDate)} onChange={date('dueDate')} /></label>
-      <label>
-        Budget line
-        <select value={d.budgetLineItemId ?? ''} onChange={chooseLineItem}>
-          <option value="">Unassigned</option>
-          {lineItems.map((li) => (
-            <option key={li.id} value={li.id}>{li.categoryName} / {li.title}</option>
-          ))}
-        </select>
-      </label>
-      <label>Category<input value={d.categoryName ?? ''} onChange={text('categoryName')} /></label>
-      <label>Room tag<input value={d.roomTag ?? ''} onChange={text('roomTag')} /></label>
-      <label>
-        <input type="checkbox" checked={d.isPaid ?? false} onChange={togglePaid} />
-        Paid
-      </label>
-      {d.isPaid && (
-        <>
-          <label>Amount paid<input type="number" step="0.01" min="0" value={paidValue} onChange={num('amountPaid')} /></label>
-          <label>Paid date<input type="date" value={dateValue(d.paidDate)} onChange={date('paidDate')} /></label>
-          <label>Payment method<input value={d.paymentMethod ?? ''} onChange={text('paymentMethod')} /></label>
-          <label>Reference<input value={d.paymentReference ?? ''} onChange={text('paymentReference')} /></label>
-        </>
-      )}
-      <label>
-        Receipt
-        <input
-          type="file"
-          accept="image/*,application/pdf"
-          onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
-        />
-      </label>
-      {(receiptFile || d.receiptObjectKey) && (
-        <p className="muted">{receiptFile ? receiptFile.name : 'Receipt attached'}</p>
-      )}
-      <label>Notes<textarea value={d.notes ?? ''} onChange={text('notes')} /></label>
-      <p className="muted">Balance due: {fmt(balance)}</p>
-      <div className="form-actions">
-        <button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Save expense'}</button>
-        <button type="button" className="secondary" onClick={onDone}>Cancel</button>
+    <form onSubmit={submit} className="form">
+      <div className="form-section">
+        <Field label="Vendor">
+          {(p) => <input {...p} value={d.vendorName ?? ''} onChange={text('vendorName')} required autoFocus />}
+        </Field>
+        <CurrencyField label="Amount" value={d.amount ?? 0} onChange={(v) => setD((p) => ({ ...p, amount: v }))} />
+        <div className="form-grid">
+          <Field label="Invoice #">
+            {(p) => <input {...p} value={d.invoiceNumber ?? ''} onChange={text('invoiceNumber')} />}
+          </Field>
+          <Field label="Date">
+            {(p) => <input type="date" {...p} value={dateValue(d.date)} onChange={date('date')} required />}
+          </Field>
+        </div>
+        <Field label="Due date">
+          {(p) => <input type="date" {...p} value={dateValue(d.dueDate)} onChange={date('dueDate')} />}
+        </Field>
+      </div>
+
+      <h3 className="form-section-title">Allocation</h3>
+      <div className="form-section">
+        <Field label="Budget line">
+          {(p) => (
+            <Select {...p} value={d.budgetLineItemId ?? ''} onChange={chooseLineItem}>
+              <option value="">Unassigned</option>
+              {lineItems.map((li) => (
+                <option key={li.id} value={li.id}>
+                  {li.categoryName} / {li.title}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+        <div className="form-grid">
+          <Field label="Category">
+            {(p) => <input {...p} value={d.categoryName ?? ''} onChange={text('categoryName')} />}
+          </Field>
+          <Field label="Room tag">{(p) => <input {...p} value={d.roomTag ?? ''} onChange={text('roomTag')} />}</Field>
+        </div>
+      </div>
+
+      <h3 className="form-section-title">Payment</h3>
+      <div className="form-section">
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={d.isPaid ?? false}
+            onChange={(e) =>
+              setD((p) => ({ ...p, isPaid: e.target.checked, paidDate: e.target.checked ? p.paidDate || today() : null }))
+            }
+          />
+          Paid
+        </label>
+        {d.isPaid && (
+          <>
+            <CurrencyField
+              label="Amount paid"
+              value={paidValue}
+              onChange={(v) => setD((p) => ({ ...p, amountPaid: v }))}
+            />
+            <div className="form-grid">
+              <Field label="Paid date">
+                {(p) => <input type="date" {...p} value={dateValue(d.paidDate)} onChange={date('paidDate')} />}
+              </Field>
+              <Field label="Payment method">
+                {(p) => <input {...p} value={d.paymentMethod ?? ''} onChange={text('paymentMethod')} />}
+              </Field>
+            </div>
+            <Field label="Reference">
+              {(p) => <input {...p} value={d.paymentReference ?? ''} onChange={text('paymentReference')} />}
+            </Field>
+          </>
+        )}
+        <p className="muted">Balance due: {fmt(balance)}</p>
+      </div>
+
+      <h3 className="form-section-title">Receipt &amp; notes</h3>
+      <div className="form-section">
+        <Field label="Receipt">
+          {(p) => (
+            <input
+              {...p}
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
+            />
+          )}
+        </Field>
+        {(receiptFile || d.receiptObjectKey) && (
+          <p className="muted">{receiptFile ? receiptFile.name : 'Receipt attached'}</p>
+        )}
+        <Field label="Notes">{(p) => <textarea {...p} value={d.notes ?? ''} onChange={text('notes')} />}</Field>
+      </div>
+
+      <div className="form-actions form-actions-sticky">
+        <Button type="submit" loading={busy} fullWidth>
+          Save expense
+        </Button>
+        <Button type="button" variant="secondary" onClick={onDone}>
+          Cancel
+        </Button>
       </div>
     </form>
   )
