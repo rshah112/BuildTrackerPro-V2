@@ -14,6 +14,7 @@ import {
   FileStack,
   CalendarClock,
   FileDown,
+  FolderOpen,
   type LucideIcon,
 } from 'lucide-react'
 import { signOut } from '../auth/useSession'
@@ -30,6 +31,7 @@ const PROJECT_LINKS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/change-orders', label: 'Change orders', icon: FileEdit },
   { to: '/allowances', label: 'Allowances', icon: Sparkles },
   { to: '/bids', label: 'Bids', icon: FileStack },
+  { to: '/documents', label: 'Documents', icon: FolderOpen },
   { to: '/cashflow', label: 'Cash flow', icon: CalendarClock },
   { to: '/export', label: 'Export & backup', icon: FileDown },
 ]

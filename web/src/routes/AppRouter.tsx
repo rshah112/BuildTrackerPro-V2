@@ -22,6 +22,7 @@ const TasksScreen = lazy(() => import('../features/tasks/TasksScreen').then((m) 
 const BidsScreen = lazy(() => import('../features/bids/BidsScreen').then((m) => ({ default: m.BidsScreen })))
 const CashFlowScreen = lazy(() => import('../features/cashflow/CashFlowScreen').then((m) => ({ default: m.CashFlowScreen })))
 const ExportScreen = lazy(() => import('../features/export/ExportScreen').then((m) => ({ default: m.ExportScreen })))
+const DocumentsScreen = lazy(() => import('../features/documents/DocumentsScreen').then((m) => ({ default: m.DocumentsScreen })))
 
 export function AppRouter() {
   return (
@@ -48,6 +49,7 @@ export function AppRouter() {
           <Route path="/tasks" element={<RequireProject><TasksScreen /></RequireProject>} />
           <Route path="/bids" element={<RequireProject><BidsScreen /></RequireProject>} />
           <Route path="/cashflow" element={<RequireProject><CashFlowScreen /></RequireProject>} />
+          <Route path="/documents" element={<RequireProject><DocumentsScreen /></RequireProject>} />
           <Route path="/export" element={<RequireProject><ExportScreen /></RequireProject>} />
           <Route path="/more" element={<MoreScreen />} />
         </Route>
