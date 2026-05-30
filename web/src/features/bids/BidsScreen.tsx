@@ -7,7 +7,7 @@ import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, type BadgeTone } from '../../components/ui/Badge'
 import { Sheet } from '../../components/ui/Sheet'
-import { EmptyState } from '../../components/ui/Feedback'
+import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useConfirm } from '../../components/ui/Confirm'
 import { useCurrentProject } from '../projects/currentProject'
@@ -104,7 +104,7 @@ export function BidsScreen() {
       />
 
       {error && <p role="alert">Couldn’t load bids: {(error as Error).message}</p>}
-      {isLoading && <div className="loading">Loading bids…</div>}
+      {isLoading && <ListSkeleton />}
 
       {!isLoading && packages.length === 0 ? (
         <EmptyState

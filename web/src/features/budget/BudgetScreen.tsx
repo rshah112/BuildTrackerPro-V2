@@ -7,7 +7,7 @@ import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
-import { EmptyState } from '../../components/ui/Feedback'
+import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useConfirm } from '../../components/ui/Confirm'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
@@ -40,8 +40,8 @@ export function BudgetScreen() {
   const [editing, setEditing] = useState<Editing | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
-  const { data: categories = [], isLoading: catsLoading } = useCategories(projectId!)
-  const { data: lineItems = [], isLoading: itemsLoading } = useLineItems(projectId!)
+  const { data: categories = [], isLoading: catsLoading, error: catsError } = useCategories(projectId!)
+  const { data: lineItems = [], isLoading: itemsLoading, error: itemsError } = useLineItems(projectId!)
   const removeCategory = useRemoveCategory()
   const removeLineItem = useRemoveLineItem()
   const confirm = useConfirm()
@@ -61,7 +61,14 @@ export function BudgetScreen() {
   }
 
   if (!projectId) return null
-  if (catsLoading || itemsLoading) return <div className="loading">Loading budget…</div>
+  const loadError = catsError || itemsError
+  if (loadError)
+    return (
+      <p role="alert" className="error-banner">
+        Couldn’t load budget: {(loadError as Error).message}
+      </p>
+    )
+  if (catsLoading || itemsLoading) return <ListSkeleton />
 
   const itemsByCategory = (catName: string) => lineItems.filter((li) => li.categoryName === catName)
 

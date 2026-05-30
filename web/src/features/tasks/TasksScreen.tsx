@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/Button'
 import { Badge, type BadgeTone } from '../../components/ui/Badge'
 import { Sheet } from '../../components/ui/Sheet'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
-import { EmptyState } from '../../components/ui/Feedback'
+import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
 import { useVendors } from '../vendors/useVendors'
@@ -73,7 +73,7 @@ export function TasksScreen() {
       />
 
       {error && <p role="alert">Couldn’t load tasks: {(error as Error).message}</p>}
-      {isLoading && <div className="loading">Loading tasks…</div>}
+      {isLoading && <ListSkeleton />}
 
       {!isLoading && tasks.length === 0 ? (
         <EmptyState

@@ -4,7 +4,7 @@ import type { Vendor } from '../../domain/types'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
-import { EmptyState } from '../../components/ui/Feedback'
+import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
 import { useVendors, useRemoveVendor } from './useVendors'
@@ -38,7 +38,7 @@ export function VendorsScreen() {
       />
 
       {error && <p role="alert">Couldn’t load vendors: {(error as Error).message}</p>}
-      {isLoading && <div className="loading">Loading vendors…</div>}
+      {isLoading && <ListSkeleton />}
 
       {!isLoading && vendors.length === 0 ? (
         <EmptyState

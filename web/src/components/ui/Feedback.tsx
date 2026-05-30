@@ -49,6 +49,19 @@ export function Skeleton({
   )
 }
 
+/** Loading placeholder for a list/card screen: shimmer rows on the card-list rhythm.
+ *  Announces "Loading…" to screen readers via an aria-live region. */
+export function ListSkeleton({ rows = 4, height = '64px' }: { rows?: number; height?: string }) {
+  return (
+    <div className="card-list" aria-busy="true" aria-live="polite">
+      <span className="sr-only">Loading…</span>
+      {Array.from({ length: rows }).map((_, i) => (
+        <Skeleton key={i} height={height} radius="var(--radius-lg)" />
+      ))}
+    </div>
+  )
+}
+
 export function Spinner({ size = 20, label }: { size?: number; label?: string }) {
   return (
     <span className="spinner" role={label ? 'status' : undefined} aria-label={label}>

@@ -3,7 +3,7 @@ import { fmt, sumBy } from '../../lib/money'
 import { balanceDue } from '../../lib/expenseMath'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Badge } from '../../components/ui/Badge'
-import { EmptyState } from '../../components/ui/Feedback'
+import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { Stat } from '../../components/ui/Stat'
 import { SectionCard } from '../../components/ui/SectionCard'
 import { useCurrentProject } from '../projects/currentProject'
@@ -18,11 +18,18 @@ const fmtDay = (iso: string) => {
 
 export function CashFlowScreen() {
   const { projectId } = useCurrentProject()
-  const { data: expenses = [], isLoading } = useExpenses(projectId!)
+  const { data: expenses = [], isLoading, error } = useExpenses(projectId!)
   const { data: changeOrders = [] } = useChangeOrders(projectId!)
 
   if (!projectId) return null
-  if (isLoading) return <div className="loading">Loading cash flow…</div>
+  if (error)
+    return (
+      <p role="alert" className="error-banner">
+        Couldn’t load cash flow: {(error as Error).message}
+      </p>
+    )
+  if (isLoading) return <ListSkeleton />
+
 
   const today = localToday()
   const days = cashFlowForecast(expenses, changeOrders, today).filter((d) => d.payments.length > 0)

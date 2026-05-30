@@ -8,7 +8,7 @@ import { Badge } from '../../components/ui/Badge'
 import { Stat } from '../../components/ui/Stat'
 import { Sheet } from '../../components/ui/Sheet'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
-import { EmptyState } from '../../components/ui/Feedback'
+import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useConfirm } from '../../components/ui/Confirm'
 import { useSyncActuals } from '../budget/useSyncActuals'
@@ -53,8 +53,8 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
     toast.success('Expense deleted')
   }
 
-  if (isLoading) return <div className="loading">Loading expenses…</div>
-  if (error) return <p role="alert">Couldn’t load expenses: {(error as Error).message}</p>
+  if (isLoading) return <ListSkeleton />
+  if (error) return <p role="alert" className="error-banner">Couldn’t load expenses: {(error as Error).message}</p>
 
   return (
     <>

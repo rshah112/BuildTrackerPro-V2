@@ -1,6 +1,7 @@
 import { useCurrentProject } from '../projects/currentProject'
 import { useLineItems } from '../budget/useBudget'
 import { ScreenHeader } from '../../app/ScreenHeader'
+import { ListSkeleton } from '../../components/ui/Feedback'
 import { ExpenseList } from './ExpenseList'
 
 export function ExpensesScreen() {
@@ -12,7 +13,7 @@ export function ExpensesScreen() {
     <section>
       <ScreenHeader title="Expenses" />
       {isLoading ? (
-        <div className="loading">Loading expenses…</div>
+        <ListSkeleton />
       ) : (
         <ExpenseList projectId={projectId} lineItems={lineItems} />
       )}

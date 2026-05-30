@@ -5,7 +5,7 @@ import { roomsForTemplate } from '../../domain/roomCatalog'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
-import { EmptyState } from '../../components/ui/Feedback'
+import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
 import { useProjects } from '../projects/useProjects'
@@ -54,7 +54,7 @@ export function PhotosScreen() {
         }
       />
 
-      {isLoading && <div className="loading">Loading photos…</div>}
+      {isLoading && <ListSkeleton />}
 
       {!isLoading && photos.length === 0 ? (
         <EmptyState

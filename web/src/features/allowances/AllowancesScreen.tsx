@@ -6,7 +6,7 @@ import { allowanceOverage } from '../../lib/budgetAggregates'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
-import { EmptyState } from '../../components/ui/Feedback'
+import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useConfirm } from '../../components/ui/Confirm'
 import { useCurrentProject } from '../projects/currentProject'
@@ -64,7 +64,7 @@ export function AllowancesScreen() {
       />
 
       {error && <p role="alert">Couldn’t load allowances: {(error as Error).message}</p>}
-      {isLoading && <div className="loading">Loading allowances…</div>}
+      {isLoading && <ListSkeleton />}
 
       {!isLoading && allowanceLineItems.length === 0 ? (
         <EmptyState

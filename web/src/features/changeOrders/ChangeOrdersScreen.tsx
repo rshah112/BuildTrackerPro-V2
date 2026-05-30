@@ -9,7 +9,7 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge'
 import { Stat } from '../../components/ui/Stat'
 import { Sheet } from '../../components/ui/Sheet'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
-import { EmptyState } from '../../components/ui/Feedback'
+import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
 import { useLineItems } from '../budget/useBudget'
@@ -64,8 +64,8 @@ export function ChangeOrdersScreen() {
         }
       />
 
-      {error && <p role="alert">Couldn’t load change orders: {(error as Error).message}</p>}
-      {isLoading && <div className="loading">Loading change orders…</div>}
+      {error && <p role="alert" className="error-banner">Couldn’t load change orders: {(error as Error).message}</p>}
+      {isLoading && <ListSkeleton />}
 
       {!isLoading && orders.length === 0 ? (
         <EmptyState

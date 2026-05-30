@@ -18,6 +18,9 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
+      <a href="#main" className="skip-link">
+        Skip to content
+      </a>
       <header className="app-header">
         <span className="brand">HomeBuild&nbsp;Pro</span>
         <Link to="/projects" className="header-link">
@@ -25,7 +28,7 @@ export function AppShell() {
           Projects
         </Link>
       </header>
-      <main className="app-main">
+      <main className="app-main" id="main">
         <PageTransition>
           <Outlet />
         </PageTransition>
