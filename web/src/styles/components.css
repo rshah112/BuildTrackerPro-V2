@@ -298,6 +298,7 @@
 }
 .sheet-title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--text-xl);
   font-weight: var(--font-weight-bold);
 }
@@ -313,6 +314,7 @@
 .sheet-body {
   padding: var(--space-2) var(--space-4) var(--space-4);
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .sheet-footer {
   display: flex;
@@ -378,13 +380,16 @@
 }
 .empty-title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--text-lg);
   font-weight: var(--font-weight-bold);
   color: var(--color-text);
+  text-wrap: balance;
 }
 .empty-body {
   margin: 0;
   max-width: 32ch;
+  text-wrap: pretty;
 }
 .empty-action {
   margin-top: var(--space-3);
@@ -421,6 +426,7 @@
   min-width: 0;
 }
 .project-card-name {
+  font-family: var(--font-display);
   font-size: var(--text-lg);
   font-weight: var(--font-weight-bold);
 }
@@ -507,8 +513,10 @@
   font-size: var(--text-sm);
 }
 .hero-figure strong {
+  font-family: var(--font-display);
   font-size: var(--text-xl);
   font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
 }
 .barrow-list {
   display: grid;

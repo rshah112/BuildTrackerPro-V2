@@ -3,6 +3,20 @@
    resolved light|dark (so CSS never needs a media query). Legacy aliases at the
    bottom keep pre-Wave-2 component classes working and dark-aware. */
 
+/* Archivo — self-hosted variable font (latin subset) for the "Blueprint & Ledger"
+   display layer: screen titles, the brand mark, and large figures. Body text stays
+   on the native SF system stack (--font-sans). One file covers weights 400–800. */
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 400 800;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url('/fonts/archivo-latin-var.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
   color-scheme: light dark;
 
@@ -58,6 +72,14 @@
   --shadow-md: 0 4px 14px rgba(20, 20, 24, 0.08);
   --shadow-lg: 0 16px 40px rgba(20, 20, 24, 0.18);
 
+  /* Blueprint motif — a faint structural grid for hero / login atmosphere. Drawn
+     from the border token so it adapts to theme; opacity kept low so it reads as
+     texture, never decoration that fights the data. */
+  --blueprint-line: color-mix(in srgb, var(--color-brand) 16%, transparent);
+  --blueprint-size: 22px;
+  --blueprint-grid: linear-gradient(var(--blueprint-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--blueprint-line) 1px, transparent 1px);
+
   /* Radii */
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -79,6 +101,9 @@
   /* Typography */
   --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto,
     system-ui, sans-serif;
+  /* Display face — titles, brand, big figures. Falls back to the system stack
+     until Archivo loads (font-display: swap). */
+  --font-display: 'Archivo', var(--font-sans);
   --text-xs: 0.75rem;
   --text-sm: 0.8125rem;
   --text-base: 1rem;
@@ -116,10 +141,13 @@
 }
 
 :root[data-theme='dark'] {
-  --color-bg: #000000;
-  --color-surface: #1c1c1e;
-  --color-surface-2: #2c2c2e;
-  --color-surface-raised: #2c2c2e;
+  color-scheme: dark;
+  /* Surface ladder: a hair off pure-black so cards read as lifted planes rather
+     than floating on a void, while staying OLED-friendly. */
+  --color-bg: #08080a;
+  --color-surface: #18181b;
+  --color-surface-2: #242427;
+  --color-surface-raised: #2a2a2e;
   --color-text: #f5f5f7;
   --color-text-muted: #9a9aa2;
   --color-text-faint: #6b6b72;
