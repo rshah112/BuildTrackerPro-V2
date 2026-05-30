@@ -607,6 +607,25 @@
   gap: 0.4rem;
   flex-shrink: 0;
 }
+.task-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  border: none;
+  border-right: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-faint);
+  cursor: pointer;
+}
+.task-check.is-done {
+  background: var(--color-success);
+  color: #fff;
+}
+.task-done-text {
+  text-decoration: line-through;
+  color: var(--color-text-muted);
+}
 .expense-row-del {
   display: flex;
   align-items: center;
@@ -728,6 +747,9 @@
 .lineitem-acts {
   display: flex;
   gap: 0.15rem;
+}
+.bid-awarded {
+  margin-left: 0.4rem;
 }
 
 /* ---- Health pill ---- */

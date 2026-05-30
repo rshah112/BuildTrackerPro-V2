@@ -10,6 +10,8 @@ import {
   Contact,
   FileEdit,
   Sparkles,
+  ListTodo,
+  FileStack,
   type LucideIcon,
 } from 'lucide-react'
 import { signOut } from '../auth/useSession'
@@ -21,9 +23,11 @@ import { useInstallPrompt } from '../../lib/useInstallPrompt'
 import { useCurrentProject } from '../projects/currentProject'
 
 const PROJECT_LINKS: { to: string; label: string; icon: LucideIcon }[] = [
+  { to: '/tasks', label: 'Tasks', icon: ListTodo },
   { to: '/vendors', label: 'Vendors', icon: Contact },
   { to: '/change-orders', label: 'Change orders', icon: FileEdit },
   { to: '/allowances', label: 'Allowances', icon: Sparkles },
+  { to: '/bids', label: 'Bids', icon: FileStack },
 ]
 
 export function MoreScreen() {
