@@ -36,7 +36,7 @@
 
 ### Task 6: e2e + verify
 **Files:** extend `tests/e2e/` (a change-order flow)
-- [ ] e2e: add a change order to the seeded project → it appears; (optional) a paid CO bumps committed/actual on the dashboard. Full `npm run test` + `npm run e2e` + build green. Deploy. Commit.
+- [x] e2e: add a change order to the seeded project → it appears; (optional) a paid CO bumps committed/actual on the dashboard. Full `npm run test` + `npm run e2e` + build green. Deploy. Commit.
 
 ## Self-Review
 - Closes the spec's Wave 3 surface (ChangeOrder/AllowanceSelection/Vendor) reusing the Wave 2 primitives; no new math (already in budgetAggregates), only recalc-on-write wiring via the shared hook.
