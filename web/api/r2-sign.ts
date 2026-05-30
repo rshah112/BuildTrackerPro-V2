@@ -1,13 +1,23 @@
 // Vercel serverless function: mints short-lived presigned URLs for Cloudflare R2.
 // The browser never holds R2 credentials. Every call must carry a valid Supabase
 // JWT; keys are namespaced by user id so one user can't sign for another's objects.
-// Built/served by Vercel (not Vite); the pure key helpers it uses are unit-tested
-// in src/lib/objectKey.ts.
+// Built/served by Vercel (not Vite).
+//
+// NOTE: the key helpers are INLINED here (not imported from ../src/lib/objectKey)
+// because Vercel's function bundler doesn't resolve imports that reach outside the
+// api/ dir at runtime → ERR_MODULE_NOT_FOUND. The src copy stays the unit-tested
+// source of truth for the client; keep these two in sync (they're trivial + stable).
 
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { createClient } from '@supabase/supabase-js'
-import { objectKeyFor, keyBelongsToUser } from '../src/lib/objectKey'
+
+function objectKeyFor(userId: string, entity: string, id: string): string {
+  return `${userId}/${entity}/${id}`
+}
+function keyBelongsToUser(key: string, userId: string): boolean {
+  return key.startsWith(`${userId}/`)
+}
 
 function r2Client(): S3Client {
   return new S3Client({
