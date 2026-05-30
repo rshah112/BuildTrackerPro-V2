@@ -1110,8 +1110,9 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
-/* Danger-toned panel for alerts (overdue, over budget). */
-.panel-danger {
+/* Danger-toned panel for alerts (overdue, over budget). Qualified with .panel so it
+   out-specifies the base ".panel" rule (which loads later, from index.css). */
+.panel.panel-danger {
   border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
   background: color-mix(in srgb, var(--color-danger-bg) 40%, var(--color-surface));
 }

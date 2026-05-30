@@ -4,6 +4,8 @@ import { balanceDue } from '../../lib/expenseMath'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Badge } from '../../components/ui/Badge'
 import { EmptyState } from '../../components/ui/Feedback'
+import { Stat } from '../../components/ui/Stat'
+import { SectionCard } from '../../components/ui/SectionCard'
 import { useCurrentProject } from '../projects/currentProject'
 import { useExpenses } from '../expenses/useExpenses'
 import { useChangeOrders } from '../changeOrders/useChangeOrders'
@@ -43,22 +45,12 @@ export function CashFlowScreen() {
       <ScreenHeader title="Cash flow" subtitle="Upcoming and overdue payments" />
 
       <div className="metric-grid compact">
-        <div className="metric-card">
-          <span>Due next 14 days</span>
-          <strong>{fmt(total)}</strong>
-        </div>
-        <div className="metric-card">
-          <span>Overdue</span>
-          <strong className={overdueTotal > 0 ? 'danger-text' : undefined}>{fmt(overdueTotal)}</strong>
-        </div>
+        <Stat label="Due next 14 days" value={fmt(total)} />
+        <Stat label="Overdue" value={fmt(overdueTotal)} tone={overdueTotal > 0 ? 'danger' : 'default'} />
       </div>
 
       {hasOverdue && (
-        <div className="panel" style={{ marginTop: '1rem', borderColor: 'var(--color-danger)' }}>
-          <div className="row-between">
-            <h2 className="danger-text">Overdue</h2>
-            <strong className="danger-text">{fmt(overdueTotal)}</strong>
-          </div>
+        <SectionCard tone="danger" title="Overdue" trailing={<span className="danger-text">{fmt(overdueTotal)}</span>}>
           <ul className="plain-list">
             {overdueExpenses.map((e) => (
               <li key={e.id} className="cashflow-pay">
@@ -82,7 +74,7 @@ export function CashFlowScreen() {
               </li>
             ))}
           </ul>
-        </div>
+        </SectionCard>
       )}
 
       {days.length === 0 ? (
@@ -94,11 +86,7 @@ export function CashFlowScreen() {
       ) : (
         <div className="cashflow-days">
           {days.map((d) => (
-            <div key={d.date} className="panel">
-              <div className="row-between">
-                <h2>{fmtDay(d.date)}</h2>
-                <strong>{fmt(d.total)}</strong>
-              </div>
+            <SectionCard key={d.date} title={fmtDay(d.date)} trailing={<strong>{fmt(d.total)}</strong>}>
               <ul className="plain-list">
                 {d.payments.map((p) => (
                   <li key={p.id} className="cashflow-pay">
@@ -113,7 +101,7 @@ export function CashFlowScreen() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </SectionCard>
           ))}
         </div>
       )}

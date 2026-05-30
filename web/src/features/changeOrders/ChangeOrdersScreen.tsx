@@ -6,6 +6,7 @@ import { fmt, sumBy } from '../../lib/money'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, type BadgeTone } from '../../components/ui/Badge'
+import { Stat } from '../../components/ui/Stat'
 import { Sheet } from '../../components/ui/Sheet'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState } from '../../components/ui/Feedback'
@@ -81,21 +82,12 @@ export function ChangeOrdersScreen() {
         !isLoading && (
           <>
             <div className="metric-grid compact">
-              <div className="metric-card">
-                <span>Pending</span>
-                <strong>{fmt(pendingTotal)}</strong>
-              </div>
-              <div className="metric-card">
-                <span>Approved</span>
-                <strong>{fmt(approvedTotal)}</strong>
-              </div>
-              <div className="metric-card">
-                <span>Paid</span>
-                <strong>{fmt(paidTotal)}</strong>
-              </div>
+              <Stat label="Pending" value={fmt(pendingTotal)} />
+              <Stat label="Approved" value={fmt(approvedTotal)} />
+              <Stat label="Paid" value={fmt(paidTotal)} />
             </div>
 
-            <div style={{ margin: '1rem 0 0.75rem', maxWidth: 420 }}>
+            <div className="list-toolbar">
               <SegmentedControl<Filter>
                 ariaLabel="Filter change orders"
                 value={filter}
