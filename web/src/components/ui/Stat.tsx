@@ -53,7 +53,8 @@ export function TrendDelta({
         : 'trend trend-neg'
   return (
     <span className={cls}>
-      <span aria-hidden>{up ? '▲' : '▼'}</span> {format(Math.abs(value))}
+      <span aria-hidden>{up ? '▲' : '▼'}</span>
+      <span className="sr-only">{up ? 'up ' : 'down '}</span> {format(Math.abs(value))}
       {label && <span className="trend-label"> {label}</span>}
     </span>
   )

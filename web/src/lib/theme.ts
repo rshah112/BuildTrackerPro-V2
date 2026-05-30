@@ -24,6 +24,17 @@ function systemPrefersDark(): boolean {
 export function applyTheme(pref: ThemePref): void {
   const resolved = resolveTheme(pref, systemPrefersDark())
   document.documentElement.setAttribute('data-theme', resolved)
+  // Keep the browser/PWA chrome (status-bar tint) in sync with the *resolved* theme,
+  // even when the user forces a theme that differs from the OS. Read the resolved
+  // --color-bg token so it always matches the actual background. Feature-checked so it
+  // no-ops under the node test env (which stubs only part of `document`).
+  if (typeof document !== 'undefined' && typeof document.querySelector === 'function' && typeof getComputedStyle === 'function') {
+    const meta = document.querySelector('meta[name="theme-color"]')
+    if (meta) {
+      const bg = getComputedStyle(document.documentElement).getPropertyValue('--color-bg').trim()
+      if (bg) meta.setAttribute('content', bg)
+    }
+  }
 }
 
 export function setTheme(pref: ThemePref): void {

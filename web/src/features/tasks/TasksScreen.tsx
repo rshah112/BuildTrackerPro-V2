@@ -5,6 +5,7 @@ import type { ProjectTaskStatus } from '../../domain/enums'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, type BadgeTone } from '../../components/ui/Badge'
+import { fmtDate } from '../../lib/date'
 import { Sheet } from '../../components/ui/Sheet'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
@@ -117,7 +118,7 @@ export function TasksScreen() {
                       <strong className={t.status === 'done' ? 'task-done-text' : undefined}>{t.title}</strong>
                       <span className="muted">
                         {vendorName(t.vendorId) ? `${vendorName(t.vendorId)} · ` : ''}
-                        {t.dueDate ? `Due ${new Date(t.dueDate).toLocaleDateString()}` : 'No due date'}
+                        {t.dueDate ? `Due ${fmtDate(t.dueDate)}` : 'No due date'}
                       </span>
                     </div>
                     <Badge tone={STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</Badge>

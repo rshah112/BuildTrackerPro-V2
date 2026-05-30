@@ -10,25 +10,24 @@ import { useCurrentProject } from '../projects/currentProject'
 import { useExpenses } from '../expenses/useExpenses'
 import { useChangeOrders } from '../changeOrders/useChangeOrders'
 import { cashFlowForecast, localToday, nextFourteenDaysDue } from './cashFlow'
+import { fmtDate } from '../../lib/date'
 
-const fmtDay = (iso: string) => {
-  const [y, m, d] = iso.split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-}
+const fmtDay = (iso: string) => fmtDate(iso, { weekday: 'short', month: 'short', day: 'numeric' })
 
 export function CashFlowScreen() {
   const { projectId } = useCurrentProject()
-  const { data: expenses = [], isLoading, error } = useExpenses(projectId!)
-  const { data: changeOrders = [] } = useChangeOrders(projectId!)
+  const { data: expenses = [], isLoading: expensesLoading, error: expensesError } = useExpenses(projectId!)
+  const { data: changeOrders = [], isLoading: ordersLoading, error: ordersError } = useChangeOrders(projectId!)
 
   if (!projectId) return null
+  const error = expensesError ?? ordersError
   if (error)
     return (
       <p role="alert" className="error-banner">
         Couldn’t load cash flow: {(error as Error).message}
       </p>
     )
-  if (isLoading) return <ListSkeleton />
+  if (expensesLoading || ordersLoading) return <ListSkeleton />
 
 
   const today = localToday()

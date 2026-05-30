@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, Trash2, Sparkles } from 'lucide-react'
 import type { AllowanceSelection } from '../../domain/types'
 import { fmt } from '../../lib/money'
+import { fmtDate } from '../../lib/date'
 import { allowanceOverage } from '../../lib/budgetAggregates'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
@@ -63,7 +64,7 @@ export function AllowancesScreen() {
         }
       />
 
-      {error && <p role="alert">Couldn’t load allowances: {(error as Error).message}</p>}
+      {error && <p role="alert" className="error-banner">Couldn’t load allowances: {(error as Error).message}</p>}
       {isLoading && <ListSkeleton />}
 
       {!isLoading && allowanceLineItems.length === 0 ? (
@@ -91,7 +92,7 @@ export function AllowancesScreen() {
                 <div className="expense-row-main">
                   <strong>{titleOf(s.lineItemId)}</strong>
                   <span className="muted">
-                    {s.vendor || 'Selection'} · {new Date(s.selectionDate).toLocaleDateString()}
+                    {s.vendor || 'Selection'} · {fmtDate(s.selectionDate)}
                   </span>
                 </div>
                 <strong>{fmt(s.amount)}</strong>

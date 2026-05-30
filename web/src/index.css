@@ -22,6 +22,12 @@ a,
 [role='button'] {
   touch-action: manipulation;
 }
+html,
+body {
+  /* Keep over-drag inside the app so the custom pull-to-refresh doesn't fight the
+     browser's native top-of-page refresh. */
+  overscroll-behavior-y: contain;
+}
 body {
   margin: 0;
   background: var(--bg);
@@ -75,13 +81,17 @@ button {
   font-weight: 600;
 }
 button:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
 }
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: none;
+  /* Solid outline (follows border-radius) for a high-contrast keyboard ring on any
+     surface, plus the soft brand tint. The outline guarantees visibility where the
+     tint alone would be too faint (e.g. buttons with no border). */
+  outline: 2px solid var(--color-brand);
+  outline-offset: 1px;
   border-color: var(--color-brand);
   box-shadow: 0 0 0 3px var(--color-brand-tint);
 }
@@ -139,9 +149,13 @@ textarea {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 0.15rem;
+  /* >=44px tap target (WCAG 2.5.5 / iOS HIG) */
+  min-height: 44px;
   padding: 0.5rem 0.25rem 0.45rem;
-  color: var(--color-text-faint);
+  /* Muted (not faint) so the small labels keep >=4.5:1 over the translucent bar. */
+  color: var(--color-text-muted);
   text-decoration: none;
   font-size: 0.66rem;
   font-weight: var(--font-weight-semibold);

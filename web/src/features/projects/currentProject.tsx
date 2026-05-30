@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useProjects } from './useProjects'
 
@@ -16,12 +16,14 @@ const Ctx = createContext<CurrentProject | null>(null)
 
 export function CurrentProjectProvider({ children }: { children: ReactNode }) {
   const [projectId, setId] = useState<string | null>(() => localStorage.getItem(KEY))
-  const setProjectId = (id: string | null) => {
+  const setProjectId = useCallback((id: string | null) => {
     setId(id)
     if (id) localStorage.setItem(KEY, id)
     else localStorage.removeItem(KEY)
-  }
-  return <Ctx.Provider value={{ projectId, setProjectId }}>{children}</Ctx.Provider>
+  }, [])
+  // Memoize so consumers (the whole authed app) don't re-render unless projectId changes.
+  const value = useMemo(() => ({ projectId, setProjectId }), [projectId, setProjectId])
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

@@ -9,9 +9,12 @@ export function usePullToRefresh(onRefresh: () => void) {
     let armed = false
 
     const atTop = () => window.scrollY <= 0 && document.documentElement.scrollTop <= 0
+    // A Sheet/Modal locks body scroll while open; never arm pull-to-refresh underneath
+    // it, so dragging inside an open sheet can't trigger a full data refresh.
+    const overlayOpen = () => document.body.style.overflow === 'hidden'
 
     const onStart = (e: TouchEvent) => {
-      armed = atTop()
+      armed = atTop() && !overlayOpen()
       startY = e.touches[0]?.clientY ?? 0
     }
     const onMove = (e: TouchEvent) => {

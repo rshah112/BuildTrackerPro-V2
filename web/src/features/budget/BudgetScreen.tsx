@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ChevronDown, Plus, Pencil, Trash2, FolderPlus } from 'lucide-react'
 import type { BudgetCategory, BudgetLineItem } from '../../domain/types'
 import { fmt, sumBy } from '../../lib/money'
@@ -47,7 +47,27 @@ export function BudgetScreen() {
   const confirm = useConfirm()
   const toast = useToast()
 
-  const deleteCategory = async (cat: BudgetCategory) => {
+  // Group line items by category once (with cent-exact budget/actual totals) instead of
+  // re-filtering + re-summing the full list for every category on every render/toggle.
+  const categoryStats = useMemo(() => {
+    const grouped = new Map<string, BudgetLineItem[]>()
+    for (const li of lineItems) {
+      const arr = grouped.get(li.categoryName)
+      if (arr) arr.push(li)
+      else grouped.set(li.categoryName, [li])
+    }
+    const out = new Map<string, { items: BudgetLineItem[]; budget: number; actual: number }>()
+    for (const [name, arr] of grouped) {
+      out.set(name, { items: arr, budget: sumBy(arr, (i) => i.budget), actual: sumBy(arr, (i) => i.actual) })
+    }
+    return out
+  }, [lineItems])
+
+  const deleteCategory = async (cat: BudgetCategory, itemCount: number) => {
+    if (itemCount > 0) {
+      toast.show(`Remove this category’s ${itemCount} line item${itemCount === 1 ? '' : 's'} before deleting it.`)
+      return
+    }
     if (await confirm({ title: 'Delete category?', message: `“${cat.name}” will be removed.`, destructive: true })) {
       await removeCategory.mutateAsync(cat.id)
       toast.success('Category deleted')
@@ -69,8 +89,6 @@ export function BudgetScreen() {
       </p>
     )
   if (catsLoading || itemsLoading) return <ListSkeleton />
-
-  const itemsByCategory = (catName: string) => lineItems.filter((li) => li.categoryName === catName)
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -125,9 +143,8 @@ export function BudgetScreen() {
           ) : (
             <ul className="card-list">
               {categories.map((cat) => {
-                const items = itemsByCategory(cat.name)
-                const budget = sumBy(items, (i) => i.budget)
-                const actual = sumBy(items, (i) => i.actual)
+                const stat = categoryStats.get(cat.name) ?? { items: [], budget: 0, actual: 0 }
+                const { items, budget, actual } = stat
                 const open = expanded.has(cat.id)
                 const over = actual > budget && budget > 0
                 return (
@@ -176,8 +193,12 @@ export function BudgetScreen() {
                         size="sm"
                         variant="ghost"
                         leadingIcon={<Trash2 size={14} />}
-                        disabled={items.length > 0}
-                        onClick={() => deleteCategory(cat)}
+                        title={
+                          items.length > 0
+                            ? 'Remove this category’s line items before deleting it'
+                            : undefined
+                        }
+                        onClick={() => deleteCategory(cat, items.length)}
                       >
                         Delete
                       </Button>

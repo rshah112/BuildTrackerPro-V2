@@ -11,7 +11,9 @@ export function AppShell() {
   const queryClient = useQueryClient()
   const toast = useToast()
   const refresh = useCallback(() => {
-    queryClient.invalidateQueries()
+    // Mark everything stale but only refetch what's currently mounted (the visible
+    // screen); off-screen tabs refetch lazily on next visit instead of all at once.
+    queryClient.invalidateQueries({ refetchType: 'active' })
     toast.show('Refreshed')
   }, [queryClient, toast])
   usePullToRefresh(refresh)

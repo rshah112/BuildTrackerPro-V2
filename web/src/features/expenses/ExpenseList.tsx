@@ -3,6 +3,7 @@ import { Plus, Trash2, Receipt as ReceiptIcon, FileText } from 'lucide-react'
 import type { BudgetLineItem, Expense } from '../../domain/types'
 import { balanceDue, effectiveAmountPaid } from '../../lib/expenseMath'
 import { fmt, sumBy } from '../../lib/money'
+import { fmtDate } from '../../lib/date'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Stat } from '../../components/ui/Stat'
@@ -37,14 +38,23 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
   const [filter, setFilter] = useState<Filter>('all')
 
   const sorted = useMemo(() => [...expenses].sort((a, b) => b.date.localeCompare(a.date)), [expenses])
-  const visible = sorted.filter((e) => {
-    if (filter === 'all') return true
-    const open = balanceDue(e) > 0
-    return filter === 'open' ? open : !open
-  })
-  const total = sumBy(expenses, (e) => e.amount)
-  const paid = sumBy(expenses, effectiveAmountPaid)
-  const outstanding = sumBy(expenses, balanceDue)
+  const visible = useMemo(
+    () =>
+      sorted.filter((e) => {
+        if (filter === 'all') return true
+        const open = balanceDue(e) > 0
+        return filter === 'open' ? open : !open
+      }),
+    [sorted, filter],
+  )
+  const { total, paid, outstanding } = useMemo(
+    () => ({
+      total: sumBy(expenses, (e) => e.amount),
+      paid: sumBy(expenses, effectiveAmountPaid),
+      outstanding: sumBy(expenses, balanceDue),
+    }),
+    [expenses],
+  )
 
   const removeAndSync = async (expense: Expense) => {
     if (!(await confirm({ title: 'Delete expense?', message: `${expense.vendorName || 'This expense'} will be removed.`, destructive: true }))) return
@@ -107,7 +117,7 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
                 <div className="expense-row-main">
                   <strong>{e.vendorName || 'Unnamed vendor'}</strong>
                   <span className="muted">
-                    {new Date(e.date).toLocaleDateString()} · {e.categoryName || 'Uncategorized'}
+                    {fmtDate(e.date)} · {e.categoryName || 'Uncategorized'}
                     {e.budgetLineItemTitle ? ` · ${e.budgetLineItemTitle}` : ''}
                   </span>
                 </div>

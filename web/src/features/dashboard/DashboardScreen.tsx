@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useRows } from '../../data/hooks'
 import type { AllowanceSelection, ChangeOrder, Expense, Project } from '../../domain/types'
 import {
@@ -32,18 +33,143 @@ function healthTone(used: number, limit: number): Tone {
 
 export function DashboardScreen() {
   const { projectId } = useCurrentProject()
-  const { data: projects = [], isLoading: projectsLoading } = useProjects()
-  const { data: lineItems = [], isLoading: itemsLoading } = useLineItems(projectId!)
-  const { data: expenses = [], isLoading: expensesLoading } = useExpenses(projectId!)
-  const { data: changeOrders = [], isLoading: ordersLoading } = useRows<ChangeOrder>('change_orders', { projectId })
-  const { data: allowanceSelections = [], isLoading: selectionsLoading } = useRows<AllowanceSelection>(
-    'allowance_selections',
+  const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useProjects()
+  const { data: lineItems = [], isLoading: itemsLoading, error: itemsError } = useLineItems(projectId!)
+  const { data: expenses = [], isLoading: expensesLoading, error: expensesError } = useExpenses(projectId!)
+  const { data: changeOrders = [], isLoading: ordersLoading, error: ordersError } = useRows<ChangeOrder>(
+    'change_orders',
     { projectId },
   )
+  const {
+    data: allowanceSelections = [],
+    isLoading: selectionsLoading,
+    error: selectionsError,
+  } = useRows<AllowanceSelection>('allowance_selections', { projectId })
+
+  // All derived figures in one memo so they don't recompute on unrelated re-renders
+  // (react-query returns stable array refs between refetches, so this is effective).
+  const view = useMemo(() => {
+    const project = projects.find((p) => p.id === projectId) as Project | undefined
+    const budgetLimit = project
+      ? project.constructionBudget + project.contingencyBudget
+      : sumBy(lineItems, (i) => i.budget)
+    const baseBudget = project?.constructionBudget ?? sumBy(lineItems, (i) => i.budget)
+    const actual = actualSpend(lineItems, expenses, allowanceSelections, changeOrders)
+    const committed = committedSpend(lineItems, changeOrders)
+    const paid = cashPaidTotal(expenses, changeOrders)
+    const pending = pendingExposure(changeOrders)
+    const allowanceRisk = allowanceOverage(lineItems, allowanceSelections, expenses)
+    const projected = actual + committed + pending
+    const remaining = budgetLimit - projected
+    const usedPct = budgetLimit > 0 ? Math.round((projected / budgetLimit) * 100) : 0
+    const tone = healthTone(projected, budgetLimit)
+
+    const overBudgetItems = lineItems.filter((li) => lineItemHealth(li) === 'overBudget')
+    const nearLimitItems = lineItems.filter((li) => lineItemHealth(li) === 'nearLimit')
+    const openExpenses = expenses.filter((e) => !e.isPaid)
+    const pendingOrders = changeOrders.filter((c) => c.status === 'pending')
+    const due14 = nextFourteenDaysDue(expenses, changeOrders, localToday())
+    const recentExpenses = [...expenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
+
+    // Spend logged in the trailing 7 days — a momentum read on the Actual spend KPI.
+    const today = localToday()
+    const [ty, tm, td] = today.split('-').map(Number)
+    const wa = new Date(ty, tm - 1, td - 7)
+    const weekAgo = `${wa.getFullYear()}-${String(wa.getMonth() + 1).padStart(2, '0')}-${String(wa.getDate()).padStart(2, '0')}`
+    const spendThisWeek = sumBy(
+      expenses.filter((e) => e.date.slice(0, 10) > weekAgo),
+      (e) => e.amount,
+    )
+
+    // --- Estimated Final Cost (EAC): spent + committed + still-to-spend budget + pending COs ---
+    const lineBudgetTotal = sumBy(lineItems, (i) => i.budget)
+    const uncommittedRemaining = Math.max(0, lineBudgetTotal - actual - committed)
+    const estimatedFinalCost = actual + committed + uncommittedRemaining + pending
+    const eacVsBudget = estimatedFinalCost - budgetLimit // + = projected over, − = under
+
+    // --- Contingency burn-down: how much of the contingency the overage has eaten ---
+    const contingency = project?.contingencyBudget ?? 0
+    const overBase = Math.max(0, actual + committed - baseBudget) // spend past the base budget
+    const contingencyUsed = Math.min(contingency, overBase)
+    const contingencyRemaining = Math.max(0, contingency - overBase)
+    const contingencyPct = contingency > 0 ? Math.round((contingencyUsed / contingency) * 100) : 0
+
+    // --- Cost per square foot ---
+    const sqft = project?.squareFootage ?? 0
+    const actualPsf = sqft > 0 ? actual / sqft : 0
+    const eacPsf = sqft > 0 ? estimatedFinalCost / sqft : 0
+
+    // Spend by category (top 5 by actual).
+    const byCategory = new Map<string, { actual: number; budget: number }>()
+    for (const li of lineItems) {
+      const c = byCategory.get(li.categoryName) ?? { actual: 0, budget: 0 }
+      c.actual += li.actual
+      c.budget += li.budget
+      byCategory.set(li.categoryName, c)
+    }
+    const categoryBars = [...byCategory.entries()]
+      .filter(([name]) => name)
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.actual - a.actual)
+      .slice(0, 5)
+
+    // Cumulative spend over time.
+    const cumulative: number[] = []
+    let running = 0
+    for (const e of [...expenses].sort((a, b) => a.date.localeCompare(b.date))) {
+      running += e.amount
+      cumulative.push(running)
+    }
+
+    return {
+      project,
+      budgetLimit,
+      baseBudget,
+      actual,
+      committed,
+      paid,
+      pending,
+      allowanceRisk,
+      projected,
+      remaining,
+      usedPct,
+      tone,
+      overBudgetItems,
+      nearLimitItems,
+      openExpenses,
+      pendingOrders,
+      due14,
+      recentExpenses,
+      spendThisWeek,
+      estimatedFinalCost,
+      eacVsBudget,
+      contingency,
+      contingencyUsed,
+      contingencyRemaining,
+      contingencyPct,
+      sqft,
+      actualPsf,
+      eacPsf,
+      categoryBars,
+      cumulative,
+      running,
+    }
+  }, [projects, projectId, lineItems, expenses, changeOrders, allowanceSelections])
 
   if (!projectId) return null
 
   const loading = projectsLoading || itemsLoading || expensesLoading || ordersLoading || selectionsLoading
+  const error = projectsError || itemsError || expensesError || ordersError || selectionsError
+  if (error && !loading) {
+    return (
+      <section>
+        <ScreenHeader title="Dashboard" />
+        <p role="alert" className="error-banner">
+          Couldn’t load the dashboard: {(error as Error).message}
+        </p>
+      </section>
+    )
+  }
   if (loading) {
     return (
       <section>
@@ -59,77 +185,39 @@ export function DashboardScreen() {
     )
   }
 
-  const project = projects.find((p) => p.id === projectId) as Project | undefined
-  const budgetLimit = project
-    ? project.constructionBudget + project.contingencyBudget
-    : sumBy(lineItems, (i) => i.budget)
-  const baseBudget = project?.constructionBudget ?? sumBy(lineItems, (i) => i.budget)
-  const actual = actualSpend(lineItems, expenses, allowanceSelections, changeOrders)
-  const committed = committedSpend(lineItems, changeOrders)
-  const paid = cashPaidTotal(expenses, changeOrders)
-  const pending = pendingExposure(changeOrders)
-  const allowanceRisk = allowanceOverage(lineItems, allowanceSelections, expenses)
-  const projected = actual + committed + pending
-  const remaining = budgetLimit - projected
-  const usedPct = budgetLimit > 0 ? Math.round((projected / budgetLimit) * 100) : 0
-  const tone = healthTone(projected, budgetLimit)
-
-  const overBudgetItems = lineItems.filter((li) => lineItemHealth(li) === 'overBudget')
-  const nearLimitItems = lineItems.filter((li) => lineItemHealth(li) === 'nearLimit')
-  const openExpenses = expenses.filter((e) => !e.isPaid)
-  const pendingOrders = changeOrders.filter((c) => c.status === 'pending')
-  const due14 = nextFourteenDaysDue(expenses, changeOrders, localToday())
-  const recentExpenses = [...expenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
-
-  // Spend logged in the trailing 7 days — a momentum read on the Actual spend KPI.
-  const today = localToday()
-  const [ty, tm, td] = today.split('-').map(Number)
-  const wa = new Date(ty, tm - 1, td - 7)
-  const weekAgo = `${wa.getFullYear()}-${String(wa.getMonth() + 1).padStart(2, '0')}-${String(wa.getDate()).padStart(2, '0')}`
-  const spendThisWeek = sumBy(
-    expenses.filter((e) => e.date.slice(0, 10) > weekAgo),
-    (e) => e.amount,
-  )
-
-  // --- Estimated Final Cost (EAC): spent + committed + still-to-spend budget + pending COs ---
-  const lineBudgetTotal = sumBy(lineItems, (i) => i.budget)
-  const uncommittedRemaining = Math.max(0, lineBudgetTotal - actual - committed)
-  const estimatedFinalCost = actual + committed + uncommittedRemaining + pending
-  const eacVsBudget = estimatedFinalCost - budgetLimit // + = projected over, − = under
-
-  // --- Contingency burn-down: how much of the contingency the overage has eaten ---
-  const contingency = project?.contingencyBudget ?? 0
-  const overBase = Math.max(0, actual + committed - baseBudget) // spend past the base budget
-  const contingencyUsed = Math.min(contingency, overBase)
-  const contingencyRemaining = Math.max(0, contingency - overBase)
-  const contingencyPct = contingency > 0 ? Math.round((contingencyUsed / contingency) * 100) : 0
-
-  // --- Cost per square foot ---
-  const sqft = project?.squareFootage ?? 0
-  const actualPsf = sqft > 0 ? actual / sqft : 0
-  const eacPsf = sqft > 0 ? estimatedFinalCost / sqft : 0
-
-  // Spend by category (top 5 by actual).
-  const byCategory = new Map<string, { actual: number; budget: number }>()
-  for (const li of lineItems) {
-    const c = byCategory.get(li.categoryName) ?? { actual: 0, budget: 0 }
-    c.actual += li.actual
-    c.budget += li.budget
-    byCategory.set(li.categoryName, c)
-  }
-  const categoryBars = [...byCategory.entries()]
-    .filter(([name]) => name)
-    .map(([name, v]) => ({ name, ...v }))
-    .sort((a, b) => b.actual - a.actual)
-    .slice(0, 5)
-
-  // Cumulative spend over time.
-  const cumulative: number[] = []
-  let running = 0
-  for (const e of [...expenses].sort((a, b) => a.date.localeCompare(b.date))) {
-    running += e.amount
-    cumulative.push(running)
-  }
+  const {
+    project,
+    budgetLimit,
+    baseBudget,
+    actual,
+    committed,
+    paid,
+    pending,
+    allowanceRisk,
+    projected,
+    remaining,
+    usedPct,
+    tone,
+    overBudgetItems,
+    nearLimitItems,
+    openExpenses,
+    pendingOrders,
+    due14,
+    recentExpenses,
+    spendThisWeek,
+    estimatedFinalCost,
+    eacVsBudget,
+    contingency,
+    contingencyUsed,
+    contingencyRemaining,
+    contingencyPct,
+    sqft,
+    actualPsf,
+    eacPsf,
+    categoryBars,
+    cumulative,
+    running,
+  } = view
 
   return (
     <section className="dashboard">
