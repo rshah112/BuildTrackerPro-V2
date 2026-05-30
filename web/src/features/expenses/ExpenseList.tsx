@@ -117,7 +117,7 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
                       const st = payStatus(e)
                       return <Badge tone={st.tone}>{st.label}</Badge>
                     })()}
-                    {e.receiptObjectKey && <FileText size={15} className="muted" aria-label="Has receipt" />}
+                    {e.receiptObjectKey && <FileText size={15} className="muted" role="img" aria-label="Has receipt" />}
                   </div>
                   <strong>{fmt(e.amount)}</strong>
                 </div>

@@ -21,7 +21,7 @@ export function EmptyState({
           <Glyph size={28} />
         </div>
       )}
-      <h3 className="empty-title">{title}</h3>
+      <h2 className="empty-title">{title}</h2>
       {body && <p className="empty-body">{body}</p>}
       {action && <div className="empty-action">{action}</div>}
     </div>

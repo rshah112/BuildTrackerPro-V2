@@ -72,7 +72,7 @@ export function TasksScreen() {
         }
       />
 
-      {error && <p role="alert">Couldn’t load tasks: {(error as Error).message}</p>}
+      {error && <p role="alert" className="error-banner">Couldn’t load tasks: {(error as Error).message}</p>}
       {isLoading && <ListSkeleton />}
 
       {!isLoading && tasks.length === 0 ? (
