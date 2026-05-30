@@ -6,6 +6,7 @@ import App from './App.tsx'
 import { queryClient } from './lib/queryClient.ts'
 import { initTheme } from './lib/theme.ts'
 import { ToastProvider } from './components/ui/Toast.tsx'
+import { ConfirmProvider } from './components/ui/Confirm.tsx'
 
 initTheme()
 
@@ -13,7 +14,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <App />
+        <ConfirmProvider>
+          <App />
+        </ConfirmProvider>
       </ToastProvider>
     </QueryClientProvider>
   </StrictMode>,

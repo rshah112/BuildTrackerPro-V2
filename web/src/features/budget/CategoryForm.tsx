@@ -1,9 +1,11 @@
 import { useState, type FormEvent, type ChangeEvent } from 'react'
-import type { BudgetCategory } from '../../domain/types'
+import type { BudgetCategory, ChangeOrder, Expense } from '../../domain/types'
 import { Field } from '../../components/ui/Field'
 import { CurrencyField } from '../../components/ui/CurrencyField'
 import { Button } from '../../components/ui/Button'
-import { useCreateCategory, useUpdateCategory } from './useBudget'
+import { useCreateCategory, useUpdateCategory, useLineItems, useUpdateLineItem } from './useBudget'
+import { useExpenses, useUpdateExpense } from '../expenses/useExpenses'
+import { useChangeOrders, useUpdateChangeOrder } from '../changeOrders/useChangeOrders'
 
 type Draft = { name: string; targetBudget: number; sortOrder: number; systemImage: string }
 
@@ -27,6 +29,12 @@ export function CategoryForm({
   const [d, setD] = useState<Draft>(initial ?? blank(projectId))
   const create = useCreateCategory()
   const update = useUpdateCategory()
+  const { data: lineItems = [] } = useLineItems(projectId)
+  const { data: expenses = [] } = useExpenses(projectId)
+  const { data: changeOrders = [] } = useChangeOrders(projectId)
+  const updateLineItem = useUpdateLineItem()
+  const updateExpense = useUpdateExpense()
+  const updateChangeOrder = useUpdateChangeOrder()
   const busy = create.isPending || update.isPending
 
   const text = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement>) =>
@@ -34,8 +42,27 @@ export function CategoryForm({
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (initial) await update.mutateAsync({ id: initial.id, patch: d })
-    else await create.mutateAsync({ ...d, projectId })
+    if (initial) {
+      const oldName = initial.name
+      await update.mutateAsync({ id: initial.id, patch: d })
+      // Children reference the category by NAME string — cascade the rename so they
+      // don't orphan from the category and its totals.
+      if (d.name !== oldName) {
+        await Promise.all([
+          ...lineItems
+            .filter((li) => li.categoryName === oldName)
+            .map((li) => updateLineItem.mutateAsync({ id: li.id, patch: { categoryName: d.name } })),
+          ...expenses
+            .filter((x: Expense) => x.categoryName === oldName)
+            .map((x) => updateExpense.mutateAsync({ id: x.id, patch: { categoryName: d.name } })),
+          ...changeOrders
+            .filter((c: ChangeOrder) => c.categoryName === oldName)
+            .map((c) => updateChangeOrder.mutateAsync({ id: c.id, patch: { categoryName: d.name } })),
+        ])
+      }
+    } else {
+      await create.mutateAsync({ ...d, projectId })
+    }
     onDone()
   }
 

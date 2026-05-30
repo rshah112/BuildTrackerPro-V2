@@ -8,8 +8,15 @@ import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState } from '../../components/ui/Feedback'
+import { useConfirm } from '../../components/ui/Confirm'
+import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
 import { useCategories, useRemoveCategory, useLineItems, useRemoveLineItem } from './useBudget'
+
+/** Allowance items measure against their allowance amount; others against budget. */
+function lineLimit(li: BudgetLineItem): number {
+  return li.isAllowance ? li.allowanceAmount : li.budget
+}
 import { CategoryForm } from './CategoryForm'
 import { LineItemForm } from './LineItemForm'
 import { HealthPill } from './HealthPill'
@@ -37,6 +44,21 @@ export function BudgetScreen() {
   const { data: lineItems = [], isLoading: itemsLoading } = useLineItems(projectId!)
   const removeCategory = useRemoveCategory()
   const removeLineItem = useRemoveLineItem()
+  const confirm = useConfirm()
+  const toast = useToast()
+
+  const deleteCategory = async (cat: BudgetCategory) => {
+    if (await confirm({ title: 'Delete category?', message: `“${cat.name}” will be removed.`, destructive: true })) {
+      await removeCategory.mutateAsync(cat.id)
+      toast.success('Category deleted')
+    }
+  }
+  const deleteLineItem = async (li: BudgetLineItem) => {
+    if (await confirm({ title: 'Delete line item?', message: `“${li.title}” will be removed.`, destructive: true })) {
+      await removeLineItem.mutateAsync(li.id)
+      toast.success('Line item deleted')
+    }
+  }
 
   if (!projectId) return null
   if (catsLoading || itemsLoading) return <div className="loading">Loading budget…</div>
@@ -145,7 +167,7 @@ export function BudgetScreen() {
                         variant="ghost"
                         leadingIcon={<Trash2 size={14} />}
                         disabled={items.length > 0}
-                        onClick={() => removeCategory.mutate(cat.id)}
+                        onClick={() => deleteCategory(cat)}
                       >
                         Delete
                       </Button>
@@ -166,17 +188,18 @@ export function BudgetScreen() {
                                 <HealthPill item={li} />
                               </div>
                               <div className="progress thin">
-                                <span className={`fill-${health}`} style={{ width: `${pct(li.actual, li.budget)}%` }} />
+                                <span className={`fill-${health}`} style={{ width: `${pct(li.actual, lineLimit(li))}%` }} />
                               </div>
                               <div className="lineitem-foot">
                                 <span className="muted">
-                                  {fmt(li.actual)} / {fmt(li.budget)}
+                                  {fmt(li.actual)} / {fmt(lineLimit(li))}
+                                  {li.isAllowance && <span className="muted"> · allowance</span>}
                                 </span>
                                 <span className="lineitem-acts">
                                   <Button size="sm" variant="ghost" onClick={() => setEditing({ kind: 'editLineItem', item: li })}>
                                     Edit
                                   </Button>
-                                  <Button size="sm" variant="ghost" onClick={() => removeLineItem.mutate(li.id)}>
+                                  <Button size="sm" variant="ghost" onClick={() => deleteLineItem(li)}>
                                     Delete
                                   </Button>
                                 </span>
