@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Plus, Trash2, Sparkles } from 'lucide-react'
 import type { AllowanceSelection } from '../../domain/types'
 import { fmt } from '../../lib/money'
@@ -6,7 +5,8 @@ import { fmtDate } from '../../lib/date'
 import { allowanceOverage } from '../../lib/budgetAggregates'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
-import { Sheet } from '../../components/ui/Sheet'
+import { EditorSheet } from '../../components/ui/EditorSheet'
+import { useEditor } from '../../components/ui/useEditor'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useConfirm } from '../../components/ui/Confirm'
@@ -30,7 +30,7 @@ export function AllowancesScreen() {
   const syncActuals = useSyncActuals(projectId!)
   const toast = useToast()
   const confirm = useConfirm()
-  const [editing, setEditing] = useState<AllowanceSelection | 'new' | null>(null)
+  const editor = useEditor<AllowanceSelection>()
 
   if (!projectId) return null
 
@@ -57,7 +57,7 @@ export function AllowancesScreen() {
         subtitle={selections.length > 0 ? overageLabel : undefined}
         trailing={
           selections.length > 0 ? (
-            <Button size="sm" leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+            <Button size="sm" leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
               Add selection
             </Button>
           ) : undefined
@@ -79,7 +79,7 @@ export function AllowancesScreen() {
           title="No allowance selections yet"
           body="Record the finishes you've chosen against allowance line items to see where you're over or under."
           action={
-            <Button leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+            <Button leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
               Add selection
             </Button>
           }
@@ -88,7 +88,7 @@ export function AllowancesScreen() {
         <ul className="card-list">
           {selections.map((s) => (
             <li key={s.id} className="expense-row">
-              <button className="expense-row-open" onClick={() => setEditing(s)}>
+              <button className="expense-row-open" onClick={() => editor.openEdit(s)}>
                 <div className="expense-row-main">
                   <strong>{titleOf(s.lineItemId)}</strong>
                   <span className="muted">
@@ -109,24 +109,20 @@ export function AllowancesScreen() {
         </ul>
       )}
 
-      <Sheet
-        open={editing !== null}
-        onClose={() => setEditing(null)}
-        title={editing === 'new' ? 'New allowance selection' : 'Edit allowance selection'}
-      >
-        {editing !== null && (
+      <EditorSheet editor={editor} newTitle="New allowance selection" editTitle="Edit allowance selection">
+        {(initial) => (
           <AllowanceForm
             projectId={projectId}
             lineItems={allowanceLineItems}
-            initial={editing === 'new' ? undefined : editing}
+            initial={initial}
             onSaved={async (saved) => {
               await syncActuals({ allowanceSelections: upsert(selections, saved) })
               toast.success('Allowance selection saved')
             }}
-            onDone={() => setEditing(null)}
+            onDone={editor.close}
           />
         )}
-      </Sheet>
+      </EditorSheet>
     </section>
   )
 }

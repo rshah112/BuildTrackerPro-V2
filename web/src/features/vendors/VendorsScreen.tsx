@@ -1,9 +1,9 @@
-import { useState } from 'react'
 import { Plus, Trash2, Contact, Phone, Mail } from 'lucide-react'
 import type { Vendor } from '../../domain/types'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
-import { Sheet } from '../../components/ui/Sheet'
+import { EditorSheet } from '../../components/ui/EditorSheet'
+import { useEditor } from '../../components/ui/useEditor'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
@@ -15,7 +15,7 @@ export function VendorsScreen() {
   const { data: vendors = [], isLoading, error } = useVendors(projectId!)
   const remove = useRemoveVendor()
   const toast = useToast()
-  const [editing, setEditing] = useState<Vendor | 'new' | null>(null)
+  const editor = useEditor<Vendor>()
 
   if (!projectId) return null
 
@@ -30,14 +30,14 @@ export function VendorsScreen() {
         title="Vendors"
         trailing={
           vendors.length > 0 ? (
-            <Button size="sm" leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+            <Button size="sm" leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
               Add vendor
             </Button>
           ) : undefined
         }
       />
 
-      {error && <p role="alert">Couldn’t load vendors: {(error as Error).message}</p>}
+      {error && <p role="alert" className="error-banner">Couldn’t load vendors: {(error as Error).message}</p>}
       {isLoading && <ListSkeleton />}
 
       {!isLoading && vendors.length === 0 ? (
@@ -46,7 +46,7 @@ export function VendorsScreen() {
           title="No vendors yet"
           body="Keep your subs and suppliers — trade, phone, and email — in one place."
           action={
-            <Button leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+            <Button leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
               Add vendor
             </Button>
           }
@@ -55,7 +55,7 @@ export function VendorsScreen() {
         <ul className="card-list">
           {vendors.map((v) => (
             <li key={v.id} className="expense-row">
-              <button className="expense-row-open" onClick={() => setEditing(v)}>
+              <button className="expense-row-open" onClick={() => editor.openEdit(v)}>
                 <div className="expense-row-main">
                   <strong>{v.name}</strong>
                   <span className="muted">
@@ -77,19 +77,9 @@ export function VendorsScreen() {
         </ul>
       )}
 
-      <Sheet
-        open={editing !== null}
-        onClose={() => setEditing(null)}
-        title={editing === 'new' ? 'New vendor' : 'Edit vendor'}
-      >
-        {editing !== null && (
-          <VendorForm
-            projectId={projectId}
-            initial={editing === 'new' ? undefined : editing}
-            onDone={() => setEditing(null)}
-          />
-        )}
-      </Sheet>
+      <EditorSheet editor={editor} newTitle="New vendor" editTitle="Edit vendor">
+        {(initial) => <VendorForm projectId={projectId} initial={initial} onDone={editor.close} />}
+      </EditorSheet>
     </section>
   )
 }

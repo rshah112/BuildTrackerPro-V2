@@ -7,7 +7,8 @@ import { fmtDate } from '../../lib/date'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Stat } from '../../components/ui/Stat'
-import { Sheet } from '../../components/ui/Sheet'
+import { EditorSheet } from '../../components/ui/EditorSheet'
+import { useEditor } from '../../components/ui/useEditor'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
@@ -34,7 +35,7 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
   const syncActuals = useSyncActuals(projectId)
   const toast = useToast()
   const confirm = useConfirm()
-  const [editing, setEditing] = useState<Expense | 'new' | null>(null)
+  const editor = useEditor<Expense>()
   const [filter, setFilter] = useState<Filter>('all')
 
   const sorted = useMemo(() => [...expenses].sort((a, b) => b.date.localeCompare(a.date)), [expenses])
@@ -86,7 +87,7 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
               { value: 'paid', label: 'Paid' },
             ]}
           />
-          <Button size="sm" leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+          <Button size="sm" leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
             Add expense
           </Button>
         </div>
@@ -103,7 +104,7 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
           }
           action={
             expenses.length === 0 ? (
-              <Button leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+              <Button leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
                 Add expense
               </Button>
             ) : undefined
@@ -113,7 +114,7 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
         <ul className="card-list">
           {visible.map((e) => (
             <li key={e.id} className="expense-row">
-              <button className="expense-row-open" onClick={() => setEditing(e)}>
+              <button className="expense-row-open" onClick={() => editor.openEdit(e)}>
                 <div className="expense-row-main">
                   <strong>{e.vendorName || 'Unnamed vendor'}</strong>
                   <span className="muted">
@@ -140,24 +141,20 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
         </ul>
       )}
 
-      <Sheet
-        open={editing !== null}
-        onClose={() => setEditing(null)}
-        title={editing === 'new' ? 'New expense' : 'Edit expense'}
-      >
-        {editing !== null && (
+      <EditorSheet editor={editor} newTitle="New expense" editTitle="Edit expense">
+        {(initial) => (
           <ExpenseForm
             projectId={projectId}
             lineItems={lineItems}
-            initial={editing === 'new' ? undefined : editing}
+            initial={initial}
             onSaved={async (saved) => {
               await syncActuals({ expenses: upsertExpense(expenses, saved) })
               toast.success('Expense saved')
             }}
-            onDone={() => setEditing(null)}
+            onDone={editor.close}
           />
         )}
-      </Sheet>
+      </EditorSheet>
     </>
   )
 }

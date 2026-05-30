@@ -6,7 +6,8 @@ import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, type BadgeTone } from '../../components/ui/Badge'
 import { fmtDate } from '../../lib/date'
-import { Sheet } from '../../components/ui/Sheet'
+import { EditorSheet } from '../../components/ui/EditorSheet'
+import { useEditor } from '../../components/ui/useEditor'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
@@ -38,7 +39,7 @@ export function TasksScreen() {
   const update = useUpdateTask()
   const remove = useRemoveTask()
   const toast = useToast()
-  const [editing, setEditing] = useState<ProjectTask | 'new' | null>(null)
+  const editor = useEditor<ProjectTask>()
   const [filter, setFilter] = useState<Filter>('all')
 
   if (!projectId) return null
@@ -66,7 +67,7 @@ export function TasksScreen() {
         title="Tasks"
         trailing={
           tasks.length > 0 ? (
-            <Button size="sm" leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+            <Button size="sm" leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
               Add task
             </Button>
           ) : undefined
@@ -82,7 +83,7 @@ export function TasksScreen() {
           title="No tasks yet"
           body="Track to-dos, who's responsible, and what they tie back to in the budget."
           action={
-            <Button leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+            <Button leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
               Add task
             </Button>
           }
@@ -113,7 +114,7 @@ export function TasksScreen() {
                   >
                     <Check size={16} aria-hidden />
                   </button>
-                  <button className="expense-row-open" onClick={() => setEditing(t)}>
+                  <button className="expense-row-open" onClick={() => editor.openEdit(t)}>
                     <div className="expense-row-main">
                       <strong className={t.status === 'done' ? 'task-done-text' : undefined}>{t.title}</strong>
                       <span className="muted">
@@ -133,21 +134,11 @@ export function TasksScreen() {
         )
       )}
 
-      <Sheet
-        open={editing !== null}
-        onClose={() => setEditing(null)}
-        title={editing === 'new' ? 'New task' : 'Edit task'}
-      >
-        {editing !== null && (
-          <TaskForm
-            projectId={projectId}
-            vendors={vendors}
-            lineItems={lineItems}
-            initial={editing === 'new' ? undefined : editing}
-            onDone={() => setEditing(null)}
-          />
+      <EditorSheet editor={editor} newTitle="New task" editTitle="Edit task">
+        {(initial) => (
+          <TaskForm projectId={projectId} vendors={vendors} lineItems={lineItems} initial={initial} onDone={editor.close} />
         )}
-      </Sheet>
+      </EditorSheet>
     </section>
   )
 }

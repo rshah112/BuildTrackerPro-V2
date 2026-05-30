@@ -7,7 +7,8 @@ import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, type BadgeTone } from '../../components/ui/Badge'
 import { Stat } from '../../components/ui/Stat'
-import { Sheet } from '../../components/ui/Sheet'
+import { EditorSheet } from '../../components/ui/EditorSheet'
+import { useEditor } from '../../components/ui/useEditor'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
@@ -35,7 +36,7 @@ export function ChangeOrdersScreen() {
   const remove = useRemoveChangeOrder()
   const syncActuals = useSyncActuals(projectId!)
   const toast = useToast()
-  const [editing, setEditing] = useState<ChangeOrder | 'new' | null>(null)
+  const editor = useEditor<ChangeOrder>()
   const [filter, setFilter] = useState<Filter>('all')
 
   if (!projectId) return null
@@ -57,7 +58,7 @@ export function ChangeOrdersScreen() {
         title="Change orders"
         trailing={
           orders.length > 0 ? (
-            <Button size="sm" leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+            <Button size="sm" leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
               Add change order
             </Button>
           ) : undefined
@@ -73,7 +74,7 @@ export function ChangeOrdersScreen() {
           title="No change orders yet"
           body="Track scope changes from pending through approved to paid; approved and paid orders flow into your budget."
           action={
-            <Button leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+            <Button leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
               Add change order
             </Button>
           }
@@ -104,7 +105,7 @@ export function ChangeOrdersScreen() {
             <ul className="card-list">
               {visible.map((o) => (
                 <li key={o.id} className="expense-row">
-                  <button className="expense-row-open" onClick={() => setEditing(o)}>
+                  <button className="expense-row-open" onClick={() => editor.openEdit(o)}>
                     <div className="expense-row-main">
                       <strong>{o.title}</strong>
                       <span className="muted">{o.budgetLineItemTitle || o.categoryName || 'Unassigned'}</span>
@@ -124,24 +125,20 @@ export function ChangeOrdersScreen() {
         )
       )}
 
-      <Sheet
-        open={editing !== null}
-        onClose={() => setEditing(null)}
-        title={editing === 'new' ? 'New change order' : 'Edit change order'}
-      >
-        {editing !== null && (
+      <EditorSheet editor={editor} newTitle="New change order" editTitle="Edit change order">
+        {(initial) => (
           <ChangeOrderForm
             projectId={projectId}
             lineItems={lineItems}
-            initial={editing === 'new' ? undefined : editing}
+            initial={initial}
             onSaved={async (saved) => {
               await syncActuals({ changeOrders: upsert(orders, saved) })
               toast.success('Change order saved')
             }}
-            onDone={() => setEditing(null)}
+            onDone={editor.close}
           />
         )}
-      </Sheet>
+      </EditorSheet>
     </section>
   )
 }

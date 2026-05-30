@@ -1,10 +1,10 @@
-import { useState } from 'react'
 import { Plus, Trash2, Camera } from 'lucide-react'
 import type { PhotoAttachment } from '../../domain/types'
 import { roomsForTemplate } from '../../domain/roomCatalog'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
-import { Sheet } from '../../components/ui/Sheet'
+import { EditorSheet } from '../../components/ui/EditorSheet'
+import { useEditor } from '../../components/ui/useEditor'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
@@ -21,7 +21,7 @@ export function PhotosScreen() {
   const { data: categories = [] } = useCategories(projectId!)
   const remove = useRemovePhoto()
   const toast = useToast()
-  const [editing, setEditing] = useState<PhotoAttachment | 'new' | null>(null)
+  const editor = useEditor<PhotoAttachment>()
 
   if (!projectId) return null
 
@@ -47,7 +47,7 @@ export function PhotosScreen() {
         title="Photos"
         trailing={
           photos.length > 0 ? (
-            <Button size="sm" leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+            <Button size="sm" leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
               Add photo
             </Button>
           ) : undefined
@@ -62,7 +62,7 @@ export function PhotosScreen() {
           title="No photos yet"
           body="Document the build by room and phase. Each photo can tie to a budget category."
           action={
-            <Button leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+            <Button leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
               Add photo
             </Button>
           }
@@ -76,7 +76,7 @@ export function PhotosScreen() {
                 <div key={ph.id} className="photo-cell">
                   <button
                     className="photo-open"
-                    onClick={() => setEditing(ph)}
+                    onClick={() => editor.openEdit(ph)}
                     aria-label={`Photo: ${ph.notes || room}`}
                   >
                     <PhotoThumb objectKey={ph.imageObjectKey} alt={ph.notes || room} />
@@ -92,21 +92,11 @@ export function PhotosScreen() {
         ))
       )}
 
-      <Sheet
-        open={editing !== null}
-        onClose={() => setEditing(null)}
-        title={editing === 'new' ? 'Add photo' : 'Edit photo'}
-      >
-        {editing !== null && (
-          <PhotoForm
-            projectId={projectId}
-            rooms={rooms}
-            categories={catNames}
-            initial={editing === 'new' ? undefined : editing}
-            onDone={() => setEditing(null)}
-          />
+      <EditorSheet editor={editor} newTitle="Add photo" editTitle="Edit photo">
+        {(initial) => (
+          <PhotoForm projectId={projectId} rooms={rooms} categories={catNames} initial={initial} onDone={editor.close} />
         )}
-      </Sheet>
+      </EditorSheet>
     </section>
   )
 }
