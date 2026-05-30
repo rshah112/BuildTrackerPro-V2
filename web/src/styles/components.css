@@ -1,0 +1,224 @@
+/* Wave 2 primitives. Token-driven; works in light + dark automatically. */
+
+/* ---- Button ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast)
+      var(--ease-out), opacity var(--dur-fast) var(--ease-out), border-color var(--dur-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn-sm {
+  padding: 0.4rem 0.7rem;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+}
+.btn-md {
+  padding: 0.65rem 1rem;
+  font-size: var(--text-base);
+}
+.btn-lg {
+  padding: 0.85rem 1.25rem;
+  font-size: var(--text-lg);
+}
+.btn-block {
+  display: flex;
+  width: 100%;
+}
+.btn-primary {
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-brand-hover);
+}
+.btn-secondary {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--color-brand);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--color-brand-tint);
+}
+.btn-danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.btn-icon,
+.btn-label {
+  display: inline-flex;
+  align-items: center;
+}
+.btn-spinner {
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- Field ---- */
+.field {
+  display: grid;
+  gap: 0.3rem;
+}
+.field-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+}
+.field-hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+.field-error {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-danger);
+}
+.field input,
+.field textarea,
+.field .select {
+  margin-top: 0;
+}
+.field-invalid input,
+.field-invalid textarea,
+.field-invalid .select {
+  border-color: var(--color-danger);
+}
+
+/* Shared control look (applies to bare inputs and .select) */
+.input,
+.field input:not([type='checkbox']):not([type='radio']),
+.field textarea,
+.select {
+  width: 100%;
+  font: inherit;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+.field input:focus-visible,
+.field textarea:focus-visible,
+.select:focus-visible {
+  outline: none;
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-brand-tint);
+}
+
+/* ---- Select ---- */
+.select-wrap {
+  position: relative;
+  display: block;
+}
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.2rem;
+}
+.select-chevron {
+  position: absolute;
+  right: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+/* ---- Badge ---- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: var(--radius-full);
+  padding: 0.18rem 0.55rem;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.01em;
+  text-transform: capitalize;
+}
+.badge-neutral {
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+}
+.badge-brand {
+  background: var(--color-brand-tint);
+  color: var(--color-brand);
+}
+.badge-success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.badge-warn {
+  background: var(--color-warn-bg);
+  color: var(--color-warn);
+}
+.badge-danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.badge-info {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+}
+
+/* ---- SegmentedControl ---- */
+.segmented {
+  display: inline-flex;
+  gap: 0.15rem;
+  padding: 0.2rem;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
+  width: 100%;
+}
+.segment {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  padding: 0.45rem 0.6rem;
+  border-radius: calc(var(--radius-md) - 0.2rem);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.segment.is-active {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+}
+.segment-icon {
+  display: inline-flex;
+}

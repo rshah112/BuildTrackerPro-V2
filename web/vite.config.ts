@@ -27,8 +27,11 @@ export default defineConfig({
     }),
   ],
   test: {
+    // Default env is node (fast; most suites render to string or are pure).
+    // Interactive component tests opt into jsdom with `// @vitest-environment jsdom`.
     environment: 'node',
     globals: true,
+    setupFiles: ['./src/test/setup.ts'],
     exclude: ['node_modules', 'dist', 'tests/e2e/**'],
   },
 })

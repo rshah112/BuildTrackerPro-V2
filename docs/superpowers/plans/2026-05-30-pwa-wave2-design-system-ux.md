@@ -19,8 +19,8 @@
 
 ### Task 1: Design tokens + theming foundation
 **Files:** Create `web/src/styles/tokens.css`, `web/src/styles/base.css`; refactor `src/index.css` to consume tokens; create `src/lib/theme.ts` (+ `theme.test.ts`)
-- [ ] Tokens as CSS custom properties: neutral ramp (50–900), brand (construction orange), semantic (success/warn/danger/info), surface/text/border; type scale, spacing scale, radii, elevation shadows, z-index layers, motion durations + easings. Light values on `:root`, dark overrides on `:root[data-theme='dark']` and `@media (prefers-color-scheme: dark)` when theme is `system`.
-- [ ] `theme.ts`: `getTheme()/setTheme('light'|'dark'|'system')` persisting to localStorage, applying `data-theme` on `<html>`, defaulting to system. Unit test the resolve logic. Run `npm run test -- theme`. Commit.
+- [x] Tokens as CSS custom properties: neutral ramp (50–900), brand (construction orange), semantic (success/warn/danger/info), surface/text/border; type scale, spacing scale, radii, elevation shadows, z-index layers, motion durations + easings. Light values on `:root`, dark overrides on `:root[data-theme='dark']`; theme.ts resolves system → light|dark so CSS needs no media query.
+- [x] `theme.ts`: `getStoredTheme()/setTheme('light'|'dark'|'system')` persisting to localStorage, applying `data-theme` on `<html>`, defaulting to system. Unit-tested (globals stubbed; no jsdom). Commit.
 
 ### Task 2: Icon system + input primitives
 **Files:** add `lucide-react`; create `src/components/ui/{Icon,Button,Field,Select,Badge,SegmentedControl}.tsx` + `Button.test.tsx`, `Field.test.tsx`
