@@ -19,7 +19,7 @@ import { useLineItems } from '../budget/useBudget'
 import { useCurrentProject } from '../projects/currentProject'
 import { useProjects } from '../projects/useProjects'
 import { useExpenses } from '../expenses/useExpenses'
-import { nextFourteenDaysDue } from '../cashflow/cashFlow'
+import { localToday, nextFourteenDaysDue } from '../cashflow/cashFlow'
 
 type Tone = 'brand' | 'warn' | 'danger'
 function healthTone(used: number, limit: number): Tone {

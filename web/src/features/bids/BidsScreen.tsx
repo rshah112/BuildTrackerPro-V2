@@ -50,9 +50,19 @@ export function BidsScreen() {
     })
 
   const award = async (pkg: BidPackage, bid: Bid) => {
+    // Clear the previously-awarded bid's stamp when re-awarding to a different vendor.
+    if (pkg.awardedBidId && pkg.awardedBidId !== bid.id) {
+      await updateBid.mutateAsync({ id: pkg.awardedBidId, patch: { awardedAt: null } })
+    }
     await updatePackage.mutateAsync({ id: pkg.id, patch: { status: 'awarded', awardedBidId: bid.id } })
     await updateBid.mutateAsync({ id: bid.id, patch: { awardedAt: new Date().toISOString() } })
     toast.success(`Awarded to ${bid.vendorName || 'vendor'}`)
+  }
+
+  const unaward = async (pkg: BidPackage, bid: Bid) => {
+    await updateBid.mutateAsync({ id: bid.id, patch: { awardedAt: null } })
+    await updatePackage.mutateAsync({ id: pkg.id, patch: { status: 'open', awardedBidId: null } })
+    toast.success('Award removed')
   }
 
   return (

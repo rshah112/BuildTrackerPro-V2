@@ -40,9 +40,11 @@ export function ProjectsScreen() {
       <ScreenHeader
         title="Projects"
         trailing={
-          <Button size="sm" leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
-            New project
-          </Button>
+          active.length > 0 ? (
+            <Button size="sm" leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+              New project
+            </Button>
+          ) : undefined
         }
       />
 

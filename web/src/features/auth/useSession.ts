@@ -27,5 +27,7 @@ export function useSession() {
 }
 
 export async function signOut() {
+  // Clear the selected project so it can't leak into another account's session.
+  localStorage.removeItem('btp.currentProjectId')
   await supabase.auth.signOut()
 }

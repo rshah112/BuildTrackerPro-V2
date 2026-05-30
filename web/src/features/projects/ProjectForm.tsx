@@ -126,7 +126,17 @@ export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: ()
             )}
           </Field>
           <Field label="Stories">
-            {(p) => <input type="number" step="1" {...p} value={d.stories ?? 0} onChange={num('stories')} />}
+            {(p) => (
+              <input
+                type="number"
+                step="1"
+                {...p}
+                value={d.stories ?? 0}
+                onChange={(e) =>
+                  setD((prev) => ({ ...prev, stories: e.target.value === '' ? 0 : Number(e.target.value) }))
+                }
+              />
+            )}
           </Field>
         </div>
         <Field label="Footprint">

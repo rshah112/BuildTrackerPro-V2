@@ -15,45 +15,94 @@ export async function downloadBackup(projectId: string): Promise<void> {
   downloadBlob(blob, `${safeFileName(data.project.name)}-backup-${data.exportedAt.slice(0, 10)}.json`)
 }
 
-function omitMeta(row: Record<string, unknown>): Record<string, unknown> {
+type Row = Record<string, unknown>
+
+function omitMeta(row: Row): Row {
   const copy = { ...row }
   delete copy.id
   delete copy.owner
   return copy
 }
-const stripMeta = (rows: Array<Record<string, unknown>>) => rows.map(omitMeta)
 
-/** Restore a backup as a NEW project (owned by the current user via RLS). Returns the
- *  new project id. Child rows are re-pointed at the new project. */
+/** Restore a backup as a NEW project (owned by the current user via RLS). Child rows
+ *  are re-pointed at the new project AND their cross-entity id references (line item,
+ *  vendor, package, awarded bid, task photos) are remapped to the newly-created ids so
+ *  the restored project's internal linkage stays intact instead of dangling at the
+ *  source project's UUIDs. */
 export async function restoreBackup(json: string): Promise<string> {
   const file = JSON.parse(json) as BackupFile
   if (!file.project) throw new Error('Not a valid project backup')
 
-  const projectFields = omitMeta(file.project as unknown as Record<string, unknown>)
+  const projectFields = omitMeta(file.project as unknown as Row)
   const newProject = await table<{ id: string }>('projects').create({
     ...projectFields,
     name: `${file.project.name} (restored)`,
   } as never)
   const pid = newProject.id
 
-  const insertAll = async (name: string, rows: object[]) => {
-    for (const row of stripMeta(rows as Array<Record<string, unknown>>)) {
-      await table(name).create({ ...row, projectId: pid } as never)
+  // Insert a table's rows, capturing oldId -> newId. `patch` rewrites foreign refs
+  // using maps built from earlier inserts.
+  const insertMapped = async (
+    name: string,
+    rows: unknown[] = [],
+    patch?: (clean: Row) => Row,
+  ): Promise<Map<string, string>> => {
+    const map = new Map<string, string>()
+    for (const raw of rows as Row[]) {
+      const oldId = raw.id as string | undefined
+      const clean = omitMeta(raw)
+      const created = await table<{ id: string }>(name).create({
+        ...clean,
+        ...(patch ? patch(clean) : {}),
+        projectId: pid,
+      } as never)
+      if (oldId) map.set(oldId, created.id)
     }
+    return map
   }
 
-  // Order matters only loosely (no FKs between children); projects first (done).
-  await insertAll('budget_categories', file.categories)
-  await insertAll('budget_line_items', file.lineItems)
-  await insertAll('vendors', file.vendors)
-  await insertAll('expenses', file.expenses)
-  await insertAll('change_orders', file.changeOrders)
-  await insertAll('allowance_selections', file.allowanceSelections)
-  await insertAll('project_tasks', file.tasks)
-  await insertAll('bid_packages', file.bidPackages)
-  await insertAll('bids', file.bids)
-  await insertAll('photo_attachments', file.photos)
-  await insertAll('project_documents', file.documents)
+  const remap = (m: Map<string, string>, v: unknown): string | null =>
+    typeof v === 'string' && m.has(v) ? (m.get(v) as string) : null
+
+  await insertMapped('budget_categories', file.categories)
+  const lineMap = await insertMapped('budget_line_items', file.lineItems)
+  const vendorMap = await insertMapped('vendors', file.vendors)
+  const photoMap = await insertMapped('photo_attachments', file.photos, (r) => ({
+    budgetLineItemId: remap(lineMap, r.budgetLineItemId),
+  }))
+
+  // Packages first (awardedBidId cleared — bids don't exist yet), patched after bids.
+  const pkgMap = await insertMapped('bid_packages', file.bidPackages, () => ({ awardedBidId: null }))
+  const bidMap = await insertMapped('bids', file.bids, (r) => ({
+    packageId: remap(pkgMap, r.packageId) ?? (r.packageId as string),
+    vendorId: remap(vendorMap, r.vendorId),
+  }))
+  for (const pkg of (file.bidPackages ?? []) as Row[]) {
+    const newPkg = remap(pkgMap, pkg.id)
+    const newBid = remap(bidMap, pkg.awardedBidId)
+    if (newPkg && newBid) await table('bid_packages').update(newPkg, { awardedBidId: newBid } as never)
+  }
+
+  await insertMapped('expenses', file.expenses, (r) => ({ budgetLineItemId: remap(lineMap, r.budgetLineItemId) }))
+  await insertMapped('change_orders', file.changeOrders, (r) => ({
+    budgetLineItemId: remap(lineMap, r.budgetLineItemId),
+  }))
+  await insertMapped('allowance_selections', file.allowanceSelections, (r) => ({
+    lineItemId: remap(lineMap, r.lineItemId) ?? (r.lineItemId as string),
+  }))
+  await insertMapped('project_tasks', file.tasks, (r) => ({
+    vendorId: remap(vendorMap, r.vendorId),
+    budgetLineItemId: remap(lineMap, r.budgetLineItemId),
+    photoIds: Array.isArray(r.photoIds)
+      ? r.photoIds.flatMap((id) => {
+          const n = photoMap.get(id as string)
+          return n ? [n] : []
+        })
+      : [],
+  }))
+  await insertMapped('project_documents', file.documents, (r) => ({
+    budgetLineItemId: remap(lineMap, r.budgetLineItemId),
+  }))
 
   return pid
 }

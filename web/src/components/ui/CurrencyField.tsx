@@ -5,7 +5,15 @@ const FMT = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 })
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function parseCurrency(raw: string): number {
-  const n = Number(raw.replace(/[^0-9.]/g, ''))
+  // Strip non-numeric, then keep only the first decimal point so "1.2.3" -> "1.23"
+  // instead of NaN -> 0 (which would silently wipe the user's input).
+  const cleaned = raw.replace(/[^0-9.]/g, '')
+  const firstDot = cleaned.indexOf('.')
+  const normalized =
+    firstDot === -1
+      ? cleaned
+      : cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '')
+  const n = Number(normalized)
   return Number.isFinite(n) ? n : 0
 }
 
