@@ -48,7 +48,7 @@
 
 ### Task 9: e2e — core loop
 **Files:** `web/tests/e2e/budget-loop.spec.ts`
-- [ ] Sign in → create project → add category + line item → add expense → dashboard reflects the spend and health. Run `npm run e2e`. Commit.
+- [x] Sign in → create project → add category + line item → add expense → dashboard reflects the spend and health. Run `npm run e2e`. Commit.
 
 ## Self-Review
 - Spec §5/§6 covered: aggregates+expense math (T2,T3), schema already in Wave 0; CRUD for Projects/Categories/LineItems/Expenses (T5–T7); Dashboard health (T8); mapping layer (T1,T4); e2e (T9).
