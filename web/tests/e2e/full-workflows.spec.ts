@@ -12,7 +12,7 @@ test('ops workflows: vendor, task, bid award/unaward, export', async ({ page }) 
 
   await page.goto('/login')
   await page.getByLabel('Email').fill(EMAIL)
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
   await expect(page).toHaveURL(/\/projects/)
   await page.getByRole('button', { name: 'New project' }).click()

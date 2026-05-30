@@ -12,7 +12,7 @@ test('change order: create project → add change order → it appears', async (
 
   await page.goto('/login')
   await page.getByLabel('Email').fill(EMAIL)
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
   await expect(page).toHaveURL(/\/projects/)
 

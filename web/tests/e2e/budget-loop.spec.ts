@@ -19,7 +19,7 @@ test('budget loop: project → category → line item → expense → dashboard'
   // --- Sign in ---
   await page.goto('/login')
   await page.getByLabel('Email').fill(EMAIL)
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
 
   // No project selected yet → app bounces to the portfolio.
