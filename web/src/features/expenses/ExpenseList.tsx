@@ -9,6 +9,7 @@ import { Sheet } from '../../components/ui/Sheet'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
+import { useConfirm } from '../../components/ui/Confirm'
 import { useSyncActuals } from '../budget/useSyncActuals'
 import { ExpenseForm } from './ExpenseForm'
 import { upsertExpense } from './recalculateLineItemActuals'
@@ -16,21 +17,36 @@ import { useExpenses, useRemoveExpense } from './useExpenses'
 
 type Filter = 'all' | 'open' | 'paid'
 
+/** An expense is "open" if it still owes money, regardless of the isPaid flag — so a
+ *  partial payment shows as Partial/open, not a misleading "Paid". */
+function payStatus(e: Expense): { label: string; tone: 'success' | 'warn'; open: boolean } {
+  const due = balanceDue(e)
+  if (due <= 0 && e.isPaid) return { label: 'Paid', tone: 'success', open: false }
+  if (effectiveAmountPaid(e) > 0) return { label: 'Partial', tone: 'warn', open: true }
+  return { label: 'Open', tone: 'warn', open: true }
+}
+
 export function ExpenseList({ projectId, lineItems }: { projectId: string; lineItems: BudgetLineItem[] }) {
   const { data: expenses = [], isLoading, error } = useExpenses(projectId)
   const removeExpense = useRemoveExpense()
   const syncActuals = useSyncActuals(projectId)
   const toast = useToast()
+  const confirm = useConfirm()
   const [editing, setEditing] = useState<Expense | 'new' | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
 
   const sorted = useMemo(() => [...expenses].sort((a, b) => b.date.localeCompare(a.date)), [expenses])
-  const visible = sorted.filter((e) => (filter === 'all' ? true : filter === 'paid' ? e.isPaid : !e.isPaid))
+  const visible = sorted.filter((e) => {
+    if (filter === 'all') return true
+    const open = balanceDue(e) > 0
+    return filter === 'open' ? open : !open
+  })
   const total = sumBy(expenses, (e) => e.amount)
   const paid = sumBy(expenses, effectiveAmountPaid)
   const outstanding = sumBy(expenses, balanceDue)
 
   const removeAndSync = async (expense: Expense) => {
+    if (!(await confirm({ title: 'Delete expense?', message: `${expense.vendorName || 'This expense'} will be removed.`, destructive: true }))) return
     await removeExpense.mutateAsync(expense.id)
     await syncActuals({ expenses: expenses.filter((e) => e.id !== expense.id) })
     toast.success('Expense deleted')
@@ -107,7 +123,10 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
                 </div>
                 <div className="expense-row-amount">
                   <div className="expense-row-badges">
-                    <Badge tone={e.isPaid ? 'success' : 'warn'}>{e.isPaid ? 'Paid' : 'Open'}</Badge>
+                    {(() => {
+                      const st = payStatus(e)
+                      return <Badge tone={st.tone}>{st.label}</Badge>
+                    })()}
                     {e.receiptObjectKey && <FileText size={15} className="muted" aria-label="Has receipt" />}
                   </div>
                   <strong>{fmt(e.amount)}</strong>

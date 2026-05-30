@@ -2,7 +2,7 @@ import { useState, type ChangeEvent, type FormEvent } from 'react'
 import type { BudgetLineItem, Expense } from '../../domain/types'
 import { balanceDue } from '../../lib/expenseMath'
 import { fmt } from '../../lib/money'
-import { uploadBlob } from '../../lib/r2'
+import { uploadBlob, signedDownloadUrl } from '../../lib/r2'
 import { Field } from '../../components/ui/Field'
 import { Select } from '../../components/ui/Select'
 import { CurrencyField } from '../../components/ui/CurrencyField'
@@ -53,9 +53,18 @@ export function ExpenseForm({
 }) {
   const [d, setD] = useState<Draft>(initial ?? blank(projectId))
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  // Once the user edits "Amount paid", honor their literal value (incl. $0) instead of
+  // re-deriving the full-amount default on every render.
+  const [paidTouched, setPaidTouched] = useState(false)
   const create = useCreateExpense()
   const update = useUpdateExpense()
   const busy = create.isPending || update.isPending
+
+  const openReceipt = async () => {
+    if (!d.receiptObjectKey) return
+    const url = await signedDownloadUrl(d.receiptObjectKey)
+    if (url) window.open(url, '_blank', 'noopener')
+  }
 
   const text = (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setD((p) => ({ ...p, [k]: e.target.value }))
@@ -63,7 +72,11 @@ export function ExpenseForm({
     setD((p) => ({ ...p, [k]: e.target.value || null }))
 
   const selectedLineItem = lineItems.find((li) => li.id === d.budgetLineItemId)
-  const paidValue = resolvePaidAmount(d.isPaid ?? false, d.amountPaid ?? 0, d.amount ?? 0)
+  // Display value: once touched, show exactly what they typed (allows $0); until then,
+  // default a paid expense to the full amount.
+  const paidValue = paidTouched
+    ? d.amountPaid ?? 0
+    : resolvePaidAmount(d.isPaid ?? false, d.amountPaid ?? 0, d.amount ?? 0)
   const balance = balanceDue({ amount: d.amount ?? 0, amountPaid: paidValue, isPaid: d.isPaid ?? false })
 
   const chooseLineItem = (e: ChangeEvent<HTMLSelectElement>) => {
@@ -86,7 +99,8 @@ export function ExpenseForm({
       ...d,
       projectId,
       amount,
-      amountPaid: resolvePaidAmount(isPaid, d.amountPaid ?? 0, amount),
+      // If they explicitly set the paid amount (incl. $0), keep it; else default to full.
+      amountPaid: isPaid ? (paidTouched ? d.amountPaid ?? 0 : resolvePaidAmount(true, d.amountPaid ?? 0, amount)) : 0,
       paidDate: isPaid ? d.paidDate || today() : null,
       budgetLineItemId: d.budgetLineItemId || null,
       budgetLineItemTitle: selectedLineItem?.title ?? d.budgetLineItemTitle ?? '',
@@ -160,7 +174,10 @@ export function ExpenseForm({
             <CurrencyField
               label="Amount paid"
               value={paidValue}
-              onChange={(v) => setD((p) => ({ ...p, amountPaid: v }))}
+              onChange={(v) => {
+                setPaidTouched(true)
+                setD((p) => ({ ...p, amountPaid: v }))
+              }}
             />
             <div className="form-grid">
               <Field label="Paid date">
@@ -191,7 +208,14 @@ export function ExpenseForm({
           )}
         </Field>
         {(receiptFile || d.receiptObjectKey) && (
-          <p className="muted">{receiptFile ? receiptFile.name : 'Receipt attached'}</p>
+          <div className="row-between">
+            <p className="muted" style={{ margin: 0 }}>{receiptFile ? receiptFile.name : 'Receipt attached'}</p>
+            {d.receiptObjectKey && !receiptFile && (
+              <Button type="button" size="sm" variant="secondary" onClick={openReceipt}>
+                View receipt
+              </Button>
+            )}
+          </div>
         )}
         <Field label="Notes">{(p) => <textarea {...p} value={d.notes ?? ''} onChange={text('notes')} />}</Field>
       </div>
