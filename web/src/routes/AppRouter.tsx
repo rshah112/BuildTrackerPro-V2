@@ -9,6 +9,7 @@ import { BudgetScreen } from '../features/budget/BudgetScreen'
 import { ExpensesScreen } from '../features/expenses/ExpensesScreen'
 import { PhotosScreen } from '../features/photos/PhotosScreen'
 import { MoreScreen } from '../features/more/MoreScreen'
+import { VendorsScreen } from '../features/vendors/VendorsScreen'
 
 export function AppRouter() {
   return (
@@ -29,6 +30,7 @@ export function AppRouter() {
           <Route path="/budget" element={<RequireProject><BudgetScreen /></RequireProject>} />
           <Route path="/expenses" element={<RequireProject><ExpensesScreen /></RequireProject>} />
           <Route path="/photos" element={<RequireProject><PhotosScreen /></RequireProject>} />
+          <Route path="/vendors" element={<RequireProject><VendorsScreen /></RequireProject>} />
           <Route path="/more" element={<MoreScreen />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

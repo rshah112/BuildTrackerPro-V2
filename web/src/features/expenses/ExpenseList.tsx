@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Plus, Trash2, Receipt as ReceiptIcon, FileText } from 'lucide-react'
-import type { AllowanceSelection, BudgetLineItem, ChangeOrder, Expense } from '../../domain/types'
-import { useRows } from '../../data/hooks'
+import type { BudgetLineItem, Expense } from '../../domain/types'
 import { balanceDue, effectiveAmountPaid } from '../../lib/expenseMath'
 import { fmt, sumBy } from '../../lib/money'
 import { Button } from '../../components/ui/Button'
@@ -10,22 +9,17 @@ import { Sheet } from '../../components/ui/Sheet'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
-import { useUpdateLineItem } from '../budget/useBudget'
+import { useSyncActuals } from '../budget/useSyncActuals'
 import { ExpenseForm } from './ExpenseForm'
-import { actualPatchesForExpenses, upsertExpense } from './recalculateLineItemActuals'
+import { upsertExpense } from './recalculateLineItemActuals'
 import { useExpenses, useRemoveExpense } from './useExpenses'
 
 type Filter = 'all' | 'open' | 'paid'
 
 export function ExpenseList({ projectId, lineItems }: { projectId: string; lineItems: BudgetLineItem[] }) {
   const { data: expenses = [], isLoading, error } = useExpenses(projectId)
-  const { data: changeOrders = [], isLoading: ordersLoading } = useRows<ChangeOrder>('change_orders', { projectId })
-  const { data: allowanceSelections = [], isLoading: selectionsLoading } = useRows<AllowanceSelection>(
-    'allowance_selections',
-    { projectId },
-  )
   const removeExpense = useRemoveExpense()
-  const updateLineItem = useUpdateLineItem()
+  const syncActuals = useSyncActuals(projectId)
   const toast = useToast()
   const [editing, setEditing] = useState<Expense | 'new' | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
@@ -36,18 +30,13 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
   const paid = sumBy(expenses, effectiveAmountPaid)
   const outstanding = sumBy(expenses, balanceDue)
 
-  const syncActuals = async (nextExpenses: Expense[]) => {
-    const patches = actualPatchesForExpenses({ lineItems, expenses: nextExpenses, changeOrders, allowanceSelections })
-    await Promise.all(patches.map((patch) => updateLineItem.mutateAsync({ id: patch.id, patch: { actual: patch.actual } })))
-  }
-
   const removeAndSync = async (expense: Expense) => {
     await removeExpense.mutateAsync(expense.id)
-    await syncActuals(expenses.filter((e) => e.id !== expense.id))
+    await syncActuals({ expenses: expenses.filter((e) => e.id !== expense.id) })
     toast.success('Expense deleted')
   }
 
-  if (isLoading || ordersLoading || selectionsLoading) return <div className="loading">Loading expenses…</div>
+  if (isLoading) return <div className="loading">Loading expenses…</div>
   if (error) return <p role="alert">Couldn’t load expenses: {(error as Error).message}</p>
 
   return (
@@ -143,7 +132,7 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
             lineItems={lineItems}
             initial={editing === 'new' ? undefined : editing}
             onSaved={async (saved) => {
-              await syncActuals(upsertExpense(expenses, saved))
+              await syncActuals({ expenses: upsertExpense(expenses, saved) })
               toast.success('Expense saved')
             }}
             onDone={() => setEditing(null)}

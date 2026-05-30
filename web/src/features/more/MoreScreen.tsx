@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FolderKanban, LogOut, Sun, Moon, SunMoon, Download } from 'lucide-react'
+import { FolderKanban, LogOut, Sun, Moon, SunMoon, Download, Contact } from 'lucide-react'
 import { signOut } from '../auth/useSession'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
@@ -24,6 +24,11 @@ export function MoreScreen() {
         <Link to="/projects" className="list-row">
           <FolderKanban className="list-row-icon" size={20} aria-hidden />
           <span className="list-row-label">Switch / manage projects</span>
+          <span className="list-row-chevron" aria-hidden>›</span>
+        </Link>
+        <Link to="/vendors" className="list-row">
+          <Contact className="list-row-icon" size={20} aria-hidden />
+          <span className="list-row-label">Vendors</span>
           <span className="list-row-chevron" aria-hidden>›</span>
         </Link>
         {canInstall && (

@@ -601,6 +601,12 @@
   align-items: center;
   gap: 0.35rem;
 }
+.vendor-row-icons {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
 .expense-row-del {
   display: flex;
   align-items: center;
