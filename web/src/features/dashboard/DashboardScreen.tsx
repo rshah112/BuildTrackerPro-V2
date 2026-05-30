@@ -79,6 +79,24 @@ export function DashboardScreen() {
   const due14 = nextFourteenDaysDue(expenses, changeOrders, localToday())
   const recentExpenses = [...expenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
 
+  // --- Estimated Final Cost (EAC): spent + committed + still-to-spend budget + pending COs ---
+  const lineBudgetTotal = sumBy(lineItems, (i) => i.budget)
+  const uncommittedRemaining = Math.max(0, lineBudgetTotal - actual - committed)
+  const estimatedFinalCost = actual + committed + uncommittedRemaining + pending
+  const eacVsBudget = estimatedFinalCost - budgetLimit // + = projected over, − = under
+
+  // --- Contingency burn-down: how much of the contingency the overage has eaten ---
+  const contingency = project?.contingencyBudget ?? 0
+  const overBase = Math.max(0, actual + committed - baseBudget) // spend past the base budget
+  const contingencyUsed = Math.min(contingency, overBase)
+  const contingencyRemaining = Math.max(0, contingency - overBase)
+  const contingencyPct = contingency > 0 ? Math.round((contingencyUsed / contingency) * 100) : 0
+
+  // --- Cost per square foot ---
+  const sqft = project?.squareFootage ?? 0
+  const actualPsf = sqft > 0 ? actual / sqft : 0
+  const eacPsf = sqft > 0 ? estimatedFinalCost / sqft : 0
+
   // Spend by category (top 5 by actual).
   const byCategory = new Map<string, { actual: number; budget: number }>()
   for (const li of lineItems) {
@@ -154,6 +172,36 @@ export function DashboardScreen() {
           <strong className={remaining < 0 ? 'danger-text' : undefined}>{fmt(remaining)}</strong>
           <small>{usedPct}% used</small>
         </div>
+      </div>
+
+      <div className="panel">
+        <div className="row-between">
+          <h2>Estimated final cost</h2>
+          <strong className={eacVsBudget > 0 ? 'danger-text' : undefined}>{fmt(estimatedFinalCost)}</strong>
+        </div>
+        <p className="muted" style={{ margin: '0.25rem 0 0.75rem' }}>
+          {eacVsBudget > 0
+            ? `Projected ${fmt(eacVsBudget)} over budget`
+            : `Projected ${fmt(Math.abs(eacVsBudget))} under budget`}
+          {sqft > 0 && ` · ${fmt(eacPsf)}/sqft (${fmt(actualPsf)}/sqft spent)`}
+        </p>
+        {contingency > 0 && (
+          <>
+            <div className="row-between">
+              <span className="muted">Contingency used</span>
+              <span className={contingencyPct >= 100 ? 'danger-text' : 'muted'}>
+                {fmt(contingencyUsed)} / {fmt(contingency)} ({contingencyPct}%)
+              </span>
+            </div>
+            <div className="progress thin">
+              <span
+                className={contingencyPct >= 90 ? 'fill-danger' : contingencyPct >= 60 ? 'fill-nearLimit' : 'fill-brand'}
+                style={{ width: `${Math.min(100, contingencyPct)}%` }}
+              />
+            </div>
+            <p className="muted" style={{ margin: '0.4rem 0 0' }}>{fmt(contingencyRemaining)} contingency remaining</p>
+          </>
+        )}
       </div>
 
       {categoryBars.length > 0 && (
