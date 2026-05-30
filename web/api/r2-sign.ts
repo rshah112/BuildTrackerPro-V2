@@ -19,6 +19,11 @@ function keyBelongsToUser(key: string, userId: string): boolean {
   return key.startsWith(`${userId}/`)
 }
 
+// Run on the Edge runtime: this handler is written against the Web Fetch API
+// (Request/Response, req.headers.get, req.json) — the Node serverless runtime passes
+// (req, res) Node objects instead, which is why req.headers.get crashed with a 500.
+export const config = { runtime: 'edge' }
+
 function r2Client(): S3Client {
   return new S3Client({
     region: 'auto',
