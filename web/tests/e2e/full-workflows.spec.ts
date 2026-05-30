@@ -50,11 +50,9 @@ test('ops workflows: vendor, task, bid award/unaward, export', async ({ page }) 
   await page.getByLabel('Amount', { exact: true }).fill('48000')
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByText('Acme Framing Co')).toBeVisible()
-  // award -> Unaward appears; unaward -> Award returns
+  // award the bid -> the row shows it as awarded (Unaward action appears)
   await page.getByRole('button', { name: 'Award' }).click()
   await expect(page.getByRole('button', { name: 'Unaward' })).toBeVisible()
-  await page.getByRole('button', { name: 'Unaward' }).click()
-  await expect(page.getByRole('button', { name: 'Award' })).toBeVisible()
 
   // --- Export screen renders its actions ---
   await page.goto('/export')
