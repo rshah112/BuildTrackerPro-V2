@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FolderKanban, LogOut, Sun, Moon, SunMoon } from 'lucide-react'
+import { FolderKanban, LogOut, Sun, Moon, SunMoon, Download } from 'lucide-react'
 import { signOut } from '../auth/useSession'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { getStoredTheme, setTheme, type ThemePref } from '../../lib/theme'
+import { useInstallPrompt } from '../../lib/useInstallPrompt'
 
 export function MoreScreen() {
   const [theme, setThemeState] = useState<ThemePref>(getStoredTheme())
+  const { canInstall, promptInstall } = useInstallPrompt()
   const choose = (t: ThemePref) => {
     setTheme(t)
     setThemeState(t)
@@ -24,6 +26,13 @@ export function MoreScreen() {
           <span className="list-row-label">Switch / manage projects</span>
           <span className="list-row-chevron" aria-hidden>›</span>
         </Link>
+        {canInstall && (
+          <button type="button" className="list-row" onClick={promptInstall}>
+            <Download className="list-row-icon" size={20} aria-hidden />
+            <span className="list-row-label">Install app</span>
+            <span className="list-row-chevron" aria-hidden>›</span>
+          </button>
+        )}
       </div>
 
       <h2 className="section-label">Appearance</h2>

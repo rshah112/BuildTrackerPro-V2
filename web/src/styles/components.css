@@ -866,6 +866,15 @@
     background-position: -200% 0;
   }
 }
+.page-transition {
+  animation: page-in var(--dur) var(--ease-out);
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .overlay-backdrop,
@@ -875,7 +884,10 @@
   .skeleton,
   .btn,
   .spinner-glyph,
-  .btn-spinner {
+  .btn-spinner,
+  .page-transition,
+  .budget-cat-caret,
+  .donut-arc {
     animation: none;
     transition: none;
   }

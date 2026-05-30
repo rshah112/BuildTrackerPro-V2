@@ -1,8 +1,21 @@
+import { useCallback } from 'react'
 import { Outlet, Link } from 'react-router-dom'
 import { FolderKanban } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { TabBar } from './TabBar'
+import { PageTransition } from '../components/ui/PageTransition'
+import { useToast } from '../components/ui/Toast'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
 
 export function AppShell() {
+  const queryClient = useQueryClient()
+  const toast = useToast()
+  const refresh = useCallback(() => {
+    queryClient.invalidateQueries()
+    toast.show('Refreshed')
+  }, [queryClient, toast])
+  usePullToRefresh(refresh)
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -13,7 +26,9 @@ export function AppShell() {
         </Link>
       </header>
       <main className="app-main">
-        <Outlet />
+        <PageTransition>
+          <Outlet />
+        </PageTransition>
       </main>
       <TabBar />
     </div>
