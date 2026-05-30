@@ -13,34 +13,39 @@ dark mode · installable PWA.
 
 ## Native features NOT (fully) on web
 
+> Updated 2026-05-30 (PM): implemented on branch `enhancement-fixes`.
+
 | # | Feature | Status | Value | Notes |
 |---|---------|--------|-------|-------|
-| 1 | **Project Documents** (survey/approvals/plans/permits/inspections/contracts) | table + backup exist; **no UI** | **high** | Permit & contract tracking matters on a real build. Same CRUD pattern as the other entities. |
-| 2 | **Soft-delete / Trash / undo for child entities** | projects only | **high** | Deleting an expense/line item/etc. is permanent — no undo. Native had data recovery. |
-| 3 | **Room Summary** (budget/spend rolled up by room) | missing | medium | Room tags already exist on line items + photos; just needs an aggregation screen. |
-| 4 | **Receipts gallery** (all receipt images in one view) | missing | medium | Needs R2 (manual) first. |
-| 5 | **Project templates (11 types)** "new from template" | missing | low | Low value — you have one seeded project. Room catalog already ported. |
-| 6 | **Portfolio insights** (multi-project rollup + PDF) | missing | low | Intentional: app is single-project-focused for you. |
-| 7 | **Receipt OCR** | missing | low | Native used iOS Vision (no web equiv). Manual entry; optional Tesseract.js later. |
-| 8 | **Per-bid line-item breakdown** (jsonb) | amount only | low | Bids store the total; itemized breakdown UI deferred. |
-| 9 | **Expense "expected payment date" field** in the form | minor | low | Cash flow falls back to due date, so forecasting works; the form just can't set a *distinct* expected date yet. |
+| 1 | **Project Documents** (survey/approvals/plans/permits/inspections/contracts) | ✅ **DONE** | high | `features/documents/`: required checklist, upload/classify, status filter, open/edit/delete. R2 doc uploads live. |
+| 2 | **Soft-delete / Trash / undo for child entities** | ⏳ **deferred** | **high** | Needs `deleted_at` on 11 child tables (shared-prod migration) + rewire every delete + per-entity Trash UI. Biggest remaining parity item; projects already have Trash/Restore. |
+| 3 | **Room Summary** (budget/spend rolled up by room) | ✅ **DONE** | medium | `features/rooms/` — budget/actual + line-item/photo counts per room tag. |
+| 4 | **Receipts gallery** (all receipts in one view) | ✅ **DONE** | medium | `features/expenses/ReceiptsGalleryScreen` — grid of expense receipts, tap to open. |
+| 5 | **Project Info** read-only overview + Mark Complete/Reopen | ✅ **DONE** | low–med | `features/projects/ProjectInfoScreen`. |
+| 6 | **Expense "expected payment date" field** | ✅ **DONE** | low | Added to ExpenseForm. |
+| 7 | **Dropdown empty-state hints** (Expense/CO/Task/Photo lookups) | ✅ **DONE** | med | Field hint when the lookup source is empty (was: "dropdowns have no values"). |
+| 8 | **Project templates (11 types)** "new from template" | ⏳ deferred | low | One seeded project; low value. Room catalog already ported. |
+| 9 | **Portfolio insights** (multi-project rollup + PDF) | ⏳ deferred | low | Intentional: single-project focus. |
+| 10 | **Receipt OCR** | ⏳ deferred | low | Needs a dep (Tesseract.js); no native-Vision equivalent. |
+| 11 | **Per-bid line-item breakdown** (jsonb) | ⏳ deferred | low | Bids store the total; itemized UI deferred. |
+| 12 | **Workbook re-import** ("editable workbook sync") | ⏳ deferred | low–med | PWA exports xlsx but can't read edits back. |
+| 13 | **ZIP export bundle** (timestamped, incl. media) | ⏳ deferred | low | PWA does JSON/Excel/PDF. |
+| 14 | **Settings** beyond appearance | ⏳ deferred | low | PWA "More" has theme only. |
 
-## Useful features missing from BOTH (worth considering)
+## Useful features missing from BOTH (net-new, not parity)
 
-| Feature | Value | Why |
-|---------|-------|-----|
-| **Construction loan draw tracking** | **high** | A $1.3M build is usually financed in draws tied to completion %; tracking draws vs budget/spend is a real gap neither app covers. |
-| **Payment reminders / push notifications** | medium | PWA push for cash-flow due dates. |
-| **Tap-to-call / email vendors** (`tel:` / `mailto:`) | low (quick win) | Vendor phone/email render as plain text today. |
-| **Global search** (expenses, line items, vendors) | low | Useful once data grows. |
-| **Milestone / schedule timeline** | medium | Track build phases against dates. |
+| Feature | Value | Status |
+|---------|-------|--------|
+| **Tap-to-call / email vendors** (`tel:` / `mailto:`) | low (quick win) | ✅ **DONE** |
+| **Construction loan draw tracking** | **high** | ⏳ deferred (net-new: needs schema + design) |
+| **Payment reminders / push notifications** | medium | ⏳ deferred |
+| **Milestone / schedule timeline** | medium | ⏳ deferred |
+| **Global search** (expenses, line items, vendors) | low | ⏳ deferred |
 
-## Suggested next build order (single-user)
-1. **Project Documents** UI (permits/contracts — high real-world value, cheap).
-2. **Soft-delete + Trash for child entities** (data safety — prevents irreversible mistakes).
-3. **Room Summary** screen (cheap analytics win; data already tagged).
-4. Quick wins: vendor `tel:`/`mailto:` links; expense expected-payment-date field.
-5. Then: loan-draw tracking, receipts gallery (after R2), templates, OCR.
+## Remaining build order (single-user)
+1. **Soft-delete + Trash for child entities** (#2) — highest remaining parity item; data-safety win.
+2. **Construction loan-draw tracking** (net-new, high value for a financed build).
+3. Lower: workbook re-import, per-bid breakdown, ZIP export, templates, OCR, push, timeline, search.
 
 ## ⚠️ Requires YOUR manual effort (see session report)
 - **Cloudflare R2** for photo/receipt/document uploads in production.

@@ -60,6 +60,20 @@ describe('useEntityForm', () => {
     expect(create.mutateAsync).toHaveBeenCalledWith({ name: 'ABC' })
   })
 
+  it('captures a failed save in submitError and does not call onDone', async () => {
+    const create = { mutateAsync: vi.fn(async () => { throw new Error('upload failed') }), isPending: false }
+    const update = { mutateAsync: vi.fn(), isPending: false }
+    const onDone = vi.fn()
+    const { result } = renderHook(() =>
+      useEntityForm<Entity, Draft>({ blank: { name: 'x' }, create, update, onDone }),
+    )
+    await act(async () => {
+      await result.current.submit(noEvt)
+    })
+    expect(result.current.submitError).toBe('upload failed')
+    expect(onDone).not.toHaveBeenCalled()
+  })
+
   it('reflects pending state from either mutation in busy', () => {
     const { result } = renderHook(() =>
       useEntityForm<Entity, Draft>({

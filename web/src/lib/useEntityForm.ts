@@ -1,5 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 
+const DEFAULT_ERROR = 'Save failed — please try again.'
+
 // Shared create/update plumbing for the entity forms. Encapsulates the draft state, the
 // create-vs-edit submit branch, the `busy` flag, and the text/date field-change helpers
 // that every form re-implemented. Behavior is identical to the hand-rolled versions:
@@ -31,6 +33,7 @@ export function useEntityForm<TEntity extends { id: string }, TDraft extends obj
 }) {
   const { initial, blank, create, update, transform, onSaved, onDone } = opts
   const [d, setD] = useState<TDraft>((initial as unknown as TDraft) ?? blank)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const busy = create.isPending || update.isPending
 
   const set = <K extends keyof TDraft>(k: K, v: TDraft[K]) => setD((p) => ({ ...p, [k]: v }))
@@ -42,13 +45,21 @@ export function useEntityForm<TEntity extends { id: string }, TDraft extends obj
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    const payload = transform ? await transform(d) : d
-    const saved = initial
-      ? await update.mutateAsync({ id: initial.id, patch: payload })
-      : await create.mutateAsync(payload)
-    await onSaved?.(saved)
-    onDone()
+    setSubmitError(null)
+    try {
+      // transform may upload an attachment (ExpenseForm receipt) and can reject; the
+      // mutations can reject on network/RLS failure. Surface either instead of letting
+      // the button silently flip back to idle.
+      const payload = transform ? await transform(d) : d
+      const saved = initial
+        ? await update.mutateAsync({ id: initial.id, patch: payload })
+        : await create.mutateAsync(payload)
+      await onSaved?.(saved)
+      onDone()
+    } catch (err) {
+      setSubmitError((err as Error)?.message || DEFAULT_ERROR)
+    }
   }
 
-  return { d, setD, set, busy, text, date, submit }
+  return { d, setD, set, busy, text, date, submit, submitError }
 }

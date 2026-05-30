@@ -58,7 +58,7 @@ export function ExpenseForm({
   // re-deriving the full-amount default on every render.
   const [paidTouched, setPaidTouched] = useState(false)
 
-  const { d, setD, text, date, busy, submit } = useEntityForm<Expense, Draft>({
+  const { d, setD, text, date, busy, submit, submitError } = useEntityForm<Expense, Draft>({
     initial,
     blank: blank(projectId),
     create: useCreateExpense(),
@@ -229,6 +229,11 @@ export function ExpenseForm({
         <Field label="Notes">{(p) => <textarea {...p} value={d.notes ?? ''} onChange={text('notes')} />}</Field>
       </Form.Section>
 
+      {submitError && (
+        <p role="alert" className="error-banner">
+          {submitError}
+        </p>
+      )}
       <Form.Actions busy={busy} onCancel={onDone} saveLabel="Save expense" />
     </Form>
   )
