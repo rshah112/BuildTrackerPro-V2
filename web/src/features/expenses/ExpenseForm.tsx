@@ -7,6 +7,7 @@ import { Field } from '../../components/ui/Field'
 import { Select } from '../../components/ui/Select'
 import { CurrencyField } from '../../components/ui/CurrencyField'
 import { Button } from '../../components/ui/Button'
+import { FileUploadField } from '../../components/ui/FileUploadField'
 import { Form } from '../../components/ui/Form'
 import { useEntityForm } from '../../lib/useEntityForm'
 import { resolvePaidAmount } from './paidAmount'
@@ -206,16 +207,14 @@ export function ExpenseForm({
       </Form.Section>
 
       <Form.Section title="Receipt & notes">
-        <Field label="Receipt">
-          {(p) => (
-            <input
-              {...p}
-              type="file"
-              accept="image/*,application/pdf"
-              onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
-            />
-          )}
-        </Field>
+        <FileUploadField
+          label="Receipt"
+          cameraAccept="image/*"
+          cameraLabel="Take photo"
+          fileAccept="image/*,application/pdf"
+          fileLabel="Choose file"
+          onPick={setReceiptFile}
+        />
         {(receiptFile || d.receiptObjectKey) && (
           <div className="row-between">
             <p className="muted" style={{ margin: 0 }}>{receiptFile ? receiptFile.name : 'Receipt attached'}</p>

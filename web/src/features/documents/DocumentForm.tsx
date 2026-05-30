@@ -4,6 +4,7 @@ import { PROJECT_DOCUMENT_KINDS, PROJECT_DOCUMENT_STATUSES, type ProjectDocument
 import { uploadBlob } from '../../lib/r2'
 import { Field } from '../../components/ui/Field'
 import { Select } from '../../components/ui/Select'
+import { FileUploadField } from '../../components/ui/FileUploadField'
 import { Form } from '../../components/ui/Form'
 import { useCreateDocument, useUpdateDocument, DOCUMENT_KIND_LABEL } from './useDocuments'
 
@@ -80,16 +81,15 @@ export function DocumentForm({
   return (
     <Form onSubmit={submit}>
       <Form.Section>
-        <Field label="File" error={err ?? undefined}>
-          {(p) => (
-            <input
-              {...p}
-              type="file"
-              accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-          )}
-        </Field>
+        <FileUploadField
+          label="File"
+          error={err ?? undefined}
+          cameraAccept="image/*"
+          cameraLabel="Take photo"
+          fileAccept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+          fileLabel="Choose file"
+          onPick={setFile}
+        />
         {(file || d.fileObjectKey) && <p className="muted">{file ? file.name : d.fileName || 'File attached'}</p>}
         <Field label="Display name" hint="Optional — defaults to the uploaded file name.">
           {(p) => <input {...p} value={d.fileName ?? ''} onChange={text('fileName')} />}

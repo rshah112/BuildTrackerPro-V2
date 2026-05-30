@@ -1,11 +1,10 @@
-import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
-import { Camera, Images } from 'lucide-react'
+import { useState, type ChangeEvent, type FormEvent } from 'react'
 import type { PhotoAttachment } from '../../domain/types'
 import { PHASE_TAGS } from '../../domain/roomCatalog'
 import { uploadBlob } from '../../lib/r2'
 import { Field } from '../../components/ui/Field'
 import { Select } from '../../components/ui/Select'
-import { Button } from '../../components/ui/Button'
+import { FileUploadField } from '../../components/ui/FileUploadField'
 import { Form } from '../../components/ui/Form'
 import { useCreatePhoto, useUpdatePhoto } from './usePhotos'
 
@@ -37,9 +36,6 @@ export function PhotoForm({
   const [d, setD] = useState<Draft>(initial ?? blank(projectId, rooms[0] ?? 'General'))
   const [file, setFile] = useState<File | null>(null)
   const [err, setErr] = useState<string | null>(null)
-  const cameraRef = useRef<HTMLInputElement>(null)
-  const libraryRef = useRef<HTMLInputElement>(null)
-  const onPick = (e: ChangeEvent<HTMLInputElement>) => setFile(e.target.files?.[0] ?? null)
   const create = useCreatePhoto()
   const update = useUpdatePhoto()
   const busy = create.isPending || update.isPending
@@ -69,42 +65,15 @@ export function PhotoForm({
   return (
     <Form onSubmit={submit}>
       <Form.Section>
-        <div className={`field${err ? ' field-invalid' : ''}`}>
-          <span className="field-label">Photo</span>
-          {/* Two explicit choices. On mobile, "Take photo" opens the camera (capture) and
-              "Photo library" opens the gallery/files (no capture, so it isn't forced to the
-              camera). On desktop both open the file picker. */}
-          <div className="upload-choices">
-            <input
-              ref={cameraRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="sr-only"
-              aria-label="Take a photo"
-              onChange={onPick}
-            />
-            <input
-              ref={libraryRef}
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              aria-label="Choose a photo from your library"
-              onChange={onPick}
-            />
-            <Button type="button" variant="secondary" leadingIcon={<Camera size={16} />} onClick={() => cameraRef.current?.click()}>
-              Take photo
-            </Button>
-            <Button type="button" variant="secondary" leadingIcon={<Images size={16} />} onClick={() => libraryRef.current?.click()}>
-              Photo library
-            </Button>
-          </div>
-          {err && (
-            <p className="field-error" role="alert">
-              {err}
-            </p>
-          )}
-        </div>
+        <FileUploadField
+          label="Photo"
+          error={err ?? undefined}
+          cameraAccept="image/*"
+          cameraLabel="Take photo"
+          fileAccept="image/*"
+          fileLabel="Photo library"
+          onPick={setFile}
+        />
         {(file || d.imageObjectKey) && <p className="muted">{file ? file.name : 'Photo attached'}</p>}
         <div className="form-grid">
           <Field label="Room">
