@@ -374,8 +374,8 @@ textarea {
   box-shadow: var(--shadow-sm);
   padding: 1rem;
 }
-.metric-card span,
-.metric-card small {
+.metric-card > span,
+.metric-card > small {
   display: block;
   color: var(--muted);
 }

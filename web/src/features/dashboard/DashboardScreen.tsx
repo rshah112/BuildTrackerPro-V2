@@ -12,6 +12,8 @@ import { fmt, sumBy } from '../../lib/money'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Badge } from '../../components/ui/Badge'
 import { Skeleton } from '../../components/ui/Feedback'
+import { Stat, TrendDelta } from '../../components/ui/Stat'
+import { SectionCard } from '../../components/ui/SectionCard'
 import { Donut } from '../../components/charts/Donut'
 import { BarRow } from '../../components/charts/BarRow'
 import { Sparkline } from '../../components/charts/Sparkline'
@@ -78,6 +80,16 @@ export function DashboardScreen() {
   const pendingOrders = changeOrders.filter((c) => c.status === 'pending')
   const due14 = nextFourteenDaysDue(expenses, changeOrders, localToday())
   const recentExpenses = [...expenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
+
+  // Spend logged in the trailing 7 days — a momentum read on the Actual spend KPI.
+  const today = localToday()
+  const [ty, tm, td] = today.split('-').map(Number)
+  const wa = new Date(ty, tm - 1, td - 7)
+  const weekAgo = `${wa.getFullYear()}-${String(wa.getMonth() + 1).padStart(2, '0')}-${String(wa.getDate()).padStart(2, '0')}`
+  const spendThisWeek = sumBy(
+    expenses.filter((e) => e.date.slice(0, 10) > weekAgo),
+    (e) => e.amount,
+  )
 
   // --- Estimated Final Cost (EAC): spent + committed + still-to-spend budget + pending COs ---
   const lineBudgetTotal = sumBy(lineItems, (i) => i.budget)
@@ -152,34 +164,33 @@ export function DashboardScreen() {
       </div>
 
       <div className="metric-grid">
-        <div className="metric-card">
-          <span>Budget</span>
-          <strong>{fmt(baseBudget)}</strong>
-          <small>{fmt(project?.contingencyBudget ?? 0)} contingency</small>
-        </div>
-        <div className="metric-card">
-          <span>Actual spend</span>
-          <strong>{fmt(actual)}</strong>
-          <small>{fmt(paid)} cash paid</small>
-        </div>
-        <div className="metric-card">
-          <span>Committed</span>
-          <strong>{fmt(committed)}</strong>
-          <small>{fmt(pending)} pending COs</small>
-        </div>
-        <div className="metric-card">
-          <span>Remaining</span>
-          <strong className={remaining < 0 ? 'danger-text' : undefined}>{fmt(remaining)}</strong>
-          <small>{usedPct}% used</small>
-        </div>
+        <Stat label="Budget" value={fmt(baseBudget)} sub={`${fmt(project?.contingencyBudget ?? 0)} contingency`} />
+        <Stat
+          label="Actual spend"
+          value={fmt(actual)}
+          sub={`${fmt(paid)} cash paid`}
+          delta={
+            spendThisWeek > 0 ? (
+              <TrendDelta value={spendThisWeek} label="this week" format={fmt} />
+            ) : undefined
+          }
+        />
+        <Stat label="Committed" value={fmt(committed)} sub={`${fmt(pending)} pending COs`} />
+        <Stat
+          label="Remaining"
+          value={fmt(remaining)}
+          sub={`${usedPct}% used`}
+          tone={remaining < 0 ? 'danger' : 'default'}
+        />
       </div>
 
-      <div className="panel">
-        <div className="row-between">
-          <h2>Estimated final cost</h2>
+      <SectionCard
+        title="Estimated final cost"
+        trailing={
           <strong className={eacVsBudget > 0 ? 'danger-text' : undefined}>{fmt(estimatedFinalCost)}</strong>
-        </div>
-        <p className="muted" style={{ margin: '0.25rem 0 0.75rem' }}>
+        }
+      >
+        <p className="panel-lead">
           {eacVsBudget > 0
             ? `Projected ${fmt(eacVsBudget)} over budget`
             : `Projected ${fmt(Math.abs(eacVsBudget))} under budget`}
@@ -187,7 +198,7 @@ export function DashboardScreen() {
         </p>
         {contingency > 0 && (
           <>
-            <div className="row-between">
+            <div className="kv-row">
               <span className="muted">Contingency used</span>
               <span className={contingencyPct >= 100 ? 'danger-text' : 'muted'}>
                 {fmt(contingencyUsed)} / {fmt(contingency)} ({contingencyPct}%)
@@ -199,14 +210,13 @@ export function DashboardScreen() {
                 style={{ width: `${Math.min(100, contingencyPct)}%` }}
               />
             </div>
-            <p className="muted" style={{ margin: '0.4rem 0 0' }}>{fmt(contingencyRemaining)} contingency remaining</p>
+            <p className="panel-foot">{fmt(contingencyRemaining)} contingency remaining</p>
           </>
         )}
-      </div>
+      </SectionCard>
 
       {categoryBars.length > 0 && (
-        <div className="panel">
-          <h2>Spend by category</h2>
+        <SectionCard title="Spend by category">
           <div className="barrow-list">
             {categoryBars.map((c) => (
               <BarRow
@@ -219,23 +229,18 @@ export function DashboardScreen() {
               />
             ))}
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {cumulative.length >= 2 && (
-        <div className="panel">
-          <div className="row-between">
-            <h2>Spend over time</h2>
-            <strong>{fmt(running)}</strong>
-          </div>
+        <SectionCard title="Spend over time" trailing={<strong>{fmt(running)}</strong>}>
           <Sparkline values={cumulative} />
-        </div>
+        </SectionCard>
       )}
 
       <div className="two-column">
-        <div className="panel">
-          <h2>Attention</h2>
-          <ul className="plain-list">
+        <SectionCard title="Attention">
+          <ul className="stat-list">
             <li>
               <strong>{overBudgetItems.length}</strong> over budget line items
             </li>
@@ -255,20 +260,19 @@ export function DashboardScreen() {
               <strong>{fmt(allowanceRisk)}</strong> allowance overage
             </li>
           </ul>
-        </div>
+        </SectionCard>
 
-        <div className="panel">
-          <h2>Recent expenses</h2>
-          {recentExpenses.length === 0 && <p>No expenses yet.</p>}
+        <SectionCard title="Recent expenses">
+          {recentExpenses.length === 0 && <p className="panel-lead">No expenses yet.</p>}
           <ul className="plain-list">
             {recentExpenses.map((e: Expense) => (
-              <li key={e.id} className="row-between">
+              <li key={e.id} className="kv-row">
                 <span>{e.vendorName || e.categoryName || 'Expense'}</span>
-                <strong>{fmt(e.amount)}</strong>
+                <strong className="tnum">{fmt(e.amount)}</strong>
               </li>
             ))}
           </ul>
-        </div>
+        </SectionCard>
       </div>
     </section>
   )

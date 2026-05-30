@@ -460,6 +460,8 @@
 
 /* ---- Charts + dashboard hero ---- */
 .hero-card {
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   gap: 1.25rem;
@@ -469,6 +471,22 @@
   box-shadow: var(--shadow-sm);
   padding: 1.25rem;
   margin: 1rem 0;
+}
+/* Blueprint motif: a faint orange-tinted grid fading in from the top-left corner.
+   Static (no motion), purely atmospheric, sits behind the donut and figures. */
+.hero-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--blueprint-grid);
+  background-size: var(--blueprint-size) var(--blueprint-size);
+  -webkit-mask-image: radial-gradient(125% 125% at 0% 0%, #000 0%, transparent 62%);
+  mask-image: radial-gradient(125% 125% at 0% 0%, #000 0%, transparent 62%);
+  opacity: 0.7;
+  pointer-events: none;
+}
+.hero-card > * {
+  position: relative;
 }
 .donut {
   width: 132px;
@@ -1031,4 +1049,109 @@
 .confirm-message {
   margin: 0;
   color: var(--color-text-muted);
+}
+
+/* ---- SectionCard (titled panel) ---- */
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.panel-head h2 {
+  margin: 0;
+}
+.panel-head-trailing {
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+.panel-lead {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+  text-wrap: pretty;
+}
+.panel-lead:last-child {
+  margin-bottom: 0;
+}
+.panel-foot {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+/* Danger-toned panel for alerts (overdue, over budget). */
+.panel-danger {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger-bg) 40%, var(--color-surface));
+}
+
+/* ---- Stat (KPI tile) trend + sub ---- */
+.stat-sub {
+  display: grid;
+  gap: 0.15rem;
+}
+.trend {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+.trend-label {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-faint);
+}
+.trend-pos {
+  color: var(--color-success);
+}
+.trend-neg {
+  color: var(--color-danger);
+}
+
+/* Tight key/value row that stays horizontal on mobile (unlike .row-between, which
+   collapses to a column under 700px for action rows). */
+.kv-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.kv-row > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kv-row > strong {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Stat list (Attention) — lead figure emphasized ---- */
+.stat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+.stat-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.stat-list strong {
+  min-width: 2.5ch;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
 }
