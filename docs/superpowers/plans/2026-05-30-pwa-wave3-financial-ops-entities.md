@@ -16,23 +16,23 @@
 
 ### Task 1: Shared recalc hook
 **Files:** Create `src/features/budget/useSyncActuals.ts`; refactor `ExpenseList.tsx` to use it
-- [ ] `useSyncActuals(projectId)` returns `(nextExpenses?, nextChangeOrders?, nextAllowances?) => Promise<void>` that reads current rows (defaulting to cache), runs `actualPatchesForExpenses`, and persists changed line-item actuals. ExpenseList delegates to it (no behavior change; e2e stays green). Commit.
+- [x] `useSyncActuals(projectId)` returns `(nextExpenses?, nextChangeOrders?, nextAllowances?) => Promise<void>` that reads current rows (defaulting to cache), runs `actualPatchesForExpenses`, and persists changed line-item actuals. ExpenseList delegates to it (no behavior change; e2e stays green). Commit.
 
 ### Task 2: Vendors
 **Files:** `src/features/vendors/` (useVendors, VendorForm, VendorsScreen); route + More link
-- [ ] `useVendors(projectId)` (list/create/update/remove over `vendors`). `VendorForm` in a Sheet: name (required), trade, phone, email, notes. `VendorsScreen`: ScreenHeader, list rows (name + trade + contact), EmptyState, delete with toast. Route `/vendors` (RequireProject). Component test for the form. Commit.
+- [x] `useVendors(projectId)` (list/create/update/remove over `vendors`). `VendorForm` in a Sheet: name (required), trade, phone, email, notes. `VendorsScreen`: ScreenHeader, list rows (name + trade + contact), EmptyState, delete with toast. Route `/vendors` (RequireProject). Component test for the form. Commit.
 
 ### Task 3: Change Orders
 **Files:** `src/features/changeOrders/` (useChangeOrders, ChangeOrderForm, ChangeOrdersScreen); route + More link
-- [ ] CRUD over `change_orders`. Form: title (required), amount (CurrencyField), status (pending/approved/paid Select), budget-line Select (sets categoryName/title), expected payment date, notes. On create/update/delete, call `useSyncActuals` so paid COs update line-item actuals. Screen: status-filtered list (SegmentedControl), status badge, amount; summary tiles (pending/approved/paid totals). Component test. Commit.
+- [x] CRUD over `change_orders`. Form: title (required), amount (CurrencyField), status (pending/approved/paid Select), budget-line Select (sets categoryName/title), expected payment date, notes. On create/update/delete, call `useSyncActuals` so paid COs update line-item actuals. Screen: status-filtered list (SegmentedControl), status badge, amount; summary tiles (pending/approved/paid totals). Component test. Commit.
 
 ### Task 4: Allowance Selections
 **Files:** `src/features/allowances/` (useAllowances, AllowanceForm, AllowancesScreen); route + More link
-- [ ] CRUD over `allowance_selections`. Form: line item (Select of allowance line items), amount (CurrencyField), vendor, selection date, notes. On write, `useSyncActuals`. Screen: list grouped/labeled by line item, amount; show `allowanceOverage` summary. Component test. Commit.
+- [x] CRUD over `allowance_selections`. Form: line item (Select of allowance line items), amount (CurrencyField), vendor, selection date, notes. On write, `useSyncActuals`. Screen: list grouped/labeled by line item, amount; show `allowanceOverage` summary. Component test. Commit.
 
 ### Task 5: More hub + dashboard surfacing
 **Files:** rewrite `src/features/more/MoreScreen.tsx`; small Dashboard addition
-- [ ] More becomes a grouped hub linking Vendors / Change Orders / Allowances (with icons) alongside Projects, Appearance, Install, Sign out. Dashboard: add a small "Change orders" line to the Attention/summary if any are pending/approved. Commit.
+- [x] More becomes a grouped hub linking Vendors / Change Orders / Allowances (with icons) alongside Projects, Appearance, Install, Sign out. Dashboard: add a small "Change orders" line to the Attention/summary if any are pending/approved. Commit.
 
 ### Task 6: e2e + verify
 **Files:** extend `tests/e2e/` (a change-order flow)

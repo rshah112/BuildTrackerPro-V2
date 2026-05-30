@@ -74,6 +74,7 @@ export function DashboardScreen() {
   const overBudgetItems = lineItems.filter((li) => lineItemHealth(li) === 'overBudget')
   const nearLimitItems = lineItems.filter((li) => lineItemHealth(li) === 'nearLimit')
   const openExpenses = expenses.filter((e) => !e.isPaid)
+  const pendingOrders = changeOrders.filter((c) => c.status === 'pending')
   const recentExpenses = [...expenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
 
   // Spend by category (top 5 by actual).
@@ -193,6 +194,9 @@ export function DashboardScreen() {
             </li>
             <li>
               <strong>{openExpenses.length}</strong> open expenses
+            </li>
+            <li>
+              <strong>{pendingOrders.length}</strong> pending change orders
             </li>
             <li>
               <strong>{fmt(allowanceRisk)}</strong> allowance overage
