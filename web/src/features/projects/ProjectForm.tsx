@@ -1,6 +1,10 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import type { Project } from '../../domain/types'
 import { PROJECT_STATUSES, PROJECT_PRIORITIES, PROJECT_TEMPLATE_TYPES } from '../../domain/enums'
+import { Field } from '../../components/ui/Field'
+import { Select } from '../../components/ui/Select'
+import { CurrencyField } from '../../components/ui/CurrencyField'
+import { Button } from '../../components/ui/Button'
 import { useCreateProject, useUpdateProject } from './useProjects'
 
 type Draft = Partial<Project>
@@ -40,6 +44,7 @@ export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: ()
   const num =
     (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement>) =>
       setD((p) => ({ ...p, [k]: e.target.value === '' ? null : Number(e.target.value) }))
+  const money = (k: keyof Draft) => (v: number) => setD((p) => ({ ...p, [k]: v }))
   const date =
     (k: keyof Draft) => (e: ChangeEvent<HTMLInputElement>) =>
       setD((p) => ({ ...p, [k]: e.target.value === '' ? null : e.target.value }))
@@ -53,46 +58,124 @@ export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: ()
 
   return (
     <form onSubmit={submit} className="form">
-      <h1>{initial ? 'Edit project' : 'New project'}</h1>
+      <div className="form-section">
+        <Field label="Name">
+          {(p) => <input {...p} value={d.name ?? ''} onChange={text('name')} required autoFocus />}
+        </Field>
+        <Field label="Address">
+          {(p) => <input {...p} value={d.address ?? ''} onChange={text('address')} />}
+        </Field>
+        <div className="form-grid">
+          <Field label="Status">
+            {(p) => (
+              <Select {...p} value={d.status} onChange={text('status')}>
+                {PROJECT_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Priority">
+            {(p) => (
+              <Select {...p} value={d.priority} onChange={text('priority')}>
+                {PROJECT_PRIORITIES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        </div>
+        <Field label="Template">
+          {(p) => (
+            <Select {...p} value={d.templateType} onChange={text('templateType')}>
+              {PROJECT_TEMPLATE_TYPES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+      </div>
 
-      <label>Name<input value={d.name ?? ''} onChange={text('name')} required /></label>
-      <label>Address<input value={d.address ?? ''} onChange={text('address')} /></label>
+      <h3 className="form-section-title">Budget</h3>
+      <div className="form-section">
+        <CurrencyField
+          label="Construction budget"
+          value={d.constructionBudget ?? 0}
+          onChange={money('constructionBudget')}
+        />
+        <CurrencyField
+          label="Contingency budget"
+          value={d.contingencyBudget ?? 0}
+          onChange={money('contingencyBudget')}
+        />
+        <CurrencyField label="Purchase price" value={d.purchasePrice ?? 0} onChange={money('purchasePrice')} />
+      </div>
 
-      <label>Status
-        <select value={d.status} onChange={text('status')}>
-          {PROJECT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </label>
-      <label>Priority
-        <select value={d.priority} onChange={text('priority')}>
-          {PROJECT_PRIORITIES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </label>
-      <label>Template
-        <select value={d.templateType} onChange={text('templateType')}>
-          {PROJECT_TEMPLATE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </label>
+      <h3 className="form-section-title">Structure</h3>
+      <div className="form-section">
+        <div className="form-grid">
+          <Field label="Square footage">
+            {(p) => (
+              <input type="number" step="1" {...p} value={d.squareFootage ?? ''} onChange={num('squareFootage')} />
+            )}
+          </Field>
+          <Field label="Stories">
+            {(p) => <input type="number" step="1" {...p} value={d.stories ?? 0} onChange={num('stories')} />}
+          </Field>
+        </div>
+        <Field label="Footprint">
+          {(p) => <input {...p} value={d.footprint ?? ''} onChange={text('footprint')} />}
+        </Field>
+        <Field label="Basement">
+          {(p) => <input {...p} value={d.basement ?? ''} onChange={text('basement')} />}
+        </Field>
+        <Field label="Lot dimensions">
+          {(p) => <input {...p} value={d.lotDimensions ?? ''} onChange={text('lotDimensions')} />}
+        </Field>
+        <Field label="Proposed build dimensions">
+          {(p) => (
+            <input {...p} value={d.proposedBuildDimensions ?? ''} onChange={text('proposedBuildDimensions')} />
+          )}
+        </Field>
+      </div>
 
-      <label>Purchase price<input type="number" step="0.01" value={d.purchasePrice ?? 0} onChange={num('purchasePrice')} /></label>
-      <label>Square footage<input type="number" step="1" value={d.squareFootage ?? ''} onChange={num('squareFootage')} /></label>
-      <label>Construction budget<input type="number" step="0.01" value={d.constructionBudget ?? 0} onChange={num('constructionBudget')} /></label>
-      <label>Contingency budget<input type="number" step="0.01" value={d.contingencyBudget ?? 0} onChange={num('contingencyBudget')} /></label>
+      <h3 className="form-section-title">Dates</h3>
+      <div className="form-section">
+        <div className="form-grid">
+          <Field label="Start date">
+            {(p) => <input type="date" {...p} value={dateValue(d.startDate)} onChange={date('startDate')} />}
+          </Field>
+          <Field label="Target finish">
+            {(p) => (
+              <input type="date" {...p} value={dateValue(d.targetFinishDate)} onChange={date('targetFinishDate')} />
+            )}
+          </Field>
+        </div>
+      </div>
 
-      <label>Start date<input type="date" value={dateValue(d.startDate)} onChange={date('startDate')} /></label>
-      <label>Target finish<input type="date" value={dateValue(d.targetFinishDate)} onChange={date('targetFinishDate')} /></label>
+      <h3 className="form-section-title">Notes</h3>
+      <div className="form-section">
+        <Field label="Scope summary">
+          {(p) => <textarea {...p} value={d.scopeSummary ?? ''} onChange={text('scopeSummary')} />}
+        </Field>
+        <Field label="Warranty notes">
+          {(p) => <textarea {...p} value={d.warrantyNotes ?? ''} onChange={text('warrantyNotes')} />}
+        </Field>
+      </div>
 
-      <label>Lot dimensions<input value={d.lotDimensions ?? ''} onChange={text('lotDimensions')} /></label>
-      <label>Proposed build dimensions<input value={d.proposedBuildDimensions ?? ''} onChange={text('proposedBuildDimensions')} /></label>
-      <label>Footprint<input value={d.footprint ?? ''} onChange={text('footprint')} /></label>
-      <label>Stories<input type="number" step="1" value={d.stories ?? 0} onChange={num('stories')} /></label>
-      <label>Basement<input value={d.basement ?? ''} onChange={text('basement')} /></label>
-      <label>Scope summary<textarea value={d.scopeSummary ?? ''} onChange={text('scopeSummary')} /></label>
-      <label>Warranty notes<textarea value={d.warrantyNotes ?? ''} onChange={text('warrantyNotes')} /></label>
-
-      <div className="form-actions">
-        <button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
-        <button type="button" className="secondary" onClick={onDone}>Cancel</button>
+      <div className="form-actions form-actions-sticky">
+        <Button type="submit" loading={busy} fullWidth>
+          Save
+        </Button>
+        <Button type="button" variant="secondary" onClick={onDone}>
+          Cancel
+        </Button>
       </div>
     </form>
   )

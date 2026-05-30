@@ -1,9 +1,24 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Plus, ChevronRight, Trash2, Pencil, FolderOpen } from 'lucide-react'
 import type { Project } from '../../domain/types'
+import type { ProjectStatus } from '../../domain/enums'
+import { fmt } from '../../lib/money'
+import { ScreenHeader } from '../../app/ScreenHeader'
+import { Button } from '../../components/ui/Button'
+import { Badge, type BadgeTone } from '../../components/ui/Badge'
+import { Sheet } from '../../components/ui/Sheet'
+import { EmptyState, Skeleton } from '../../components/ui/Feedback'
 import { useProjects, useUpdateProject } from './useProjects'
 import { useCurrentProject } from './currentProject'
 import { ProjectForm } from './ProjectForm'
+
+const STATUS_TONE: Record<ProjectStatus, BadgeTone> = {
+  planning: 'info',
+  active: 'success',
+  paused: 'warn',
+  complete: 'neutral',
+}
 
 export function ProjectsScreen() {
   const { data: projects = [], isLoading, error } = useProjects()
@@ -11,12 +26,6 @@ export function ProjectsScreen() {
   const { setProjectId } = useCurrentProject()
   const navigate = useNavigate()
   const [editing, setEditing] = useState<Project | 'new' | null>(null)
-
-  if (editing) {
-    return <ProjectForm initial={editing === 'new' ? undefined : editing} onDone={() => setEditing(null)} />
-  }
-  if (isLoading) return <div className="loading">Loading projects…</div>
-  if (error) return <p role="alert">Couldn’t load projects: {(error as Error).message}</p>
 
   const active = projects.filter((p) => !p.deletedAt)
   const trashed = projects.filter((p) => p.deletedAt)
@@ -28,48 +37,108 @@ export function ProjectsScreen() {
 
   return (
     <section>
-      <div className="row-between">
-        <h1>Projects</h1>
-        <button onClick={() => setEditing('new')}>New project</button>
-      </div>
+      <ScreenHeader
+        title="Projects"
+        trailing={
+          <Button size="sm" leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+            New project
+          </Button>
+        }
+      />
 
-      {active.length === 0 && <p>No projects yet — create your first one.</p>}
-      <ul className="card-list">
-        {active.map((p) => (
-          <li key={p.id} className="card">
-            <button className="link" onClick={() => open(p)}>
-              <strong>{p.name || 'Untitled'}</strong>
-              {p.address && <span className="muted"> · {p.address}</span>}
-            </button>
-            <div className="card-actions">
-              <button className="secondary" onClick={() => setEditing(p)}>Edit</button>
-              <button
-                className="danger"
-                onClick={() => update.mutate({ id: p.id, patch: { deletedAt: new Date().toISOString() } })}
-              >
-                Trash
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {error && <p role="alert">Couldn’t load projects: {(error as Error).message}</p>}
+
+      {isLoading ? (
+        <div className="card-list">
+          <Skeleton height="76px" radius="var(--radius-lg)" />
+          <Skeleton height="76px" radius="var(--radius-lg)" />
+        </div>
+      ) : active.length === 0 ? (
+        <EmptyState
+          icon={FolderOpen}
+          title="No projects yet"
+          body="Create your first project to start tracking its budget, expenses, and photos."
+          action={
+            <Button leadingIcon={<Plus size={16} />} onClick={() => setEditing('new')}>
+              New project
+            </Button>
+          }
+        />
+      ) : (
+        <ul className="card-list">
+          {active.map((p) => {
+            const budget = p.constructionBudget + p.contingencyBudget
+            return (
+              <li key={p.id} className="project-card">
+                <button className="project-card-open" aria-label={p.name || 'Untitled'} onClick={() => open(p)}>
+                  <div className="project-card-main">
+                    <strong className="project-card-name">{p.name || 'Untitled'}</strong>
+                    {p.address && <span className="project-card-addr">{p.address}</span>}
+                  </div>
+                  <ChevronRight className="project-card-chevron" size={20} aria-hidden />
+                </button>
+                <div className="project-card-footer">
+                  <Badge tone={STATUS_TONE[p.status]}>{p.status}</Badge>
+                  <span className="project-card-budget">{fmt(budget)} budget</span>
+                  <span className="project-card-actions">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      leadingIcon={<Pencil size={15} />}
+                      onClick={() => setEditing(p)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      leadingIcon={<Trash2 size={15} />}
+                      onClick={() => update.mutate({ id: p.id, patch: { deletedAt: new Date().toISOString() } })}
+                    >
+                      Trash
+                    </Button>
+                  </span>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
 
       {trashed.length > 0 && (
         <>
-          <h2>Trash</h2>
+          <h2 className="section-label">Trash</h2>
           <p className="muted">Deleted projects are kept 30 days before permanent removal.</p>
           <ul className="card-list">
             {trashed.map((p) => (
-              <li key={p.id} className="card">
-                <span className="muted">{p.name || 'Untitled'}</span>
-                <button className="secondary" onClick={() => update.mutate({ id: p.id, patch: { deletedAt: null } })}>
-                  Restore
-                </button>
+              <li key={p.id} className="project-card">
+                <div className="project-card-footer">
+                  <span className="muted" style={{ flex: 1 }}>
+                    {p.name || 'Untitled'}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => update.mutate({ id: p.id, patch: { deletedAt: null } })}
+                  >
+                    Restore
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
         </>
       )}
+
+      <Sheet
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        title={editing === 'new' ? 'New project' : 'Edit project'}
+      >
+        {editing !== null && (
+          <ProjectForm initial={editing === 'new' ? undefined : editing} onDone={() => setEditing(null)} />
+        )}
+      </Sheet>
     </section>
   )
 }
