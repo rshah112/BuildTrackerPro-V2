@@ -24,18 +24,18 @@
 
 ### Task 2: Icon system + input primitives
 **Files:** add `lucide-react`; create `src/components/ui/{Icon,Button,Field,Select,Badge,SegmentedControl}.tsx` + `Button.test.tsx`, `Field.test.tsx`
-- [ ] `Button` (variants primary/secondary/ghost/danger, sizes sm/md/lg, optional leading icon, `loading` spinner, full-width). `Field` (label + control + hint + error, wires `id`/`aria-describedby`/`aria-invalid`). `Select` (styled native select + chevron). `Badge`/`StatusPill` (semantic tone). `SegmentedControl` (iOS-style, `role=tablist`). `Icon` thin wrapper over lucide with sized defaults.
-- [ ] Tests: Button renders variant/loading + keeps accessible name; Field shows error and links `aria-describedby`. Run tests. Commit.
+- [x] `Button` (variants primary/secondary/ghost/danger, sizes sm/md/lg, optional leading icon, `loading` spinner, full-width). `Field` (label + control + hint + error, wires `id`/`aria-describedby`/`aria-invalid`). `Select` (styled native select + chevron). `Badge`/`StatusPill` (semantic tone). `SegmentedControl` (iOS-style, `role=tablist`). `Icon` thin wrapper over lucide with sized defaults.
+- [x] Tests: Button renders variant/loading + keeps accessible name; Field shows error and links `aria-describedby`. Run tests. Commit.
 
 ### Task 3: Overlay + feedback primitives
 **Files:** create `src/components/ui/{Sheet,Modal,Toast,EmptyState,Skeleton,Spinner}.tsx`, `src/components/ui/ToastProvider.tsx` + `Sheet.test.tsx`, `Toast.test.tsx`
-- [ ] `Sheet`: iOS bottom-sheet (backdrop, rounded top, safe-area pad, drag-handle, swipe/Escape/backdrop dismiss, focus trap, scroll lock). `Modal` = centered variant sharing the same shell. `Toast` provider + `useToast()` (success/error, auto-dismiss, stacked, `role=status`). `EmptyState` (icon + title + body + optional action). `Skeleton` (shimmer) + `Spinner`.
-- [ ] Tests: Sheet opens/closes via backdrop + Escape and traps focus; `useToast` enqueues and auto-dismisses. Mount `ToastProvider` in `main.tsx`. Run tests. Commit.
+- [x] `Sheet`: iOS bottom-sheet (backdrop, rounded top, safe-area pad, drag-handle, swipe/Escape/backdrop dismiss, focus trap, scroll lock). `Modal` = centered variant sharing the same shell. `Toast` provider + `useToast()` (success/error, auto-dismiss, stacked, `role=status`). `EmptyState` (icon + title + body + optional action). `Skeleton` (shimmer) + `Spinner`.
+- [x] Tests: Sheet opens/closes via backdrop + Escape and traps focus; `useToast` enqueues and auto-dismisses. Mount `ToastProvider` in `main.tsx`. Run tests. Commit.
 
 ### Task 4: App shell + navigation re-skin
 **Files:** rewrite `src/app/AppShell.tsx`; create `src/app/{ScreenHeader,TabBar}.tsx`, `src/features/more/MoreScreen.tsx` (theme toggle); update `index.html` theme-color metas
-- [ ] iOS large-title `ScreenHeader` (title + optional subtitle + trailing action slot, safe-area top). Icon `TabBar` (lucide glyph + label per tab, active tint, safe-area bottom, 44px targets). Light/dark `theme-color` metas. Dark-mode toggle (SegmentedControl) lives in `MoreScreen`.
-- [ ] Preserve `nav[aria-label="Primary"]` and link names (Dashboard/Budget/Expenses/Photos/More). Run `npm run test` + `npm run e2e`. Commit.
+- [x] iOS large-title `ScreenHeader` (title + optional subtitle + trailing action slot, safe-area top). Icon `TabBar` (lucide glyph + label per tab, active tint, safe-area bottom, 44px targets). Light/dark `theme-color` metas. Dark-mode toggle (SegmentedControl) lives in `MoreScreen`.
+- [x] Preserve `nav[aria-label="Primary"]` and link names (Dashboard/Budget/Expenses/Photos/More). Run `npm run test` + `npm run e2e`. Commit.
 
 ### Task 5: Re-skin Projects + Project form
 **Files:** rewrite `src/features/projects/{ProjectsScreen,ProjectForm}.tsx`; create `src/components/ui/CurrencyField.tsx` (+ test)
