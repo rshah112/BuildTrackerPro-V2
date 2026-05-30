@@ -15,6 +15,9 @@ import {
   CalendarClock,
   FileDown,
   FolderOpen,
+  Info,
+  Grid2x2,
+  Receipt,
   type LucideIcon,
 } from 'lucide-react'
 import { signOut } from '../auth/useSession'
@@ -26,12 +29,15 @@ import { useInstallPrompt } from '../../lib/useInstallPrompt'
 import { useCurrentProject } from '../projects/currentProject'
 
 const PROJECT_LINKS: { to: string; label: string; icon: LucideIcon }[] = [
+  { to: '/project-info', label: 'Project info', icon: Info },
   { to: '/tasks', label: 'Tasks', icon: ListTodo },
   { to: '/vendors', label: 'Vendors', icon: Contact },
   { to: '/change-orders', label: 'Change orders', icon: FileEdit },
   { to: '/allowances', label: 'Allowances', icon: Sparkles },
   { to: '/bids', label: 'Bids', icon: FileStack },
   { to: '/documents', label: 'Documents', icon: FolderOpen },
+  { to: '/receipts', label: 'Receipts', icon: Receipt },
+  { to: '/rooms', label: 'By room', icon: Grid2x2 },
   { to: '/cashflow', label: 'Cash flow', icon: CalendarClock },
   { to: '/export', label: 'Export & backup', icon: FileDown },
 ]
