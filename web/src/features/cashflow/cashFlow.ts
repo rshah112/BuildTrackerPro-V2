@@ -28,6 +28,14 @@ export interface CashFlowDay {
 
 const day = (iso: string) => iso.slice(0, 10)
 const max = (a: string, b: string) => (a < b ? b : a)
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** Today as yyyy-mm-dd in the DEVICE-LOCAL calendar (not UTC), so the 14-day horizon
+ *  lines up with the user's actual day rather than shifting near midnight in non-UTC
+ *  timezones. Pass this to the forecast functions. */
+export function localToday(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
 
 export function addDays(iso: string, days: number): string {
   const [y, m, d] = day(iso).split('-').map(Number)

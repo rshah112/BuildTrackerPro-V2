@@ -10,17 +10,25 @@ export function PhotoThumb({ objectKey, alt }: { objectKey: string | null; alt: 
   useEffect(() => {
     if (!objectKey) return
     let active = true
+    let created: string | null = null
     signedDownloadUrl(objectKey)
       .then((u) => {
-        if (!active) return
-        if (u) setUrl(u)
-        else setFailed(true)
+        if (!active) {
+          if (u && u.startsWith('blob:')) URL.revokeObjectURL(u)
+          return
+        }
+        if (u) {
+          created = u
+          setUrl(u)
+        } else setFailed(true)
       })
       .catch(() => {
         if (active) setFailed(true)
       })
     return () => {
       active = false
+      // Local mode returns an object URL; release it to avoid a leak.
+      if (created && created.startsWith('blob:')) URL.revokeObjectURL(created)
     }
   }, [objectKey])
 

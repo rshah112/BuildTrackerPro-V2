@@ -6,7 +6,10 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
 
-const snakeKey = (s: string) => s.replace(/_([a-z0-9])/g, (_m, c: string) => c.toUpperCase())
+// Symmetric inverses: snake->camel only consumes `_<letter>` (not `_<digit>`), and
+// camel->snake only inserts `_` before uppercase letters (never digits), so an
+// underscore before a digit (e.g. address_2) survives a round-trip.
+const snakeKey = (s: string) => s.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase())
 const camelKey = (s: string) => s.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase())
 
 export function toCamel<T = unknown>(value: unknown): T {

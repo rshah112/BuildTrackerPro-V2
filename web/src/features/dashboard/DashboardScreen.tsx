@@ -76,7 +76,7 @@ export function DashboardScreen() {
   const nearLimitItems = lineItems.filter((li) => lineItemHealth(li) === 'nearLimit')
   const openExpenses = expenses.filter((e) => !e.isPaid)
   const pendingOrders = changeOrders.filter((c) => c.status === 'pending')
-  const due14 = nextFourteenDaysDue(expenses, changeOrders, new Date().toISOString())
+  const due14 = nextFourteenDaysDue(expenses, changeOrders, localToday())
   const recentExpenses = [...expenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
 
   // Spend by category (top 5 by actual).

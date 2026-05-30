@@ -147,7 +147,11 @@ export function BidsScreen() {
                           </div>
                           <div className="lineitem-foot">
                             <span className="lineitem-acts">
-                              {!awarded && (
+                              {awarded ? (
+                                <Button size="sm" variant="ghost" onClick={() => unaward(pkg, b)}>
+                                  Unaward
+                                </Button>
+                              ) : (
                                 <Button size="sm" variant="ghost" leadingIcon={<Award size={14} />} onClick={() => award(pkg, b)}>
                                   Award
                                 </Button>

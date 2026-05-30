@@ -38,12 +38,21 @@ export function RequireProject({ children }: { children: ReactNode }) {
   const { projectId, setProjectId } = useCurrentProject()
   const { data: projects = [], isLoading } = useProjects()
   const active = projects.filter((p) => !p.deletedAt)
+  const valid = projectId != null && active.some((p) => p.id === projectId)
 
   useEffect(() => {
-    if (!projectId && active.length === 1) setProjectId(active[0].id)
-  }, [projectId, active, setProjectId])
+    if (isLoading) return
+    if (projectId && !active.some((p) => p.id === projectId)) {
+      // Stored id points at a trashed/deleted/foreign project — drop it so we
+      // re-resolve (auto-select the only project, or bounce to the picker).
+      setProjectId(null)
+    } else if (!projectId && active.length === 1) {
+      setProjectId(active[0].id)
+    }
+  }, [projectId, active, isLoading, setProjectId])
 
-  if (projectId) return <>{children}</>
+  if (valid) return <>{children}</>
+  // Still loading, or about to auto-select/clear — show a spinner instead of a flash.
   if (isLoading || active.length === 1) return <div className="loading">Loading…</div>
   return <Navigate to="/projects" replace />
 }
