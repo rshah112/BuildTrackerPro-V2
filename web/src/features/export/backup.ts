@@ -104,5 +104,11 @@ export async function restoreBackup(json: string): Promise<string> {
     budgetLineItemId: remap(lineMap, r.budgetLineItemId),
   }))
 
+  // Construction loan (+ its draws, re-pointed at the new loan id).
+  const loanMap = await insertMapped('construction_loans', file.loans)
+  await insertMapped('loan_draws', file.loanDraws, (r) => ({
+    loanId: remap(loanMap, r.loanId) ?? (r.loanId as string),
+  }))
+
   return pid
 }

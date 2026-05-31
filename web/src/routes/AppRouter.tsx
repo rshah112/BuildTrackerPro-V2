@@ -27,6 +27,7 @@ const RoomSummaryScreen = lazy(() => import('../features/rooms/RoomSummaryScreen
 const ReceiptsGalleryScreen = lazy(() => import('../features/expenses/ReceiptsGalleryScreen').then((m) => ({ default: m.ReceiptsGalleryScreen })))
 const ProjectInfoScreen = lazy(() => import('../features/projects/ProjectInfoScreen').then((m) => ({ default: m.ProjectInfoScreen })))
 const TrashScreen = lazy(() => import('../features/trash/TrashScreen').then((m) => ({ default: m.TrashScreen })))
+const LoanScreen = lazy(() => import('../features/loan/LoanScreen').then((m) => ({ default: m.LoanScreen })))
 
 export function AppRouter() {
   return (
@@ -58,6 +59,7 @@ export function AppRouter() {
           <Route path="/receipts" element={<RequireProject><ReceiptsGalleryScreen /></RequireProject>} />
           <Route path="/project-info" element={<RequireProject><ProjectInfoScreen /></RequireProject>} />
           <Route path="/trash" element={<RequireProject><TrashScreen /></RequireProject>} />
+          <Route path="/loan" element={<RequireProject><LoanScreen /></RequireProject>} />
           <Route path="/export" element={<RequireProject><ExportScreen /></RequireProject>} />
           <Route path="/more" element={<MoreScreen />} />
         </Route>

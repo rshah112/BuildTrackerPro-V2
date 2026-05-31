@@ -6,7 +6,9 @@ import type {
   BudgetCategory,
   BudgetLineItem,
   ChangeOrder,
+  ConstructionLoan,
   Expense,
+  LoanDraw,
   PhotoAttachment,
   Project,
   ProjectDocument,
@@ -27,6 +29,8 @@ export interface ProjectExport {
   bids: Bid[]
   photos: PhotoAttachment[]
   documents: ProjectDocument[]
+  loans: ConstructionLoan[]
+  loanDraws: LoanDraw[]
   exportedAt: string
 }
 
@@ -46,6 +50,8 @@ export async function loadProjectExport(projectId: string): Promise<ProjectExpor
     bids,
     photos,
     documents,
+    loans,
+    loanDraws,
   ] = await Promise.all([
     table<Project>('projects').get(projectId),
     table<BudgetCategory>('budget_categories').list(f),
@@ -59,6 +65,8 @@ export async function loadProjectExport(projectId: string): Promise<ProjectExpor
     table<Bid>('bids').list(f),
     table<PhotoAttachment>('photo_attachments').list(f),
     table<ProjectDocument>('project_documents').list(f),
+    table<ConstructionLoan>('construction_loans').list(f),
+    table<LoanDraw>('loan_draws').list(f),
   ])
 
   if (!project) throw new Error('Project not found')
@@ -76,6 +84,8 @@ export async function loadProjectExport(projectId: string): Promise<ProjectExpor
     bids,
     photos,
     documents,
+    loans,
+    loanDraws,
     exportedAt: new Date().toISOString(),
   }
 }

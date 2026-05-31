@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react'
-import { FileSpreadsheet, FileText, Download, Upload } from 'lucide-react'
+import { FileSpreadsheet, FileText, Download, Upload, CloudUpload } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
 import { downloadBackup, restoreBackup } from './backup'
+import { backupToCloud } from './cloudBackup'
 
 // xlsx (~430KB) and jspdf (~350KB) are loaded on demand the first time the user actually
 // exports, not when the Export screen mounts — keeping them out of every other chunk.
@@ -79,6 +80,15 @@ export function ExportScreen() {
         <Button
           variant="secondary"
           fullWidth
+          loading={busy === 'cloud'}
+          leadingIcon={<CloudUpload size={18} />}
+          onClick={() => run('cloud', () => backupToCloud(projectId), 'Backed up to the cloud')}
+        >
+          Back up to cloud now
+        </Button>
+        <Button
+          variant="secondary"
+          fullWidth
           loading={busy === 'backup'}
           leadingIcon={<Download size={18} />}
           onClick={() => run('backup', () => downloadBackup(projectId), 'Backup downloaded')}
@@ -102,7 +112,10 @@ export function ExportScreen() {
           onChange={onRestoreFile}
         />
       </div>
-      <p className="muted">Restore creates a new project from the file — your current project is left untouched.</p>
+      <p className="muted">
+        Restore creates a new project from the file — your current project is left untouched. The app
+        also snapshots this project to secure cloud storage automatically once a day.
+      </p>
     </section>
   )
 }

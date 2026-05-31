@@ -32,12 +32,20 @@ dark mode · installable PWA.
 | 13 | **ZIP export bundle** (timestamped, incl. media) | ⏳ deferred | low | PWA does JSON/Excel/PDF. |
 | 14 | **Settings** beyond appearance | ⏳ deferred | low | PWA "More" has theme only. |
 
+## Data safety (this app is the sole repository of the build — layered protection)
+- **Soft-delete + Trash** on all child entities + projects (no accidental permanent loss). ✅
+- **Undo toast** on every delete. ✅
+- **Confirm dialogs** on destructive actions. ✅
+- **Automatic daily off-site snapshot to R2** (full JSON, independent of Postgres) + manual "Back up to cloud now" + downloadable JSON backup/restore (now includes loans). ✅
+- **Supabase managed daily backups** (free tier, 7-day retention). ✅ (managed)
+- ⚠️ **RECOMMENDED (needs your action — paid):** upgrade the shared Supabase project to **Pro for Point-in-Time Recovery (PITR)** — restore to any second, the strongest single protection. ~$25/mo. The only durability lever I can't pull for you.
+
 ## Useful features missing from BOTH (net-new, not parity)
 
 | Feature | Value | Status |
 |---------|-------|--------|
 | **Tap-to-call / email vendors** (`tel:` / `mailto:`) | low (quick win) | ✅ **DONE** |
-| **Construction loan draw tracking** | **high** | ⏳ deferred (net-new: needs schema + design) |
+| **Construction loan draw tracking** | **high** | ✅ **DONE** (per-project optional; total/rate/draws, interest-only monthly payment) |
 | **Payment reminders / push notifications** | medium | ⏳ deferred |
 | **Milestone / schedule timeline** | medium | ⏳ deferred |
 | **Global search** (expenses, line items, vendors) | low | ⏳ deferred |

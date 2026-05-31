@@ -73,6 +73,22 @@ try {
   // B inserting a row owned by A must be rejected by WITH CHECK.
   const bForge = await b.client.from('projects').insert({ name: 'forged', owner: a.id }).select()
   assert(!!bForge.error, 'B must not insert a row owned by A (WITH CHECK)')
+
+  // --- Child-row isolation: A's expense must be invisible/untouchable to B. ---
+  const eIns = await a.client
+    .from('expenses')
+    .insert({ project_id: projectId, owner: a.id, vendor_name: `RLS exp ${stamp}`, amount: 1234 })
+    .select()
+    .single()
+  if (eIns.error) throw new Error(`A expense insert: ${eIns.error.message}`)
+  const expenseId = eIns.data.id
+
+  const bExpList = await b.client.from('expenses').select('id')
+  assert(!bExpList.error && bExpList.data.every((r) => r.id !== expenseId), 'B must not see A’s expense')
+  const bExpUpd = await b.client.from('expenses').update({ amount: 0 }).eq('id', expenseId).select()
+  assert(!bExpUpd.error && bExpUpd.data.length === 0, 'B update of A’s expense must affect 0 rows')
+  const bExpDel = await b.client.from('expenses').delete().eq('id', expenseId).select()
+  assert(!bExpDel.error && bExpDel.data.length === 0, 'B delete of A’s expense must affect 0 rows')
 } catch (e) {
   failures.push(`threw: ${e.message}`)
 } finally {

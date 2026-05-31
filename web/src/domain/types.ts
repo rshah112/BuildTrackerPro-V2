@@ -208,3 +208,29 @@ export interface AllowanceSelection {
   notes: string
   photoObjectKey: string | null
 }
+
+export interface ConstructionLoan {
+  id: UUID
+  owner: UUID
+  projectId: UUID
+  lender: string
+  totalAmount: number
+  /** Annual interest rate as a percent (interest-only). */
+  interestRate: number
+  notes: string
+  createdAt: ISODateString
+  deletedAt?: ISODateString | null
+}
+
+export interface LoanDraw {
+  id: UUID
+  owner: UUID
+  projectId: UUID
+  loanId: UUID
+  amount: number
+  drawDate: ISODateString
+  description: string
+  notes: string
+  createdAt: ISODateString
+  deletedAt?: ISODateString | null
+}

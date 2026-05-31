@@ -1,4 +1,4 @@
-import { Suspense, useCallback } from 'react'
+import { Suspense, useCallback, useEffect } from 'react'
 import { Outlet, Link } from 'react-router-dom'
 import { FolderKanban } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -7,10 +7,18 @@ import { PageTransition } from '../components/ui/PageTransition'
 import { ListSkeleton } from '../components/ui/Feedback'
 import { useToast } from '../components/ui/Toast'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
+import { useCurrentProject } from '../features/projects/currentProject'
+import { maybeAutoBackup } from '../features/export/cloudBackup'
 
 export function AppShell() {
   const queryClient = useQueryClient()
   const toast = useToast()
+  const { projectId } = useCurrentProject()
+
+  // Daily off-site safety snapshot to R2 (best-effort, non-blocking).
+  useEffect(() => {
+    if (projectId) void maybeAutoBackup(projectId)
+  }, [projectId])
   const refresh = useCallback(() => {
     // Mark everything stale but only refetch what's currently mounted (the visible
     // screen); off-screen tabs refetch lazily on next visit instead of all at once.
