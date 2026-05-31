@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Plus, Trash2, Pencil, Landmark } from 'lucide-react'
 import type { LoanDraw } from '../../domain/types'
-import { fmt } from '../../lib/money'
+import { fmt, sumBy } from '../../lib/money'
 import { fmtDate } from '../../lib/date'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
@@ -15,6 +15,7 @@ import { useToast } from '../../components/ui/Toast'
 import { useConfirm } from '../../components/ui/Confirm'
 import { useRestoreRow } from '../../data/hooks'
 import { useCurrentProject } from '../projects/currentProject'
+import { useExpenses } from '../expenses/useExpenses'
 import { useLoan, useLoanDraws, useRemoveDraw } from './useLoan'
 import { LoanForm } from './LoanForm'
 import { DrawForm } from './DrawForm'
@@ -24,6 +25,7 @@ export function LoanScreen() {
   const { projectId } = useCurrentProject()
   const { data: loans = [], isLoading, error } = useLoan(projectId!)
   const { data: allDraws = [] } = useLoanDraws(projectId!)
+  const { data: expenses = [] } = useExpenses(projectId!)
   const removeDraw = useRemoveDraw()
   const restoreDraw = useRestoreRow('loan_draws')
   const toast = useToast()
@@ -49,6 +51,13 @@ export function LoanScreen() {
   }, [loan, draws])
 
   const sortedDraws = useMemo(() => [...draws].sort((a, b) => b.drawDate.localeCompare(a.drawDate)), [draws])
+
+  // Personal vs loan-funded spend, from each expense's funding source tag.
+  const funding = useMemo(() => {
+    const loanSpend = sumBy(expenses.filter((e) => e.fundingSource === 'loan'), (e) => e.amount)
+    const personalSpend = sumBy(expenses.filter((e) => e.fundingSource !== 'loan'), (e) => e.amount)
+    return { loanSpend, personalSpend }
+  }, [expenses])
 
   const delDraw = async (dr: LoanDraw) => {
     if (!(await confirm({ title: 'Delete draw?', message: `${fmt(dr.amount)} draw will be moved to Trash.`, destructive: true }))) return
@@ -114,6 +123,23 @@ export function LoanScreen() {
                 <span className="muted">Interest accrued to date (est.)</span>
                 <span className="tnum">{fmt(m.accrued)}</span>
               </div>
+            </SectionCard>
+
+            <SectionCard title="Funding split" footnote="Tag each expense’s funding source in the expense form.">
+              <div className="kv-row">
+                <span className="muted">Paid from loan</span>
+                <strong className="tnum">{fmt(funding.loanSpend)}</strong>
+              </div>
+              <div className="kv-row">
+                <span className="muted">Paid from personal funds</span>
+                <span className="tnum">{fmt(funding.personalSpend)}</span>
+              </div>
+              {m.drawn > 0 && (
+                <div className="kv-row">
+                  <span className="muted">Drawn not yet spent (est.)</span>
+                  <span className="tnum">{fmt(Math.max(0, m.drawn - funding.loanSpend))}</span>
+                </div>
+              )}
             </SectionCard>
 
             <div className="list-toolbar">

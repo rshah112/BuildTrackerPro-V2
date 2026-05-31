@@ -45,3 +45,8 @@ export type ProjectDocumentStatus = (typeof PROJECT_DOCUMENT_STATUSES)[number]
 
 export const PROJECT_TASK_STATUSES = ['todo', 'inProgress', 'blocked', 'done'] as const
 export type ProjectTaskStatus = (typeof PROJECT_TASK_STATUSES)[number]
+
+// How an expense was funded — personal funds (cash/CC) vs the construction loan. '' = unset
+// (treated as personal). Only surfaced in the UI when the project has a construction loan.
+export const FUNDING_SOURCES = ['personal', 'loan'] as const
+export type FundingSource = (typeof FUNDING_SOURCES)[number]

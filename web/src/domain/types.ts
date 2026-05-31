@@ -93,6 +93,8 @@ export interface Expense {
   notes: string
   isPaid: boolean
   receiptObjectKey: string | null
+  /** '' (unset/personal), 'personal', or 'loan' — see FUNDING_SOURCES. */
+  fundingSource?: string
 }
 
 export interface Vendor {

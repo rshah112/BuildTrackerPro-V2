@@ -12,6 +12,7 @@ import { Form } from '../../components/ui/Form'
 import { useEntityForm } from '../../lib/useEntityForm'
 import { resolvePaidAmount } from './paidAmount'
 import { useCreateExpense, useUpdateExpense } from './useExpenses'
+import { useLoan } from '../loan/useLoan'
 
 type Draft = Partial<Omit<Expense, 'id' | 'owner'>>
 
@@ -38,6 +39,7 @@ function blank(projectId: string): Draft {
     notes: '',
     isPaid: true,
     receiptObjectKey: null,
+    fundingSource: '',
   }
 }
 
@@ -58,6 +60,8 @@ export function ExpenseForm({
   // Once the user edits "Amount paid", honor their literal value (incl. $0) instead of
   // re-deriving the full-amount default on every render.
   const [paidTouched, setPaidTouched] = useState(false)
+  // Funding source (personal vs loan) only matters once the project is financed.
+  const hasLoan = (useLoan(projectId).data ?? []).length > 0
 
   const { d, setD, text, date, busy, submit, submitError } = useEntityForm<Expense, Draft>({
     initial,
@@ -170,6 +174,16 @@ export function ExpenseForm({
       </Form.Section>
 
       <Form.Section title="Payment">
+        {hasLoan && (
+          <Field label="Funding source" hint="Track personal funds vs construction-loan spend.">
+            {(p) => (
+              <Select {...p} value={d.fundingSource || 'personal'} onChange={text('fundingSource')}>
+                <option value="personal">Personal (cash / credit card)</option>
+                <option value="loan">Construction loan</option>
+              </Select>
+            )}
+          </Field>
+        )}
         <label className="checkbox-row">
           <input
             type="checkbox"
