@@ -10,6 +10,8 @@ import { Sheet } from '../../components/ui/Sheet'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useConfirm } from '../../components/ui/Confirm'
+import { SearchField } from '../../components/ui/SearchField'
+import { matchesQuery } from '../../lib/search'
 import { useRestoreRow } from '../../data/hooks'
 import { useCurrentProject } from '../projects/currentProject'
 import { useVendors } from '../vendors/useVendors'
@@ -42,10 +44,17 @@ export function BidsScreen() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [pkgEditing, setPkgEditing] = useState<BidPackage | 'new' | null>(null)
   const [bidEditing, setBidEditing] = useState<{ packageId: string; bid?: Bid } | null>(null)
+  const [q, setQ] = useState('')
 
   if (!projectId) return null
 
   const bidsFor = (pkgId: string) => bids.filter((b) => b.packageId === pkgId)
+  // A package matches if its scope/notes match, or any of its bids match (vendor/notes).
+  const visiblePackages = packages.filter(
+    (pkg) =>
+      matchesQuery(q, pkg.scopeTitle, pkg.notes) ||
+      bidsFor(pkg.id).some((b) => matchesQuery(q, b.vendorName, b.notes)),
+  )
   const toggle = (id: string) =>
     setExpanded((prev) => {
       const next = new Set(prev)
@@ -117,6 +126,10 @@ export function BidsScreen() {
       {error && <p role="alert">Couldn’t load bids: {(error as Error).message}</p>}
       {isLoading && <ListSkeleton />}
 
+      {!isLoading && packages.length > 2 && (
+        <SearchField value={q} onChange={setQ} placeholder="Search scope, notes, vendor" />
+      )}
+
       {!isLoading && packages.length === 0 ? (
         <EmptyState
           icon={FileStack}
@@ -128,9 +141,11 @@ export function BidsScreen() {
             </Button>
           }
         />
+      ) : visiblePackages.length === 0 ? (
+        <p className="muted">No bid packages match “{q}”.</p>
       ) : (
         <ul className="card-list">
-          {packages.map((pkg) => {
+          {visiblePackages.map((pkg) => {
             const pkgBids = bidsFor(pkg.id)
             const low = pkgBids.length ? Math.min(...pkgBids.map((b) => b.amount)) : 0
             const open = expanded.has(pkg.id)

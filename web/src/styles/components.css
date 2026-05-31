@@ -934,6 +934,37 @@
   flex-wrap: wrap;
   margin-top: 0.25rem;
 }
+.search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 0.5rem 0 0.75rem;
+}
+.search-field .search-icon {
+  position: absolute;
+  left: 0.7rem;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.search-input {
+  width: 100%;
+  padding: 0.55rem 2rem 0.55rem 2.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font: inherit;
+  margin: 0;
+}
+.search-clear {
+  position: absolute;
+  right: 0.4rem;
+  display: flex;
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
 .form-actions-sticky {
   position: sticky;
   bottom: 0;

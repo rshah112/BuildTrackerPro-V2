@@ -9,6 +9,8 @@ import { Badge } from '../../components/ui/Badge'
 import { Stat } from '../../components/ui/Stat'
 import { EditorSheet } from '../../components/ui/EditorSheet'
 import { useEditor } from '../../components/ui/useEditor'
+import { SearchField } from '../../components/ui/SearchField'
+import { matchesQuery } from '../../lib/search'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
@@ -39,16 +41,19 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
   const confirm = useConfirm()
   const editor = useEditor<Expense>()
   const [filter, setFilter] = useState<Filter>('all')
+  const [q, setQ] = useState('')
 
   const sorted = useMemo(() => [...expenses].sort((a, b) => b.date.localeCompare(a.date)), [expenses])
   const visible = useMemo(
     () =>
       sorted.filter((e) => {
-        if (filter === 'all') return true
-        const open = balanceDue(e) > 0
-        return filter === 'open' ? open : !open
+        if (filter !== 'all') {
+          const open = balanceDue(e) > 0
+          if (filter === 'open' ? !open : open) return false
+        }
+        return matchesQuery(q, e.vendorName, e.invoiceNumber, e.notes, e.categoryName, e.budgetLineItemTitle)
       }),
-    [sorted, filter],
+    [sorted, filter, q],
   )
   const { total, paid, outstanding } = useMemo(
     () => ({
@@ -102,6 +107,7 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
           </Button>
         </div>
       )}
+      {expenses.length > 2 && <SearchField value={q} onChange={setQ} placeholder="Search vendor, invoice, notes, line item" />}
 
       {visible.length === 0 ? (
         <EmptyState

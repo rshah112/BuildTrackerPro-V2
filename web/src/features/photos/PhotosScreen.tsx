@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import { Plus, Trash2, Camera } from 'lucide-react'
 import type { PhotoAttachment } from '../../domain/types'
 import { roomsForTemplate } from '../../domain/roomCatalog'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
+import { SearchField } from '../../components/ui/SearchField'
+import { matchesQuery } from '../../lib/search'
 import { EditorSheet } from '../../components/ui/EditorSheet'
 import { useEditor } from '../../components/ui/useEditor'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
@@ -24,6 +27,7 @@ export function PhotosScreen() {
   const restore = useRestoreRow('photo_attachments')
   const toast = useToast()
   const editor = useEditor<PhotoAttachment>()
+  const [q, setQ] = useState('')
 
   if (!projectId) return null
 
@@ -31,8 +35,9 @@ export function PhotosScreen() {
   const rooms = roomsForTemplate(project?.templateType ?? 'customHome')
   const catNames = categories.map((c) => c.name)
 
+  const visible = photos.filter((ph) => matchesQuery(q, ph.notes, ph.roomTag, ph.phaseTag, ph.categoryName))
   const byRoom = new Map<string, PhotoAttachment[]>()
-  for (const ph of photos) {
+  for (const ph of visible) {
     const room = ph.roomTag || 'General'
     byRoom.set(room, [...(byRoom.get(room) ?? []), ph])
   }
@@ -58,6 +63,10 @@ export function PhotosScreen() {
 
       {isLoading && <ListSkeleton />}
 
+      {!isLoading && photos.length > 2 && (
+        <SearchField value={q} onChange={setQ} placeholder="Search notes, room, phase, category" />
+      )}
+
       {!isLoading && photos.length === 0 ? (
         <EmptyState
           icon={Camera}
@@ -69,6 +78,8 @@ export function PhotosScreen() {
             </Button>
           }
         />
+      ) : orderedRooms.length === 0 ? (
+        <p className="muted">No photos match “{q}”.</p>
       ) : (
         orderedRooms.map((room) => (
           <div key={room}>

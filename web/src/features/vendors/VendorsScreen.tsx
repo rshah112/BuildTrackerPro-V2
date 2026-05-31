@@ -1,13 +1,16 @@
+import { useState } from 'react'
 import { Plus, Trash2, Contact, Phone, Mail } from 'lucide-react'
 import type { Vendor } from '../../domain/types'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
+import { SearchField } from '../../components/ui/SearchField'
 import { EditorSheet } from '../../components/ui/EditorSheet'
 import { useEditor } from '../../components/ui/useEditor'
 import { EmptyState, ListState } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
 import { useRestoreRow } from '../../data/hooks'
+import { matchesQuery } from '../../lib/search'
 import { useVendors, useRemoveVendor } from './useVendors'
 import { VendorForm } from './VendorForm'
 
@@ -18,8 +21,11 @@ export function VendorsScreen() {
   const restore = useRestoreRow('vendors')
   const toast = useToast()
   const editor = useEditor<Vendor>()
+  const [q, setQ] = useState('')
 
   if (!projectId) return null
+
+  const visible = vendors.filter((v) => matchesQuery(q, v.name, v.trade, v.phone, v.email, v.notes))
 
   const del = async (v: Vendor) => {
     await remove.mutateAsync(v.id)
@@ -57,8 +63,12 @@ export function VendorsScreen() {
           />
         }
       >
+        {vendors.length > 2 && <SearchField value={q} onChange={setQ} placeholder="Search vendor, trade, phone, email" />}
+        {visible.length === 0 ? (
+          <p className="muted">No vendors match “{q}”.</p>
+        ) : (
         <ul className="card-list">
-          {vendors.map((v) => (
+          {visible.map((v) => (
             <li key={v.id} className="expense-row">
               <button className="expense-row-open" onClick={() => editor.openEdit(v)}>
                 <div className="expense-row-main">
@@ -86,6 +96,7 @@ export function VendorsScreen() {
             </li>
           ))}
         </ul>
+        )}
       </ListState>
 
       <EditorSheet editor={editor} newTitle="New vendor" editTitle="Edit vendor">

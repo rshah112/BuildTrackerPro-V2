@@ -6,6 +6,8 @@ import { lineItemHealth } from '../../lib/budgetMath'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
+import { SearchField } from '../../components/ui/SearchField'
+import { matchesQuery } from '../../lib/search'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useConfirm } from '../../components/ui/Confirm'
@@ -40,6 +42,7 @@ export function BudgetScreen() {
   const [tab, setTab] = useState<Tab>('budget')
   const [editing, setEditing] = useState<Editing | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [q, setQ] = useState('')
 
   const { data: categories = [], isLoading: catsLoading, error: catsError } = useCategories(projectId!)
   const { data: lineItems = [], isLoading: itemsLoading, error: itemsError } = useLineItems(projectId!)
@@ -103,6 +106,14 @@ export function BudgetScreen() {
 
   const close = () => setEditing(null)
 
+  const searching = q.trim() !== ''
+  const itemMatches = (li: BudgetLineItem) => matchesQuery(q, li.title, li.costCode, li.notes, li.roomTag)
+  const shownCats = searching
+    ? categories.filter(
+        (cat) => matchesQuery(q, cat.name) || (categoryStats.get(cat.name)?.items ?? []).some(itemMatches),
+      )
+    : categories
+
   return (
     <section>
       <ScreenHeader
@@ -144,11 +155,15 @@ export function BudgetScreen() {
               }
             />
           ) : (
+            <>
+            {categories.length > 2 && <SearchField value={q} onChange={setQ} placeholder="Search line items, cost code, notes" />}
+            {searching && shownCats.length === 0 && <p className="muted">No budget items match “{q}”.</p>}
             <ul className="card-list">
-              {categories.map((cat) => {
+              {shownCats.map((cat) => {
                 const stat = categoryStats.get(cat.name) ?? { items: [], budget: 0, actual: 0 }
                 const { items, budget, actual } = stat
-                const open = expanded.has(cat.id)
+                const shownItems = searching ? items.filter(itemMatches) : items
+                const open = searching || expanded.has(cat.id)
                 const over = actual > budget && budget > 0
                 return (
                   <li key={cat.id} className="budget-cat">
@@ -209,8 +224,8 @@ export function BudgetScreen() {
 
                     {open && (
                       <ul className="lineitem-list">
-                        {items.length === 0 && <li className="muted lineitem-empty">No line items yet.</li>}
-                        {items.map((li) => {
+                        {shownItems.length === 0 && <li className="muted lineitem-empty">No line items yet.</li>}
+                        {shownItems.map((li) => {
                           const health = lineItemHealth(li)
                           return (
                             <li key={li.id} className="lineitem">
@@ -247,6 +262,7 @@ export function BudgetScreen() {
                 )
               })}
             </ul>
+            </>
           )}
         </div>
       )}

@@ -8,6 +8,8 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge'
 import { fmtDate } from '../../lib/date'
 import { EditorSheet } from '../../components/ui/EditorSheet'
 import { useEditor } from '../../components/ui/useEditor'
+import { SearchField } from '../../components/ui/SearchField'
+import { matchesQuery } from '../../lib/search'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState, ListState } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
@@ -43,11 +45,14 @@ export function TasksScreen() {
   const toast = useToast()
   const editor = useEditor<ProjectTask>()
   const [filter, setFilter] = useState<Filter>('all')
+  const [q, setQ] = useState('')
 
   if (!projectId) return null
 
-  const visible = tasks.filter((t) => (filter === 'all' ? true : t.status === filter))
   const vendorName = (id: string | null) => vendors.find((v) => v.id === id)?.name
+  const visible = tasks.filter(
+    (t) => (filter === 'all' ? true : t.status === filter) && matchesQuery(q, t.title, t.notes, vendorName(t.vendorId)),
+  )
 
   const toggleDone = (t: ProjectTask) => {
     const done = t.status === 'done'
@@ -107,6 +112,10 @@ export function TasksScreen() {
                 ]}
               />
             </div>
+            {tasks.length > 2 && <SearchField value={q} onChange={setQ} placeholder="Search title, notes, vendor" />}
+            {visible.length === 0 ? (
+              <p className="muted">No tasks match this filter or search.</p>
+            ) : (
             <ul className="card-list">
               {visible.map((t) => (
                 <li key={t.id} className="expense-row">
@@ -133,6 +142,7 @@ export function TasksScreen() {
                 </li>
               ))}
             </ul>
+            )}
       </ListState>
 
       <EditorSheet editor={editor} newTitle="New task" editTitle="Edit task">

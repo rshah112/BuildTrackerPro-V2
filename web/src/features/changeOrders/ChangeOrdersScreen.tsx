@@ -9,6 +9,8 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge'
 import { Stat } from '../../components/ui/Stat'
 import { EditorSheet } from '../../components/ui/EditorSheet'
 import { useEditor } from '../../components/ui/useEditor'
+import { SearchField } from '../../components/ui/SearchField'
+import { matchesQuery } from '../../lib/search'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState, ListState } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
@@ -40,10 +42,15 @@ export function ChangeOrdersScreen() {
   const toast = useToast()
   const editor = useEditor<ChangeOrder>()
   const [filter, setFilter] = useState<Filter>('all')
+  const [q, setQ] = useState('')
 
   if (!projectId) return null
 
-  const visible = orders.filter((o) => (filter === 'all' ? true : o.status === filter))
+  const visible = orders.filter(
+    (o) =>
+      (filter === 'all' ? true : o.status === filter) &&
+      matchesQuery(q, o.title, o.categoryName, o.notes, o.budgetLineItemTitle),
+  )
   const pendingTotal = sumBy(orders.filter((o) => o.status === 'pending'), (o) => o.amount)
   const approvedTotal = sumBy(orders.filter((o) => o.status === 'approved'), (o) => o.amount)
   const paidTotal = sumBy(orders.filter((o) => o.status === 'paid'), (o) => o.amount)
@@ -112,7 +119,11 @@ export function ChangeOrdersScreen() {
                 ]}
               />
             </div>
+            {orders.length > 2 && <SearchField value={q} onChange={setQ} placeholder="Search title, category, notes" />}
 
+            {visible.length === 0 ? (
+              <p className="muted">No change orders match this filter or search.</p>
+            ) : (
             <ul className="card-list">
               {visible.map((o) => (
                 <li key={o.id} className="expense-row">
@@ -132,6 +143,7 @@ export function ChangeOrdersScreen() {
                 </li>
               ))}
             </ul>
+            )}
       </ListState>
 
       <EditorSheet editor={editor} newTitle="New change order" editTitle="Edit change order">
