@@ -143,9 +143,9 @@ export function BidsScreen() {
             </Button>
           }
         />
-      ) : visiblePackages.length === 0 ? (
+      ) : !isLoading && visiblePackages.length === 0 ? (
         <p className="muted">No bid packages match “{q}”.</p>
-      ) : (
+      ) : isLoading ? null : (
         <ul className="card-list">
           {visiblePackages.map((pkg) => {
             const pkgBids = bidsFor(pkg.id)

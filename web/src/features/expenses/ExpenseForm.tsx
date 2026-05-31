@@ -89,6 +89,9 @@ export function ExpenseForm({
         categoryName: selected?.categoryName ?? draft.categoryName ?? '',
         roomTag: selected?.roomTag ?? draft.roomTag ?? '',
         receiptObjectKey,
+        // Persist an explicit funding source (the select shows "Personal" by default but
+        // leaves the draft '' until touched) so the stored row matches what was shown.
+        fundingSource: draft.fundingSource || 'personal',
       }
     },
   })
