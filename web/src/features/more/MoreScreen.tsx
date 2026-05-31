@@ -22,6 +22,7 @@ import {
   Landmark,
   Activity,
   PieChart,
+  Settings,
   type LucideIcon,
 } from 'lucide-react'
 import { signOut } from '../auth/useSession'
@@ -106,6 +107,13 @@ export function MoreScreen() {
           </button>
         )}
         <NotifyControl />
+        <Link to="/notification-settings" className="list-row">
+          <Settings className="list-row-icon" size={20} aria-hidden />
+          <span className="list-row-label">Reminder settings</span>
+          <span className="list-row-chevron" aria-hidden>
+            ›
+          </span>
+        </Link>
       </div>
 
       <h2 className="section-label">Appearance</h2>

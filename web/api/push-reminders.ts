@@ -45,6 +45,37 @@ interface SubRow {
   p256dh: string
   auth: string
 }
+interface PrefRow {
+  owner: string
+  lead_days: number
+  quiet_start: number
+  quiet_end: number
+  remind_due_soon: boolean
+  remind_overdue: boolean
+  remind_change_orders: boolean
+}
+const DEFAULT_PREF: Omit<PrefRow, 'owner'> = {
+  lead_days: LEAD_DAYS,
+  quiet_start: 21,
+  quiet_end: 7,
+  remind_due_soon: true,
+  remind_overdue: true,
+  remind_change_orders: true,
+}
+
+/** Current hour (0–23) in the project timezone. */
+function currentHourInTz(): number {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour: 'numeric', hour12: false }).formatToParts(
+    new Date(),
+  )
+  const h = Number(parts.find((p) => p.type === 'hour')?.value ?? '0')
+  return h === 24 ? 0 : h
+}
+/** Is hour `h` inside the quiet window [start, end)? Handles windows that wrap midnight. */
+function inQuietHours(h: number, start: number, end: number): boolean {
+  if (start === end) return false
+  return start < end ? h >= start && h < end : h >= start || h < end
+}
 
 function send(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status
@@ -93,14 +124,25 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   if (subErr) return send(res, 500, { ok: false, error: subErr.message })
   if (!subs || subs.length === 0) return send(res, 200, { ok: true, sent: 0, owners: 0 })
 
+  // Per-owner preferences (lead time, quiet hours, which reminder types). Missing → defaults.
+  const { data: prefRows } = await supa.from('notification_prefs').select('*')
+  const prefs = new Map<string, PrefRow>(((prefRows ?? []) as PrefRow[]).map((p) => [p.owner, p]))
+
   const today = todayInTz()
-  const soon = addDays(today, LEAD_DAYS)
+  const hourNow = currentHourInTz()
   const owners = [...new Set((subs as SubRow[]).map((s) => s.owner))]
 
   let sent = 0
+  let skippedQuiet = 0
   const dead: string[] = []
 
   for (const owner of owners) {
+    const pref = prefs.get(owner) ?? { owner, ...DEFAULT_PREF }
+    if (inQuietHours(hourNow, pref.quiet_start, pref.quiet_end)) {
+      skippedQuiet++
+      continue
+    }
+    const soon = addDays(today, pref.lead_days)
     const [{ data: exp }, { data: cos }] = await Promise.all([
       supa
         .from('expenses')
@@ -123,21 +165,25 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       const expected = e.expected_payment_date ?? e.due_date
       if (!expected) continue
       if (expected < today) {
+        if (!pref.remind_overdue) continue
         overdue++
         total += bal
       } else if (expected <= soon) {
+        if (!pref.remind_due_soon) continue
         dueSoon++
         total += bal
       }
     }
-    for (const o of (cos ?? []) as CoRow[]) {
-      if (o.status === 'paid' || !o.expected_payment_date) continue
-      if (o.expected_payment_date < today) {
-        overdue++
-        total += o.amount
-      } else if (o.expected_payment_date <= soon) {
-        dueSoon++
-        total += o.amount
+    if (pref.remind_change_orders) {
+      for (const o of (cos ?? []) as CoRow[]) {
+        if (o.status === 'paid' || !o.expected_payment_date) continue
+        if (o.expected_payment_date < today) {
+          overdue++
+          total += o.amount
+        } else if (o.expected_payment_date <= soon) {
+          dueSoon++
+          total += o.amount
+        }
       }
     }
 
@@ -168,5 +214,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   if (dead.length) await supa.from('push_subscriptions').delete().in('id', dead)
 
-  return send(res, 200, { ok: true, owners: owners.length, sent, pruned: dead.length, at: new Date().toISOString() })
+  return send(res, 200, {
+    ok: true,
+    owners: owners.length,
+    sent,
+    pruned: dead.length,
+    skippedQuiet,
+    at: new Date().toISOString(),
+  })
 }

@@ -250,3 +250,16 @@ export interface Phase {
   createdAt: ISODateString
   deletedAt?: ISODateString | null
 }
+
+export interface NotificationPrefs {
+  owner: UUID
+  /** Days before an item's expected/due date to start the "due soon" reminder. */
+  leadDays: number
+  /** Quiet-hours window (local hours 0–23); reminders are suppressed inside it. */
+  quietStart: number
+  quietEnd: number
+  remindDueSoon: boolean
+  remindOverdue: boolean
+  remindChangeOrders: boolean
+  updatedAt: ISODateString
+}
