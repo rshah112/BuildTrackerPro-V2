@@ -977,6 +977,11 @@
   text-align: left;
   cursor: pointer;
 }
+.dash-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 .form-actions-sticky {
   position: sticky;
   bottom: 0;

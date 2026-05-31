@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { SlidersHorizontal } from 'lucide-react'
 import { useRows } from '../../data/hooks'
 import type { AllowanceSelection, ChangeOrder, Expense, Project } from '../../domain/types'
 import {
@@ -12,17 +13,23 @@ import { lineItemHealth } from '../../lib/budgetMath'
 import { fmt, sumBy } from '../../lib/money'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Badge } from '../../components/ui/Badge'
+import { Button } from '../../components/ui/Button'
+import { Sheet } from '../../components/ui/Sheet'
 import { Skeleton } from '../../components/ui/Feedback'
 import { Stat, TrendDelta } from '../../components/ui/Stat'
 import { SectionCard } from '../../components/ui/SectionCard'
 import { Donut } from '../../components/charts/Donut'
 import { BarRow } from '../../components/charts/BarRow'
 import { Sparkline } from '../../components/charts/Sparkline'
+import { fmtDate } from '../../lib/date'
 import { useLineItems } from '../budget/useBudget'
 import { useCurrentProject } from '../projects/currentProject'
 import { useProjects } from '../projects/useProjects'
 import { useExpenses } from '../expenses/useExpenses'
-import { localToday, nextFourteenDaysDue } from '../cashflow/cashFlow'
+import { usePhotos } from '../photos/usePhotos'
+import { PhotoThumb } from '../photos/PhotoThumb'
+import { localToday, nextFourteenDaysDue, cashFlowPayments } from '../cashflow/cashFlow'
+import { useDashboardPrefs, DASHBOARD_SECTIONS } from './dashboardPrefs'
 
 type Tone = 'brand' | 'warn' | 'danger'
 function healthTone(used: number, limit: number): Tone {
@@ -45,6 +52,9 @@ export function DashboardScreen() {
     isLoading: selectionsLoading,
     error: selectionsError,
   } = useRows<AllowanceSelection>('allowance_selections', { projectId })
+  const { data: photos = [] } = usePhotos(projectId!)
+  const { prefs, toggle } = useDashboardPrefs()
+  const [customizing, setCustomizing] = useState(false)
 
   // All derived figures in one memo so they don't recompute on unrelated re-renders
   // (react-query returns stable array refs between refetches, so this is effective).
@@ -219,12 +229,30 @@ export function DashboardScreen() {
     running,
   } = view
 
+  const upcoming = cashFlowPayments(expenses, changeOrders, localToday()).slice(0, 5)
+  const recentPhotos = [...photos]
+    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+    .slice(0, 6)
+
   return (
     <section className="dashboard">
       <ScreenHeader
         title={project?.name || 'Dashboard'}
         subtitle={project?.address || undefined}
-        trailing={<Badge tone="neutral">{project?.status ?? 'active'}</Badge>}
+        trailing={
+          <span className="dash-header-actions">
+            <Badge tone="neutral">{project?.status ?? 'active'}</Badge>
+            <Button
+              size="sm"
+              variant="ghost"
+              leadingIcon={<SlidersHorizontal size={15} />}
+              onClick={() => setCustomizing(true)}
+              aria-label="Customize dashboard"
+            >
+              Customize
+            </Button>
+          </span>
+        }
       />
 
       <div className="hero-card">
@@ -251,6 +279,7 @@ export function DashboardScreen() {
         </div>
       </div>
 
+      {prefs.metrics && (
       <div className="metric-grid">
         <Stat label="Budget" value={fmt(baseBudget)} sub={`${fmt(project?.contingencyBudget ?? 0)} contingency`} />
         <Stat
@@ -271,7 +300,9 @@ export function DashboardScreen() {
           tone={remaining < 0 ? 'danger' : 'default'}
         />
       </div>
+      )}
 
+      {prefs.eac && (
       <SectionCard
         title="Estimated final cost"
         trailing={
@@ -302,8 +333,9 @@ export function DashboardScreen() {
           </>
         )}
       </SectionCard>
+      )}
 
-      {categoryBars.length > 0 && (
+      {prefs.category && categoryBars.length > 0 && (
         <SectionCard title="Spend by category">
           <div className="barrow-list">
             {categoryBars.map((c) => (
@@ -320,13 +352,41 @@ export function DashboardScreen() {
         </SectionCard>
       )}
 
-      {cumulative.length >= 2 && (
+      {prefs.trend && cumulative.length >= 2 && (
         <SectionCard title="Spend over time" trailing={<strong>{fmt(running)}</strong>}>
           <Sparkline values={cumulative} />
         </SectionCard>
       )}
 
+      {prefs.upcoming && upcoming.length > 0 && (
+        <SectionCard title="Upcoming payments" trailing={<strong>{fmt(due14)}</strong>}>
+          <ul className="plain-list">
+            {upcoming.map((p) => (
+              <li key={p.id} className="kv-row">
+                <span>
+                  {p.title} <span className="muted">· {fmtDate(p.expectedDate)}</span>
+                </span>
+                <strong className="tnum">{fmt(p.amount)}</strong>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      )}
+
+      {prefs.recentPhotos && recentPhotos.length > 0 && (
+        <SectionCard title="Recent photos">
+          <div className="photo-grid">
+            {recentPhotos.map((ph) => (
+              <div key={ph.id} className="photo-cell">
+                <PhotoThumb objectKey={ph.imageObjectKey} alt={ph.notes || ph.roomTag || 'Photo'} />
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
       <div className="two-column">
+        {prefs.attention && (
         <SectionCard title="Attention">
           <ul className="stat-list">
             <li>
@@ -349,7 +409,9 @@ export function DashboardScreen() {
             </li>
           </ul>
         </SectionCard>
+        )}
 
+        {prefs.recentExpenses && (
         <SectionCard title="Recent expenses">
           {recentExpenses.length === 0 && <p className="panel-lead">No expenses yet.</p>}
           <ul className="plain-list">
@@ -361,7 +423,22 @@ export function DashboardScreen() {
             ))}
           </ul>
         </SectionCard>
+        )}
       </div>
+
+      <Sheet open={customizing} onClose={() => setCustomizing(false)} title="Customize dashboard">
+        <ul className="stat-list">
+          {DASHBOARD_SECTIONS.map((s) => (
+            <li key={s.key} className="kv-row">
+              <label className="checkbox-row" style={{ margin: 0 }}>
+                <input type="checkbox" checked={prefs[s.key]} onChange={() => toggle(s.key)} />
+                {s.label}
+              </label>
+            </li>
+          ))}
+        </ul>
+        <p className="muted">Choose which sections appear on your dashboard. Saved on this device.</p>
+      </Sheet>
     </section>
   )
 }
