@@ -19,6 +19,8 @@ import { useLineItems } from '../budget/useBudget'
 import { useRestoreRow } from '../../data/hooks'
 import { useTasks, useUpdateTask, useRemoveTask } from './useTasks'
 import { TaskForm } from './TaskForm'
+import { PunchWalkSheet } from './PunchWalkSheet'
+import { ClipboardList } from 'lucide-react'
 
 type Filter = 'all' | ProjectTaskStatus
 const STATUS_TONE: Record<ProjectTaskStatus, BadgeTone> = {
@@ -46,6 +48,7 @@ export function TasksScreen() {
   const editor = useEditor<ProjectTask>()
   const [filter, setFilter] = useState<Filter>('all')
   const [q, setQ] = useState('')
+  const [punchWalk, setPunchWalk] = useState(false)
 
   if (!projectId) return null
 
@@ -73,11 +76,16 @@ export function TasksScreen() {
       <ScreenHeader
         title="Tasks"
         trailing={
-          tasks.length > 0 ? (
-            <Button size="sm" leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
-              Add task
+          <span className="dash-header-actions">
+            <Button size="sm" variant="ghost" leadingIcon={<ClipboardList size={15} />} onClick={() => setPunchWalk(true)}>
+              Punch walk
             </Button>
-          ) : undefined
+            {tasks.length > 0 && (
+              <Button size="sm" leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
+                Add task
+              </Button>
+            )}
+          </span>
         }
       />
 
@@ -150,6 +158,8 @@ export function TasksScreen() {
           <TaskForm projectId={projectId} vendors={vendors} lineItems={lineItems} initial={initial} onDone={editor.close} />
         )}
       </EditorSheet>
+
+      {punchWalk && <PunchWalkSheet projectId={projectId} onClose={() => setPunchWalk(false)} />}
     </section>
   )
 }

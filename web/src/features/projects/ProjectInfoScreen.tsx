@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Pencil, CheckCircle2, RotateCcw } from 'lucide-react'
+import { Pencil, CheckCircle2, RotateCcw, Share2 } from 'lucide-react'
+import { printProjectBrief } from './projectBrief'
 import { fmt } from '../../lib/money'
 import { fmtDate } from '../../lib/date'
 import { ScreenHeader } from '../../app/ScreenHeader'
@@ -53,9 +54,14 @@ export function ProjectInfoScreen() {
       <ScreenHeader
         title="Project Info"
         trailing={
-          <Button size="sm" variant="ghost" leadingIcon={<Pencil size={15} />} onClick={() => setEditing(true)}>
-            Edit
-          </Button>
+          <span className="dash-header-actions">
+            <Button size="sm" variant="ghost" leadingIcon={<Share2 size={15} />} onClick={() => printProjectBrief(project)}>
+              Brief
+            </Button>
+            <Button size="sm" variant="ghost" leadingIcon={<Pencil size={15} />} onClick={() => setEditing(true)}>
+              Edit
+            </Button>
+          </span>
         }
       />
 
