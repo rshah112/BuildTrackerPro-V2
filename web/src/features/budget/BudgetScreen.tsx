@@ -14,7 +14,7 @@ import { useConfirm } from '../../components/ui/Confirm'
 import { useToast } from '../../components/ui/Toast'
 import { useRestoreRow } from '../../data/hooks'
 import { useCurrentProject } from '../projects/currentProject'
-import { useCategories, useRemoveCategory, useLineItems, useRemoveLineItem } from './useBudget'
+import { useCategories, useRemoveCategory, useLineItems, useRemoveLineItem, useCreateLineItem } from './useBudget'
 
 /** Allowance items measure against their allowance amount; others against budget. */
 function lineLimit(li: BudgetLineItem): number {
@@ -22,6 +22,7 @@ function lineLimit(li: BudgetLineItem): number {
 }
 import { CategoryForm } from './CategoryForm'
 import { LineItemForm } from './LineItemForm'
+import { LineItemDetailSheet } from './LineItemDetailSheet'
 import { HealthPill } from './HealthPill'
 import { ExpenseList } from '../expenses/ExpenseList'
 
@@ -43,11 +44,13 @@ export function BudgetScreen() {
   const [editing, setEditing] = useState<Editing | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [q, setQ] = useState('')
+  const [detailItem, setDetailItem] = useState<BudgetLineItem | null>(null)
 
   const { data: categories = [], isLoading: catsLoading, error: catsError } = useCategories(projectId!)
   const { data: lineItems = [], isLoading: itemsLoading, error: itemsError } = useLineItems(projectId!)
   const removeCategory = useRemoveCategory()
   const removeLineItem = useRemoveLineItem()
+  const createLineItem = useCreateLineItem()
   const restoreCategory = useRestoreRow('budget_categories')
   const restoreLineItem = useRestoreRow('budget_line_items')
   const confirm = useConfirm()
@@ -78,6 +81,24 @@ export function BudgetScreen() {
       await removeCategory.mutateAsync(cat.id)
       toast.success('Category moved to Trash', { action: { label: 'Undo', onClick: () => restoreCategory.mutate(cat.id) } })
     }
+  }
+  const duplicateLineItem = async (li: BudgetLineItem) => {
+    const copy: Partial<BudgetLineItem> = {
+      projectId: li.projectId,
+      categoryName: li.categoryName,
+      costCode: li.costCode,
+      title: `${li.title} (copy)`,
+      roomTag: li.roomTag,
+      budget: li.budget,
+      committed: li.committed,
+      actual: 0, // a fresh planned item has no spend yet (recomputed from expenses)
+      notes: li.notes,
+      isPinned: false,
+      isAllowance: li.isAllowance,
+      allowanceAmount: li.allowanceAmount,
+    }
+    await createLineItem.mutateAsync(copy)
+    toast.success('Line item duplicated')
   }
   const deleteLineItem = async (li: BudgetLineItem) => {
     if (await confirm({ title: 'Delete line item?', message: `“${li.title}” will be moved to Trash.`, destructive: true })) {
@@ -230,10 +251,10 @@ export function BudgetScreen() {
                           return (
                             <li key={li.id} className="lineitem">
                               <div className="lineitem-row">
-                                <div className="lineitem-title">
+                                <button type="button" className="lineitem-title lineitem-title-btn" onClick={() => setDetailItem(li)}>
                                   <strong>{li.title}</strong>
                                   {li.costCode && <span className="muted"> · {li.costCode}</span>}
-                                </div>
+                                </button>
                                 <HealthPill item={li} />
                               </div>
                               <div className="progress thin">
@@ -247,6 +268,9 @@ export function BudgetScreen() {
                                 <span className="lineitem-acts">
                                   <Button size="sm" variant="ghost" onClick={() => setEditing({ kind: 'editLineItem', item: li })}>
                                     Edit
+                                  </Button>
+                                  <Button size="sm" variant="ghost" onClick={() => duplicateLineItem(li)}>
+                                    Duplicate
                                   </Button>
                                   <Button size="sm" variant="ghost" onClick={() => deleteLineItem(li)}>
                                     Delete
@@ -302,6 +326,21 @@ export function BudgetScreen() {
           />
         )}
       </Sheet>
+
+      {detailItem && (
+        <LineItemDetailSheet
+          item={detailItem}
+          onClose={() => setDetailItem(null)}
+          onEdit={() => {
+            setEditing({ kind: 'editLineItem', item: detailItem })
+            setDetailItem(null)
+          }}
+          onDuplicate={() => {
+            void duplicateLineItem(detailItem)
+            setDetailItem(null)
+          }}
+        />
+      )}
     </section>
   )
 }
