@@ -5,7 +5,9 @@ import { Field } from '../../components/ui/Field'
 import { Select } from '../../components/ui/Select'
 import { CurrencyField } from '../../components/ui/CurrencyField'
 import { Form } from '../../components/ui/Form'
+import { useToast } from '../../components/ui/Toast'
 import { useCreateProject, useUpdateProject } from './useProjects'
+import { seedProjectBudget } from './seedBudget'
 
 type Draft = Partial<Project>
 
@@ -36,6 +38,7 @@ export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: (c
   const [d, setD] = useState<Draft>(initial ?? blank)
   const create = useCreateProject()
   const update = useUpdateProject()
+  const toast = useToast()
   const busy = create.isPending || update.isPending
 
   const text =
@@ -56,7 +59,19 @@ export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: (c
       onDone()
     } else {
       const created = await create.mutateAsync(d)
-      onDone((created as Project | undefined)?.id)
+      const newId = (created as Project | undefined)?.id
+      // Pre-populate the budget from the chosen template + construction budget (industry-
+      // standard category % allocations). Best-effort: the project exists regardless.
+      const budget = d.constructionBudget ?? 0
+      if (newId && d.templateType && d.templateType !== 'custom' && budget > 0) {
+        try {
+          const n = await seedProjectBudget(newId, d.templateType, budget)
+          if (n > 0) toast.success(`Pre-filled ${n} budget categories from the template`)
+        } catch {
+          toast.show('Project created — set up the budget categories manually')
+        }
+      }
+      onDone(newId)
     }
   }
 
