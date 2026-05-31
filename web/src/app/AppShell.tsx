@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { Outlet, Link } from 'react-router-dom'
 import { FolderKanban } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -9,11 +9,15 @@ import { useToast } from '../components/ui/Toast'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { useCurrentProject } from '../features/projects/currentProject'
 import { maybeAutoBackup } from '../features/export/cloudBackup'
+import { NotifyPrompt } from '../features/notifications/NotifyPrompt'
+import { DueReminders } from '../features/notifications/DueReminders'
+import { notifState, type NotifState } from '../lib/notifications'
 
 export function AppShell() {
   const queryClient = useQueryClient()
   const toast = useToast()
   const { projectId } = useCurrentProject()
+  const [perm, setPerm] = useState<NotifState>(notifState())
 
   // Daily off-site safety snapshot to R2 (best-effort, non-blocking).
   useEffect(() => {
@@ -46,6 +50,8 @@ export function AppShell() {
           </Suspense>
         </PageTransition>
       </main>
+      {projectId && perm === 'granted' && <DueReminders projectId={projectId} />}
+      <NotifyPrompt onChange={setPerm} />
       <TabBar />
     </div>
   )

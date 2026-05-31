@@ -8,7 +8,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['apple-touch-icon.png'],
+      includeAssets: ['apple-touch-icon.png', 'notify-sw.js'],
+      // Keep Workbox's generated precaching, but pull in our notification/push handlers
+      // (notificationclick routing + a Phase-2 web-push receiver) via importScripts.
+      workbox: {
+        importScripts: ['notify-sw.js'],
+      },
       manifest: {
         name: 'HomeBuild Pro',
         short_name: 'HomeBuild',

@@ -25,6 +25,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { signOut } from '../auth/useSession'
+import { NotifyControl } from '../notifications/NotifyControl'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
@@ -104,6 +105,7 @@ export function MoreScreen() {
             </span>
           </button>
         )}
+        <NotifyControl />
       </div>
 
       <h2 className="section-label">Appearance</h2>

@@ -744,6 +744,67 @@
 .phase-bar + .phase-bar {
   margin-top: 0.5rem;
 }
+/* One-time "enable reminders" banner above the tab bar. */
+.notify-banner {
+  position: fixed;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: calc(var(--tab-bar-height, 56px) + env(safe-area-inset-bottom, 0px) + 0.6rem);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem 0.9rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg, var(--shadow-sm));
+  max-width: 30rem;
+  margin: 0 auto;
+}
+.notify-banner-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-brand-bg, var(--color-surface-2));
+  color: var(--color-brand);
+}
+.notify-banner-text {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+.notify-banner-text .muted {
+  font-size: var(--text-sm);
+}
+.notify-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+.notify-banner-dismiss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+/* Trailing status text on a More-screen list row (e.g. "On"). */
+.list-row-trail {
+  margin-left: auto;
+  font-size: var(--text-sm);
+}
+
 /* Inline "manage ›" link inside a dashboard card. */
 .card-link {
   display: inline-block;
