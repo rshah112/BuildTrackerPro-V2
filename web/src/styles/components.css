@@ -145,8 +145,12 @@
   font-weight: var(--font-weight-semibold);
   pointer-events: none;
 }
-.currency-input input {
-  padding-left: 1.5rem;
+/* Clear the absolutely-positioned "$" so the first digit isn't tucked under it. NOTE the
+   specificity: it must out-rank `.field input:not([type=checkbox]):not([type=radio])`
+   (0,3,1) whose `padding` shorthand would otherwise reset padding-left to 0.8rem (the bug
+   that hid the leading digit). The "$" measures to ~x:23px, so 2rem (32px) leaves a clear gap. */
+.field .currency-input input:not([type='checkbox']):not([type='radio']) {
+  padding-left: 2rem;
 }
 
 /* ---- Select ---- */
@@ -1064,6 +1068,10 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
+  /* Align each column to the top instead of the default `stretch`. Without this, a column
+     with a hint makes the row taller and stretches the OTHER column's field — whose auto
+     grid rows then stretch the (empty) input into a tall box that overlaps neighbors. */
+  align-items: start;
 }
 .upload-choices {
   display: flex;
