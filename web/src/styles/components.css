@@ -678,6 +678,82 @@
   background: var(--color-danger-bg);
 }
 
+/* Stacked action buttons (e.g. empty-state with two choices). */
+.stack-sm {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: stretch;
+}
+
+/* Build phases (Phase Pulse manage screen). */
+.phase-row {
+  display: flex;
+  align-items: stretch;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.phase-reorder {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--color-border);
+}
+.phase-move {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  padding: 0 0.3rem;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.phase-move:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.phase-move:not(:last-child) {
+  border-bottom: 1px solid var(--color-border);
+}
+.phase-open {
+  flex: 1;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--color-text);
+  min-width: 0;
+}
+.phase-open:active {
+  background: var(--color-surface-2);
+}
+.phase-open .muted {
+  font-size: var(--text-sm);
+}
+.phase-bar {
+  display: grid;
+  gap: 0.25rem;
+}
+.phase-bar + .phase-bar {
+  margin-top: 0.5rem;
+}
+/* Inline "manage ›" link inside a dashboard card. */
+.card-link {
+  display: inline-block;
+  margin-top: 0.6rem;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-brand);
+  text-decoration: none;
+}
+
 /* ---- Budget category + line items ---- */
 .budget-cat {
   background: var(--color-surface);

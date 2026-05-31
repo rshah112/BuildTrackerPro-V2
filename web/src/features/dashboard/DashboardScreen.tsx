@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { SlidersHorizontal } from 'lucide-react'
 import { useRows } from '../../data/hooks'
 import type { AllowanceSelection, ChangeOrder, Expense, Project } from '../../domain/types'
@@ -28,6 +29,8 @@ import { useProjects } from '../projects/useProjects'
 import { useExpenses } from '../expenses/useExpenses'
 import { usePhotos } from '../photos/usePhotos'
 import { PhotoThumb } from '../photos/PhotoThumb'
+import { usePhases } from '../phases/usePhases'
+import { phaseProgress, sortPhases, clampPct } from '../phases/phaseMath'
 import { localToday, nextFourteenDaysDue, cashFlowPayments } from '../cashflow/cashFlow'
 import { useDashboardPrefs, DASHBOARD_SECTIONS } from './dashboardPrefs'
 
@@ -53,6 +56,7 @@ export function DashboardScreen() {
     error: selectionsError,
   } = useRows<AllowanceSelection>('allowance_selections', { projectId })
   const { data: photos = [] } = usePhotos(projectId!)
+  const { data: phases = [] } = usePhases(projectId!)
   const { prefs, toggle } = useDashboardPrefs()
   const [customizing, setCustomizing] = useState(false)
 
@@ -233,6 +237,8 @@ export function DashboardScreen() {
   const recentPhotos = [...photos]
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
     .slice(0, 6)
+  const phaseStats = phaseProgress(phases)
+  const phaseList = sortPhases(phases).slice(0, 6)
 
   return (
     <section className="dashboard">
@@ -333,6 +339,36 @@ export function DashboardScreen() {
           </>
         )}
       </SectionCard>
+      )}
+
+      {prefs.phases && phases.length > 0 && (
+        <SectionCard
+          title="Phase Pulse"
+          trailing={<strong>{phaseStats.overall}%</strong>}
+          footnote={
+            phaseStats.current
+              ? `Now: ${phaseStats.current.name} · ${phaseStats.done}/${phaseStats.total} phases complete`
+              : `${phaseStats.done}/${phaseStats.total} phases complete`
+          }
+        >
+          <div className="barrow-list">
+            {phaseList.map((p) => {
+              const pct = clampPct(p.pctComplete)
+              return (
+                <div key={p.id} className="phase-bar">
+                  <div className="row-between">
+                    <span>{p.name}</span>
+                    <span className="muted tnum">{pct}%</span>
+                  </div>
+                  <div className="progress thin">
+                    <span className="fill-brand" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <Link to="/phases" className="card-link">Manage phases ›</Link>
+        </SectionCard>
       )}
 
       {prefs.category && categoryBars.length > 0 && (

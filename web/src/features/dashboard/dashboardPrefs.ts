@@ -4,6 +4,7 @@ import { useState } from 'react'
 export interface DashboardPrefs {
   metrics: boolean
   eac: boolean
+  phases: boolean
   category: boolean
   trend: boolean
   attention: boolean
@@ -15,6 +16,7 @@ export interface DashboardPrefs {
 const DEFAULTS: DashboardPrefs = {
   metrics: true,
   eac: true,
+  phases: true,
   category: true,
   trend: true,
   attention: true,
@@ -27,6 +29,7 @@ const KEY = 'btp.dashboardPrefs'
 export const DASHBOARD_SECTIONS: { key: keyof DashboardPrefs; label: string }[] = [
   { key: 'metrics', label: 'Key metrics' },
   { key: 'eac', label: 'Estimated final cost' },
+  { key: 'phases', label: 'Phase Pulse' },
   { key: 'category', label: 'Spend by category' },
   { key: 'trend', label: 'Spend over time' },
   { key: 'upcoming', label: 'Upcoming payments' },

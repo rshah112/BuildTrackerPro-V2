@@ -20,6 +20,8 @@ import {
   Receipt,
   Trash2,
   Landmark,
+  Activity,
+  PieChart,
   type LucideIcon,
 } from 'lucide-react'
 import { signOut } from '../auth/useSession'
@@ -32,6 +34,7 @@ import { useCurrentProject } from '../projects/currentProject'
 
 const PROJECT_LINKS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/project-info', label: 'Project info', icon: Info },
+  { to: '/phases', label: 'Build phases', icon: Activity },
   { to: '/tasks', label: 'Tasks', icon: ListTodo },
   { to: '/vendors', label: 'Vendors', icon: Contact },
   { to: '/change-orders', label: 'Change orders', icon: FileEdit },
@@ -78,6 +81,13 @@ export function MoreScreen() {
 
       <h2 className="section-label">App</h2>
       <div className="list-group">
+        <Link to="/portfolio" className="list-row">
+          <PieChart className="list-row-icon" size={20} aria-hidden />
+          <span className="list-row-label">Portfolio insights</span>
+          <span className="list-row-chevron" aria-hidden>
+            ›
+          </span>
+        </Link>
         <Link to="/projects" className="list-row">
           <FolderKanban className="list-row-icon" size={20} aria-hidden />
           <span className="list-row-label">Switch / manage projects</span>

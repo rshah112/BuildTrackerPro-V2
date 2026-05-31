@@ -28,6 +28,8 @@ const ReceiptsGalleryScreen = lazy(() => import('../features/expenses/ReceiptsGa
 const ProjectInfoScreen = lazy(() => import('../features/projects/ProjectInfoScreen').then((m) => ({ default: m.ProjectInfoScreen })))
 const TrashScreen = lazy(() => import('../features/trash/TrashScreen').then((m) => ({ default: m.TrashScreen })))
 const LoanScreen = lazy(() => import('../features/loan/LoanScreen').then((m) => ({ default: m.LoanScreen })))
+const PhasesScreen = lazy(() => import('../features/phases/PhasesScreen').then((m) => ({ default: m.PhasesScreen })))
+const PortfolioScreen = lazy(() => import('../features/portfolio/PortfolioScreen').then((m) => ({ default: m.PortfolioScreen })))
 
 export function AppRouter() {
   return (
@@ -60,7 +62,9 @@ export function AppRouter() {
           <Route path="/project-info" element={<RequireProject><ProjectInfoScreen /></RequireProject>} />
           <Route path="/trash" element={<RequireProject><TrashScreen /></RequireProject>} />
           <Route path="/loan" element={<RequireProject><LoanScreen /></RequireProject>} />
+          <Route path="/phases" element={<RequireProject><PhasesScreen /></RequireProject>} />
           <Route path="/export" element={<RequireProject><ExportScreen /></RequireProject>} />
+          <Route path="/portfolio" element={<PortfolioScreen />} />
           <Route path="/more" element={<MoreScreen />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

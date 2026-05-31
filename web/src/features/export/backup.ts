@@ -110,5 +110,8 @@ export async function restoreBackup(json: string): Promise<string> {
     loanId: remap(loanMap, r.loanId) ?? (r.loanId as string),
   }))
 
+  // Build phases (project-scoped only — no cross-entity refs to remap).
+  await insertMapped('phases', file.phases)
+
   return pid
 }

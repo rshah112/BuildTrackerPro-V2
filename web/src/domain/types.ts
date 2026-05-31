@@ -236,3 +236,17 @@ export interface LoanDraw {
   createdAt: ISODateString
   deletedAt?: ISODateString | null
 }
+
+export interface Phase {
+  id: UUID
+  owner: UUID
+  projectId: UUID
+  name: string
+  /** Completion 0–100. */
+  pctComplete: number
+  sortOrder: number
+  targetDate: ISODateString | null
+  notes: string
+  createdAt: ISODateString
+  deletedAt?: ISODateString | null
+}

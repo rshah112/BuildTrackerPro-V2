@@ -1,14 +1,17 @@
-import { useState, type ChangeEvent } from 'react'
+import { useRef, useState, type ChangeEvent } from 'react'
+import { ScanLine } from 'lucide-react'
 import type { BudgetLineItem, Expense } from '../../domain/types'
 import { balanceDue } from '../../lib/expenseMath'
 import { fmt } from '../../lib/money'
 import { uploadBlob, signedDownloadUrl } from '../../lib/r2'
+import { scanReceipt } from '../../lib/receiptOcr'
 import { Field } from '../../components/ui/Field'
 import { Select } from '../../components/ui/Select'
 import { CurrencyField } from '../../components/ui/CurrencyField'
 import { Button } from '../../components/ui/Button'
 import { FileUploadField } from '../../components/ui/FileUploadField'
 import { Form } from '../../components/ui/Form'
+import { useToast } from '../../components/ui/Toast'
 import { useEntityForm } from '../../lib/useEntityForm'
 import { resolvePaidAmount } from './paidAmount'
 import { useCreateExpense, useUpdateExpense } from './useExpenses'
@@ -62,6 +65,9 @@ export function ExpenseForm({
   const [paidTouched, setPaidTouched] = useState(false)
   // Funding source (personal vs loan) only matters once the project is financed.
   const hasLoan = (useLoan(projectId).data ?? []).length > 0
+  const scanRef = useRef<HTMLInputElement>(null)
+  const [scanning, setScanning] = useState(false)
+  const toast = useToast()
 
   const { d, setD, text, date, busy, submit, submitError } = useEntityForm<Expense, Draft>({
     initial,
@@ -118,6 +124,33 @@ export function ExpenseForm({
       categoryName: item?.categoryName ?? p.categoryName ?? '',
       roomTag: item?.roomTag ?? p.roomTag ?? '',
     }))
+  }
+
+  // OCR a receipt photo and pre-fill empty fields (the user confirms). Also attaches the
+  // scanned image as the receipt so one tap both reads and saves it.
+  const onScan = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setScanning(true)
+    try {
+      const r = await scanReceipt(file)
+      setReceiptFile(file)
+      setD((p) => ({
+        ...p,
+        vendorName: p.vendorName?.trim() ? p.vendorName : r.vendor ?? p.vendorName,
+        amount: (p.amount ?? 0) > 0 ? p.amount : r.amount ?? p.amount,
+        date: r.date ?? p.date,
+      }))
+      const found = [r.vendor && 'vendor', r.amount != null && 'amount', r.date && 'date'].filter(Boolean)
+      toast.success(
+        found.length ? `Scanned — filled ${found.join(', ')}. Double-check the values.` : 'Couldn’t read it — enter the details manually.',
+      )
+    } catch (err) {
+      toast.error((err as Error).message || 'Receipt scan failed')
+    } finally {
+      setScanning(false)
+    }
   }
 
   return (
@@ -224,6 +257,16 @@ export function ExpenseForm({
       </Form.Section>
 
       <Form.Section title="Receipt & notes">
+        <input ref={scanRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onScan} />
+        <Button
+          type="button"
+          variant="secondary"
+          loading={scanning}
+          leadingIcon={<ScanLine size={16} />}
+          onClick={() => scanRef.current?.click()}
+        >
+          Scan receipt to autofill
+        </Button>
         <FileUploadField
           label="Receipt"
           cameraAccept="image/*"

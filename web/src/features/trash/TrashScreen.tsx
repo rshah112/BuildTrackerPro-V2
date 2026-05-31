@@ -32,6 +32,7 @@ export function TrashScreen() {
   const bids = useRows<TrashRow>('bids', f, only)
   const loans = useRows<TrashRow>('construction_loans', f, only)
   const draws = useRows<TrashRow>('loan_draws', f, only)
+  const phases = useRows<TrashRow>('phases', f, only)
 
   const qc = useQueryClient()
   const restore = useMutation({
@@ -59,9 +60,10 @@ export function TrashScreen() {
     { name: 'bids', label: 'Bids', rows: bids.data ?? [], title: (r) => str(r.vendorName) || 'Bid' },
     { name: 'construction_loans', label: 'Loans', rows: loans.data ?? [], title: (r) => str(r.lender) || 'Construction loan' },
     { name: 'loan_draws', label: 'Loan draws', rows: draws.data ?? [], title: (r) => str(r.description) || 'Draw' },
+    { name: 'phases', label: 'Build phases', rows: phases.data ?? [], title: (r) => str(r.name) || 'Phase' },
   ]
 
-  const queries = [cats, items, expenses, vendors, cos, allowances, photos, docs, tasks, pkgs, bids, loans, draws]
+  const queries = [cats, items, expenses, vendors, cos, allowances, photos, docs, tasks, pkgs, bids, loans, draws, phases]
   const isLoading = queries.some((q) => q.isLoading)
   const error = queries.find((q) => q.error)?.error
   const total = groups.reduce((n, g) => n + g.rows.length, 0)

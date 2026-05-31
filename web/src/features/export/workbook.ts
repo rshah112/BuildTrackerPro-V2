@@ -127,10 +127,15 @@ function buildWorkbook(d: ProjectExport): XLSX.WorkBook {
   return wb
 }
 
+/** Serialize the export to an .xlsx ArrayBuffer (shared by the workbook download and the
+ *  ZIP bundle so the data is only loaded/built once). */
+export function workbookBuffer(d: ProjectExport): ArrayBuffer {
+  return XLSX.write(buildWorkbook(d), { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+}
+
 export async function downloadWorkbook(projectId: string): Promise<void> {
   const d = await loadProjectExport(projectId)
-  const wb = buildWorkbook(d)
-  const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+  const out = workbookBuffer(d)
   downloadBlob(
     new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
     `${safeFileName(d.project.name)}-${d.exportedAt.slice(0, 10)}.xlsx`,

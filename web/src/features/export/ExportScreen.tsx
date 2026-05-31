@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { FileSpreadsheet, FileText, Download, Upload, CloudUpload } from 'lucide-react'
+import { FileSpreadsheet, FileText, Download, Upload, CloudUpload, FileArchive, FileUp } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
@@ -12,12 +12,15 @@ import { backupToCloud } from './cloudBackup'
 // exports, not when the Export screen mounts — keeping them out of every other chunk.
 const loadWorkbook = () => import('./workbook').then((m) => m.downloadWorkbook)
 const loadInsightsPdf = () => import('./insightsPdf').then((m) => m.downloadInsightsPdf)
+const loadBundle = () => import('./bundle').then((m) => m.downloadBundle)
+const loadWorkbookImport = () => import('./workbookImport').then((m) => m.importWorkbookUpdates)
 
 export function ExportScreen() {
   const { projectId } = useCurrentProject()
   const toast = useToast()
   const queryClient = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
+  const xlsxRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
   if (!projectId) return null
@@ -49,6 +52,25 @@ export function ExportScreen() {
     )
   }
 
+  const onWorkbookFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !projectId) return
+    setBusy('import')
+    try {
+      const res = await (await loadWorkbookImport())(projectId, file)
+      await queryClient.invalidateQueries()
+      const parts = [`${res.lineItemsUpdated} line item${res.lineItemsUpdated === 1 ? '' : 's'} updated`]
+      if (res.categoriesUpdated) parts.push(`${res.categoriesUpdated} categor${res.categoriesUpdated === 1 ? 'y' : 'ies'}`)
+      if (res.unmatched) parts.push(`${res.unmatched} row${res.unmatched === 1 ? '' : 's'} unmatched`)
+      toast.success(parts.join(' · '))
+    } catch (err) {
+      toast.error((err as Error).message || 'Couldn’t read that workbook')
+    } finally {
+      setBusy(null)
+    }
+  }
+
   return (
     <section>
       <ScreenHeader title="Export & backup" subtitle="Download your project or save a full backup" />
@@ -72,6 +94,15 @@ export function ExportScreen() {
           onClick={() => run('pdf', async () => (await loadInsightsPdf())(projectId), 'PDF report downloaded')}
         >
           Export PDF report
+        </Button>
+        <Button
+          variant="secondary"
+          fullWidth
+          loading={busy === 'bundle'}
+          leadingIcon={<FileArchive size={18} />}
+          onClick={() => run('bundle', async () => (await loadBundle())(projectId), 'Export bundle downloaded')}
+        >
+          Download .zip bundle
         </Button>
       </div>
 
@@ -104,6 +135,15 @@ export function ExportScreen() {
         >
           Restore from backup
         </Button>
+        <Button
+          variant="secondary"
+          fullWidth
+          loading={busy === 'import'}
+          leadingIcon={<FileUp size={18} />}
+          onClick={() => xlsxRef.current?.click()}
+        >
+          Update budgets from workbook
+        </Button>
         <input
           ref={fileRef}
           type="file"
@@ -111,10 +151,19 @@ export function ExportScreen() {
           style={{ display: 'none' }}
           onChange={onRestoreFile}
         />
+        <input
+          ref={xlsxRef}
+          type="file"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          style={{ display: 'none' }}
+          onChange={onWorkbookFile}
+        />
       </div>
       <p className="muted">
         Restore creates a new project from the file — your current project is left untouched. The app
-        also snapshots this project to secure cloud storage automatically once a day.
+        also snapshots this project to secure cloud storage automatically once a day. “Update budgets
+        from workbook” re-imports an exported Excel file to update existing line-item and category
+        budgets (it never adds or deletes rows).
       </p>
     </section>
   )
