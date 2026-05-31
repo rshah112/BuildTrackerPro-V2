@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { ChevronDown, Plus, Pencil, Trash2, Award, FileStack } from 'lucide-react'
+import { ChevronDown, Plus, Pencil, Trash2, Award, FileStack, Scale } from 'lucide-react'
 import type { Bid, BidPackage } from '../../domain/types'
 import type { BidPackageStatus } from '../../domain/enums'
 import { fmt } from '../../lib/money'
+import { fmtDate } from '../../lib/date'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, type BadgeTone } from '../../components/ui/Badge'
@@ -44,6 +45,7 @@ export function BidsScreen() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [pkgEditing, setPkgEditing] = useState<BidPackage | 'new' | null>(null)
   const [bidEditing, setBidEditing] = useState<{ packageId: string; bid?: Bid } | null>(null)
+  const [comparePkg, setComparePkg] = useState<BidPackage | null>(null)
   const [q, setQ] = useState('')
 
   if (!projectId) return null
@@ -161,7 +163,7 @@ export function BidsScreen() {
                     <div className="budget-cat-figures muted">
                       {pkgBids.length} {pkgBids.length === 1 ? 'bid' : 'bids'}
                       {pkgBids.length > 0 ? ` · low ${fmt(low)}` : ''}
-                      {pkg.dueDate ? ` · due ${new Date(pkg.dueDate).toLocaleDateString()}` : ''}
+                      {pkg.dueDate ? ` · due ${fmtDate(pkg.dueDate)}` : ''}
                     </div>
                   </div>
                 </button>
@@ -178,6 +180,11 @@ export function BidsScreen() {
                   >
                     Add bid
                   </Button>
+                  {pkgBids.length >= 2 && (
+                    <Button size="sm" variant="ghost" leadingIcon={<Scale size={14} />} onClick={() => setComparePkg(pkg)}>
+                      Compare
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="ghost"
@@ -264,6 +271,55 @@ export function BidsScreen() {
             onDone={() => setBidEditing(null)}
           />
         )}
+      </Sheet>
+
+      <Sheet open={comparePkg !== null} onClose={() => setComparePkg(null)} title="Compare bids">
+        {comparePkg &&
+          (() => {
+            const cmp = bidsFor(comparePkg.id).slice().sort((a, b) => a.amount - b.amount)
+            const lowest = cmp.length ? cmp[0].amount : 0
+            return (
+              <>
+                <p className="muted">{comparePkg.scopeTitle}</p>
+                {cmp.map((b, i) => (
+                  <div key={b.id} className="bid-compare-bid">
+                    <div className="kv-row">
+                      <strong>
+                        {b.vendorName || 'Vendor'}
+                        {i === 0 && <Badge tone="success">Lowest</Badge>}
+                        {comparePkg.awardedBidId === b.id && <Badge tone="info">Awarded</Badge>}
+                      </strong>
+                      <span>
+                        <strong className="tnum">{fmt(b.amount)}</strong>
+                        {i > 0 && <span className="danger-text"> (+{fmt(b.amount - lowest)})</span>}
+                      </span>
+                    </div>
+                    {b.lineItems.length > 0 && (
+                      <ul className="plain-list">
+                        {b.lineItems.map((l) => (
+                          <li key={l.id} className="kv-row">
+                            <span className="muted">{l.title || 'Item'}</span>
+                            <span className="tnum">{fmt(l.amount)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className="row-between">
+                      {comparePkg.awardedBidId === b.id ? (
+                        <Button size="sm" variant="secondary" onClick={() => { void unaward(comparePkg, b); setComparePkg(null) }}>
+                          Remove award
+                        </Button>
+                      ) : (
+                        <Button size="sm" leadingIcon={<Award size={14} />} onClick={() => { void award(comparePkg, b); setComparePkg(null) }}>
+                          Award
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )
+          })()}
       </Sheet>
     </section>
   )
