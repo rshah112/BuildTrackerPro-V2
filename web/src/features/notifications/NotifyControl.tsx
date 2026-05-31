@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Bell, BellOff, BellRing } from 'lucide-react'
 import { useToast } from '../../components/ui/Toast'
 import { notifState, enableNotifications, showLocalNotification } from '../../lib/notifications'
+import { subscribeToPush } from '../../lib/push'
 
 /** A More-screen row to enable reminders (or see their status) — the durable entry point
  *  after the one-time banner is dismissed. Hidden entirely on browsers that can't notify. */
@@ -35,6 +36,7 @@ export function NotifyControl() {
     const next = await enableNotifications()
     setState(next)
     if (next === 'granted') {
+      void subscribeToPush() // register this device for background push (best-effort)
       toast.success('Reminders on')
       void showLocalNotification('Reminders are on', {
         body: 'BuildTracker will flag invoices and change-order payments coming due.',

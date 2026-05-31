@@ -4,5 +4,8 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }],
-  "crons": [{ "path": "/api/keepalive", "schedule": "0 12 * * *" }]
+  "crons": [
+    { "path": "/api/keepalive", "schedule": "0 12 * * *" },
+    { "path": "/api/push-reminders", "schedule": "0 13 * * *" }
+  ]
 }

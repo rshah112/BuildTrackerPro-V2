@@ -9,6 +9,7 @@ import {
   showLocalNotification,
   type NotifState,
 } from '../../lib/notifications'
+import { subscribeToPush } from '../../lib/push'
 
 /** One-time, non-blocking banner inviting the user to turn on reminders — shown ONLY when
  *  the browser supports notifications, permission is still 'default', and they haven't
@@ -34,6 +35,7 @@ export function NotifyPrompt({ onChange }: { onChange: (s: NotifState) => void }
     setShow(false)
     onChange(state)
     if (state === 'granted') {
+      void subscribeToPush() // register this device for background push (best-effort)
       toast.success('Reminders on — we’ll flag invoices coming due.')
       void showLocalNotification('Reminders are on', {
         body: 'BuildTracker will flag invoices and change-order payments coming due.',
