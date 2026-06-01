@@ -91,8 +91,10 @@ export default async function handler(req: Request): Promise<Response> {
 
   if (body.op === 'get') {
     if (!body.key || !keyBelongsToUser(body.key, userId)) return json({ error: 'forbidden' }, 403)
+    // 1 hour: must exceed the client's signed-URL cache window (usePhotoUrl staleTime ~50m),
+    // otherwise a cached URL outlives the signature and the <img> 403s → broken image.
     const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: bucket, Key: body.key }), {
-      expiresIn: 300,
+      expiresIn: 3600,
     })
     return json({ url })
   }
