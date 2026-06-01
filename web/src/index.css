@@ -498,6 +498,12 @@ textarea {
   box-shadow: var(--shadow-sm);
   padding: 1rem;
 }
+/* Space stacked cards on every screen (Project Info, Loan, Documents, Dashboard, …) so
+   they don't sit shadow-to-shadow. Vertical margins collapse, so adjacent panels keep a
+   single 1rem gap; `.metric-card` is excluded (it lives in gap-spaced grids). */
+.panel {
+  margin-bottom: 1rem;
+}
 .metric-card > span,
 .metric-card > small {
   display: block;
