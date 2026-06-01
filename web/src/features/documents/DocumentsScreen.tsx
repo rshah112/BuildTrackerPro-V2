@@ -3,7 +3,6 @@ import { Plus, Trash2, Pencil, FolderOpen, FileText } from 'lucide-react'
 import type { ProjectDocument } from '../../domain/types'
 import { PROJECT_DOCUMENT_KINDS, type ProjectDocumentKind } from '../../domain/enums'
 import { fmtDate } from '../../lib/date'
-import { signedDownloadUrl } from '../../lib/r2'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, type BadgeTone } from '../../components/ui/Badge'
@@ -12,6 +11,7 @@ import { SectionCard } from '../../components/ui/SectionCard'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState, ListState } from '../../components/ui/Feedback'
 import { EditorSheet } from '../../components/ui/EditorSheet'
+import { FilePreview } from '../../components/ui/FilePreview'
 import { useEditor } from '../../components/ui/useEditor'
 import { useToast } from '../../components/ui/Toast'
 import { useConfirm } from '../../components/ui/Confirm'
@@ -44,6 +44,7 @@ export function DocumentsScreen() {
   const editor = useEditor<ProjectDocument>()
   const [newKind, setNewKind] = useState<ProjectDocumentKind>('other')
   const [filter, setFilter] = useState<Filter>('all')
+  const [preview, setPreview] = useState<ProjectDocument | null>(null)
 
   const receivedKinds = useMemo(
     () => new Set(documents.filter((d) => d.status === 'received').map((d) => d.kind)),
@@ -65,14 +66,12 @@ export function DocumentsScreen() {
     editor.openNew()
   }
 
-  const openFile = async (doc: ProjectDocument) => {
-    if (!doc.fileObjectKey) return
-    try {
-      const url = await signedDownloadUrl(doc.fileObjectKey)
-      if (url) window.open(url, '_blank', 'noopener')
-    } catch {
-      toast.error('Couldn’t open the file')
+  const openFile = (doc: ProjectDocument) => {
+    if (!doc.fileObjectKey) {
+      toast.error('No file attached to this document.')
+      return
     }
+    setPreview(doc)
   }
 
   const del = async (doc: ProjectDocument) => {
@@ -196,6 +195,14 @@ export function DocumentsScreen() {
           ))
         )}
       </ListState>
+
+      <FilePreview
+        open={!!preview}
+        onClose={() => setPreview(null)}
+        objectKey={preview?.fileObjectKey ?? null}
+        title={preview?.fileName}
+        fileName={preview?.fileName}
+      />
 
       <EditorSheet editor={editor} newTitle="Upload document" editTitle="Edit document">
         {(initial) => (

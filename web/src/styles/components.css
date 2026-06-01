@@ -809,6 +809,52 @@
   font-size: var(--text-sm);
 }
 
+/* ---- File / photo preview (centered Modal) ---- */
+.preview-img {
+  display: block;
+  max-width: 100%;
+  max-height: 62vh;
+  margin: 0 auto;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+.preview-frame {
+  width: 100%;
+  height: 62vh;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+.preview-loading {
+  height: 50vh;
+  border-radius: var(--radius-md);
+}
+.preview-open {
+  display: inline-block;
+  margin-top: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-brand);
+  text-decoration: none;
+}
+.room-photos {
+  margin-top: 0.5rem;
+}
+/* Tappable room row in the By Room list. */
+.room-open {
+  display: block;
+  width: 100%;
+  padding: 0.75rem;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text);
+}
+.room-open:active {
+  background: var(--color-surface-2);
+}
+
 /* Inline "manage ›" link inside a dashboard card. */
 .card-link {
   display: inline-block;
@@ -956,6 +1002,9 @@
   grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: 0.5rem;
   margin-bottom: 0.5rem;
+  /* Don't stretch cells to the row height — that overrides each cell's aspect-ratio and
+     collapses the tile to the image's height. `start` lets aspect-ratio:1 make squares. */
+  align-items: start;
 }
 .photo-cell {
   position: relative;

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Trash2, Camera } from 'lucide-react'
+import { Plus, Trash2, Camera, Pencil } from 'lucide-react'
 import type { PhotoAttachment } from '../../domain/types'
 import { roomsForTemplate } from '../../domain/roomCatalog'
 import { ScreenHeader } from '../../app/ScreenHeader'
@@ -8,6 +8,7 @@ import { SearchField } from '../../components/ui/SearchField'
 import { matchesQuery } from '../../lib/search'
 import { EditorSheet } from '../../components/ui/EditorSheet'
 import { useEditor } from '../../components/ui/useEditor'
+import { FilePreview } from '../../components/ui/FilePreview'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
@@ -28,6 +29,7 @@ export function PhotosScreen() {
   const toast = useToast()
   const editor = useEditor<PhotoAttachment>()
   const [q, setQ] = useState('')
+  const [preview, setPreview] = useState<PhotoAttachment | null>(null)
 
   if (!projectId) return null
 
@@ -89,8 +91,8 @@ export function PhotosScreen() {
                 <div key={ph.id} className="photo-cell">
                   <button
                     className="photo-open"
-                    onClick={() => editor.openEdit(ph)}
-                    aria-label={`Photo: ${ph.notes || room}`}
+                    onClick={() => setPreview(ph)}
+                    aria-label={`Preview photo: ${ph.notes || room}`}
                   >
                     <PhotoThumb objectKey={ph.imageObjectKey} alt={ph.notes || room} />
                   </button>
@@ -104,6 +106,41 @@ export function PhotosScreen() {
           </div>
         ))
       )}
+
+      <FilePreview
+        open={!!preview}
+        onClose={() => setPreview(null)}
+        objectKey={preview?.imageObjectKey ?? null}
+        title={preview?.notes || preview?.roomTag || 'Photo'}
+        footer={
+          preview ? (
+            <div className="row-between">
+              <Button
+                variant="secondary"
+                leadingIcon={<Pencil size={16} />}
+                onClick={() => {
+                  const ph = preview
+                  setPreview(null)
+                  editor.openEdit(ph)
+                }}
+              >
+                Edit details
+              </Button>
+              <Button
+                variant="ghost"
+                leadingIcon={<Trash2 size={16} />}
+                onClick={() => {
+                  const ph = preview
+                  setPreview(null)
+                  void del(ph)
+                }}
+              >
+                Delete
+              </Button>
+            </div>
+          ) : undefined
+        }
+      />
 
       <EditorSheet editor={editor} newTitle="Add photo" editTitle="Edit photo">
         {(initial) => (

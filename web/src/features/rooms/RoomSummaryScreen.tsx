@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Grid2x2 } from 'lucide-react'
 import type { BudgetLineItem } from '../../domain/types'
 import { fmt, sumBy } from '../../lib/money'
@@ -7,6 +7,9 @@ import { EmptyState, ListState } from '../../components/ui/Feedback'
 import { useCurrentProject } from '../projects/currentProject'
 import { useLineItems } from '../budget/useBudget'
 import { usePhotos } from '../photos/usePhotos'
+import { RoomDetailSheet } from './RoomDetailSheet'
+
+const roomOf = (tag: string | null | undefined) => tag?.trim() || 'Unassigned'
 
 function pct(actual: number, budget: number): number {
   if (budget <= 0) return 0
@@ -17,6 +20,7 @@ export function RoomSummaryScreen() {
   const { projectId } = useCurrentProject()
   const { data: lineItems = [], isLoading, error } = useLineItems(projectId!)
   const { data: photos = [] } = usePhotos(projectId!)
+  const [active, setActive] = useState<string | null>(null)
 
   const rooms = useMemo(() => {
     const items = new Map<string, BudgetLineItem[]>()
@@ -69,12 +73,13 @@ export function RoomSummaryScreen() {
             const over = r.actual > r.budget && r.budget > 0
             return (
               <li key={r.name} className="budget-cat">
-                <div className="budget-cat-info" style={{ padding: '0.75rem' }}>
+                <button className="room-open" onClick={() => setActive(r.name)} aria-label={`Open ${r.name}`}>
                   <div className="budget-cat-titlerow">
                     <strong>{r.name}</strong>
                     <span className="muted">
                       {r.lineItems} item{r.lineItems === 1 ? '' : 's'}
                       {r.photos > 0 ? ` · ${r.photos} photo${r.photos === 1 ? '' : 's'}` : ''}
+                      <span className="list-row-chevron" aria-hidden> ›</span>
                     </span>
                   </div>
                   <div className="budget-cat-figures">
@@ -85,11 +90,18 @@ export function RoomSummaryScreen() {
                   <div className="progress thin">
                     <span className={over ? 'fill-danger' : 'fill-brand'} style={{ width: `${pct(r.actual, r.budget)}%` }} />
                   </div>
-                </div>
+                </button>
               </li>
             )
           })}
         </ul>
+
+        <RoomDetailSheet
+          room={active}
+          items={lineItems.filter((li) => roomOf(li.roomTag) === active)}
+          photos={photos.filter((ph) => roomOf(ph.roomTag) === active)}
+          onClose={() => setActive(null)}
+        />
       </ListState>
     </section>
   )
