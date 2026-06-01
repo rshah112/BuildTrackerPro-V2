@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
-import { Outlet, Link } from 'react-router-dom'
+import { Outlet, Link, useLocation } from 'react-router-dom'
 import { FolderKanban } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { TabBar } from './TabBar'
@@ -12,11 +12,13 @@ import { maybeAutoBackup } from '../features/export/cloudBackup'
 import { NotifyPrompt } from '../features/notifications/NotifyPrompt'
 import { DueReminders } from '../features/notifications/DueReminders'
 import { notifState, type NotifState } from '../lib/notifications'
+import { ErrorBoundary } from './ErrorBoundary'
 
 export function AppShell() {
   const queryClient = useQueryClient()
   const toast = useToast()
   const { projectId } = useCurrentProject()
+  const { pathname } = useLocation()
   const [perm, setPerm] = useState<NotifState>(notifState())
 
   // Daily off-site safety snapshot to R2 (best-effort, non-blocking).
@@ -45,9 +47,13 @@ export function AppShell() {
       </header>
       <main className="app-main" id="main">
         <PageTransition>
-          <Suspense fallback={<ListSkeleton />}>
-            <Outlet />
-          </Suspense>
+          {/* Keyed by route so a crash on one screen clears when you navigate away, and a
+              stale lazy-chunk error auto-reloads instead of blanking the whole app. */}
+          <ErrorBoundary key={pathname}>
+            <Suspense fallback={<ListSkeleton />}>
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </PageTransition>
       </main>
       {projectId && perm === 'granted' && <DueReminders projectId={projectId} />}
