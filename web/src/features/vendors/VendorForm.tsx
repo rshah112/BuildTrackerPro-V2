@@ -1,8 +1,10 @@
+import { useQueryClient } from '@tanstack/react-query'
 import type { Vendor } from '../../domain/types'
 import { Field } from '../../components/ui/Field'
 import { Form } from '../../components/ui/Form'
 import { useEntityForm } from '../../lib/useEntityForm'
 import { useCreateVendor, useUpdateVendor } from './useVendors'
+import { cascadeVendorRename } from './cascadeVendorRename'
 
 type Draft = Partial<Omit<Vendor, 'id' | 'owner'>>
 
@@ -24,11 +26,22 @@ export function VendorForm({
   initial?: Vendor
   onDone: () => void
 }) {
+  const qc = useQueryClient()
   const { d, text, busy, submit } = useEntityForm<Vendor, Draft>({
     initial,
     blank: blank(projectId),
     create: useCreateVendor(),
     update: useUpdateVendor(),
+    // A rename must propagate to the name-linked expenses/allowances (see cascadeVendorRename).
+    onSaved: async (saved) => {
+      if (initial && saved.name !== initial.name) {
+        await cascadeVendorRename(projectId, initial.name, saved.name)
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: ['expenses'] }),
+          qc.invalidateQueries({ queryKey: ['allowance_selections'] }),
+        ])
+      }
+    },
     onDone,
   })
 

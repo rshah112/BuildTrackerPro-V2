@@ -12,6 +12,7 @@ vi.mock('./useExpenses', () => ({
 }))
 vi.mock('../vendors/useVendors', () => ({
   useVendors: () => ({ data: [{ id: 'v1', name: 'Existing Vendor', trade: 'Plumbing' }] }),
+  useCreateVendor: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 const h = vi.hoisted(() => ({ loan: [] as unknown[] }))
 vi.mock('../loan/useLoan', () => ({ useLoan: () => ({ data: h.loan }) }))

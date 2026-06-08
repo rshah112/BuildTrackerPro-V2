@@ -19,6 +19,8 @@ import { useEntityForm } from '../../lib/useEntityForm'
 import { resolvePaidAmount } from './paidAmount'
 import { useCreateExpense, useUpdateExpense, useExpenses } from './useExpenses'
 import { useVendors } from '../vendors/useVendors'
+import { useEnsureVendor } from '../vendors/useEnsureVendor'
+import { VendorPicker } from '../vendors/VendorPicker'
 import { useLoan } from '../loan/useLoan'
 
 type Draft = Partial<Omit<Expense, 'id' | 'owner'>>
@@ -83,14 +85,11 @@ export function ExpenseForm({
   // Vendor suggestions: every distinct name from the vendor list + past expenses.
   const vendorsData = useVendors(projectId).data
   const expensesData = useExpenses(projectId).data
-  const vendorOptions = useMemo<ComboOption[]>(() => {
-    const map = new Map<string, string | undefined>()
-    for (const v of vendorsData ?? []) if (v.name) map.set(v.name, v.trade || undefined)
-    for (const e of expensesData ?? []) if (e.vendorName && !map.has(e.vendorName)) map.set(e.vendorName, undefined)
-    return [...map.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([name, trade]) => ({ value: name, label: name, hint: trade }))
-  }, [vendorsData, expensesData])
+  const pastVendorNames = useMemo<string[]>(
+    () => [...new Set((expensesData ?? []).map((e) => e.vendorName).filter(Boolean))],
+    [expensesData],
+  )
+  const ensureVendor = useEnsureVendor(projectId)
 
   // Budget lines as a searchable, category-grouped picker (sorted so groups stay contiguous).
   const lineOptions = useMemo<ComboOption[]>(() => {
@@ -137,6 +136,12 @@ export function ExpenseForm({
       // Remember the sticky payment choices so the next entry pre-fills them.
       if (isPaid && draft.paymentMethod) setLastUsed('expense.paymentMethod', draft.paymentMethod)
       if (hasLoan && draft.fundingSource) setLastUsed('expense.fundingSource', draft.fundingSource)
+      // Auto-create a vendor profile for a typed name (best-effort; never blocks the save).
+      try {
+        await ensureVendor(draft.vendorName)
+      } catch {
+        /* vendor auto-create is best-effort */
+      }
       return {
         ...draft,
         projectId,
@@ -249,13 +254,11 @@ export function ExpenseForm({
           </div>
         )}
 
-        <Combobox
-          label="Vendor"
+        <VendorPicker
           value={d.vendorName ?? ''}
-          options={vendorOptions}
+          vendors={vendorsData ?? []}
+          extraNames={pastVendorNames}
           onChange={(v) => setD((p) => ({ ...p, vendorName: v }))}
-          allowCustom
-          placeholder="Search or add a vendor"
         />
         <CurrencyField label="Amount" value={d.amount ?? 0} onChange={(v) => setD((p) => ({ ...p, amount: v }))} />
         <Combobox

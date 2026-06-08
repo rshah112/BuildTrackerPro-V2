@@ -5,6 +5,9 @@ import { CurrencyField } from '../../components/ui/CurrencyField'
 import { Form } from '../../components/ui/Form'
 import { useEntityForm } from '../../lib/useEntityForm'
 import { useCreateAllowance, useUpdateAllowance } from './useAllowances'
+import { useVendors } from '../vendors/useVendors'
+import { useEnsureVendor } from '../vendors/useEnsureVendor'
+import { VendorPicker } from '../vendors/VendorPicker'
 
 type Draft = Partial<Omit<AllowanceSelection, 'id' | 'owner'>>
 
@@ -34,11 +37,22 @@ export function AllowanceForm({
   onSaved: (saved: AllowanceSelection) => Promise<void>
   onDone: () => void
 }) {
+  const { data: vendors = [] } = useVendors(projectId)
+  const ensureVendor = useEnsureVendor(projectId)
   const { d, set, text, busy, submit } = useEntityForm<AllowanceSelection, Draft>({
     initial,
     blank: blank(projectId, lineItems[0]?.id ?? ''),
     create: useCreateAllowance(),
     update: useUpdateAllowance(),
+    // Auto-create a vendor profile for a typed name (best-effort).
+    transform: async (draft) => {
+      try {
+        await ensureVendor(draft.vendor)
+      } catch {
+        /* best-effort */
+      }
+      return draft
+    },
     onSaved,
     onDone,
   })
@@ -62,7 +76,7 @@ export function AllowanceForm({
           )}
         </Field>
         <CurrencyField label="Amount" value={d.amount ?? 0} onChange={(v) => set('amount', v)} />
-        <Field label="Vendor">{(p) => <input {...p} value={d.vendor ?? ''} onChange={text('vendor')} />}</Field>
+        <VendorPicker value={d.vendor ?? ''} vendors={vendors} onChange={(v) => set('vendor', v)} />
         <Field label="Selection date">
           {(p) => (
             <input

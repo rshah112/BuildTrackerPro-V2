@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus, Trash2, Contact, Phone, Mail } from 'lucide-react'
-import type { Vendor } from '../../domain/types'
+import type { Bid, ProjectTask, Vendor } from '../../domain/types'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { SearchField } from '../../components/ui/SearchField'
@@ -9,10 +9,12 @@ import { useEditor } from '../../components/ui/useEditor'
 import { EmptyState, ListState } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from '../projects/currentProject'
-import { useRestoreRow } from '../../data/hooks'
+import { useRestoreRow, useRows } from '../../data/hooks'
+import { useExpenses } from '../expenses/useExpenses'
 import { matchesQuery } from '../../lib/search'
 import { useVendors, useRemoveVendor } from './useVendors'
 import { VendorForm } from './VendorForm'
+import { VendorDetailSheet } from './VendorDetailSheet'
 
 export function VendorsScreen() {
   const { projectId } = useCurrentProject()
@@ -22,6 +24,10 @@ export function VendorsScreen() {
   const toast = useToast()
   const editor = useEditor<Vendor>()
   const [q, setQ] = useState('')
+  const [profile, setProfile] = useState<Vendor | null>(null)
+  const { data: expenses = [] } = useExpenses(projectId!)
+  const { data: bids = [] } = useRows<Bid>('bids', { projectId })
+  const { data: tasks = [] } = useRows<ProjectTask>('project_tasks', { projectId })
 
   if (!projectId) return null
 
@@ -70,7 +76,7 @@ export function VendorsScreen() {
         <ul className="card-list">
           {visible.map((v) => (
             <li key={v.id} className="expense-row">
-              <button className="expense-row-open" onClick={() => editor.openEdit(v)}>
+              <button className="expense-row-open" onClick={() => setProfile(v)}>
                 <div className="expense-row-main">
                   <strong>{v.name}</strong>
                   <span className="muted">
@@ -98,6 +104,19 @@ export function VendorsScreen() {
         </ul>
         )}
       </ListState>
+
+      <VendorDetailSheet
+        open={!!profile}
+        vendor={profile}
+        expenses={expenses}
+        bids={bids}
+        tasks={tasks}
+        onClose={() => setProfile(null)}
+        onEdit={(v) => {
+          setProfile(null)
+          editor.openEdit(v)
+        }}
+      />
 
       <EditorSheet editor={editor} newTitle="New vendor" editTitle="Edit vendor">
         {(initial) => <VendorForm projectId={projectId} initial={initial} onDone={editor.close} />}

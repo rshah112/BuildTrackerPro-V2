@@ -1,16 +1,17 @@
-import { useState, type ChangeEvent } from 'react'
+import { useState } from 'react'
 import { Plus, Trash2, FileText } from 'lucide-react'
 import type { Bid, BidLine, Vendor } from '../../domain/types'
 import { fmt, sumBy } from '../../lib/money'
 import { uploadBlob, signedDownloadUrl } from '../../lib/r2'
 import { Field } from '../../components/ui/Field'
-import { Select } from '../../components/ui/Select'
 import { CurrencyField } from '../../components/ui/CurrencyField'
 import { FileUploadField } from '../../components/ui/FileUploadField'
 import { Button } from '../../components/ui/Button'
 import { Form } from '../../components/ui/Form'
 import { useEntityForm } from '../../lib/useEntityForm'
 import { useCreateBid, useUpdateBid } from './useBids'
+import { useEnsureVendor } from '../vendors/useEnsureVendor'
+import { VendorPicker } from '../vendors/VendorPicker'
 
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}${Math.round(performance.now())}`)
 
@@ -43,16 +44,21 @@ export function BidForm({
   onDone: () => void
 }) {
   const [bidFile, setBidFile] = useState<File | null>(null)
+  const ensureVendor = useEnsureVendor(projectId)
   const { d, setD, set, text, busy, submit, submitError } = useEntityForm<Bid, Draft>({
     initial,
     blank: blank(projectId, packageId),
     create: useCreateBid(),
     update: useUpdateBid(),
-    // Upload an attached bid PDF/image to R2 (presigned) and store its object key + name.
     transform: async (draft) => {
-      if (!bidFile) return draft
+      // Resolve (or auto-create) the vendor by the typed name and store its id for the link.
+      let vendorId = draft.vendorId ?? null
+      const v = await ensureVendor(draft.vendorName).catch(() => null)
+      if (v) vendorId = v.id
+      if (!bidFile) return { ...draft, vendorId }
+      // Upload an attached bid PDF/image to R2 (presigned) and store its object key + name.
       const { key } = await uploadBlob(bidFile, 'bid')
-      return { ...draft, fileObjectKey: key, fileName: draft.fileName?.trim() || bidFile.name }
+      return { ...draft, vendorId, fileObjectKey: key, fileName: draft.fileName?.trim() || bidFile.name }
     },
     onDone,
   })
@@ -61,11 +67,6 @@ export function BidForm({
     if (!d.fileObjectKey) return
     const url = await signedDownloadUrl(d.fileObjectKey)
     if (url) window.open(url, '_blank', 'noopener')
-  }
-
-  const chooseVendor = (e: ChangeEvent<HTMLSelectElement>) => {
-    const v = vendors.find((x) => x.id === e.target.value)
-    setD((p) => ({ ...p, vendorId: v?.id ?? null, vendorName: v?.name ?? p.vendorName ?? '' }))
   }
 
   const lines = d.lineItems ?? []
@@ -79,23 +80,11 @@ export function BidForm({
   return (
     <Form onSubmit={submit}>
       <Form.Section>
-        <Field label="Vendor">
-          {(p) => <input {...p} value={d.vendorName ?? ''} onChange={text('vendorName')} required autoFocus />}
-        </Field>
-        {vendors.length > 0 && (
-          <Field label="Or pick a saved vendor">
-            {(p) => (
-              <Select {...p} value={d.vendorId ?? ''} onChange={chooseVendor}>
-                <option value="">—</option>
-                {vendors.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-        )}
+        <VendorPicker
+          value={d.vendorName ?? ''}
+          vendors={vendors}
+          onChange={(name) => setD((p) => ({ ...p, vendorName: name }))}
+        />
         <CurrencyField label="Amount" value={d.amount ?? 0} onChange={(v) => set('amount', v)} />
         <FileUploadField
           label="Bid document"
