@@ -53,8 +53,12 @@ test('budget loop: project → category → line item → expense → dashboard'
   await page.getByRole('button', { name: 'Add expense' }).click()
   await page.getByLabel('Vendor', { exact: true }).fill('Acme Lumber')
   await page.getByLabel('Amount', { exact: true }).fill('1200')
-  await page.getByLabel('Budget line').selectOption({ label: 'Framing / Lumber' })
-  await page.getByLabel('Amount paid').fill('1200')
+  // Budget line is a searchable combobox: type to filter, then pick the option.
+  await page.getByLabel('Budget line').fill('Lumber')
+  await page.getByRole('option', { name: 'Lumber' }).click()
+  // Mark Paid — the "paid in full today" default sets Amount paid = Amount ($1,200).
+  // exact: true so it doesn't also match "Unpaid".
+  await page.getByRole('radio', { name: 'Paid', exact: true }).click()
   await page.getByRole('button', { name: 'Save expense' }).click()
 
   // The expense lands in the list.

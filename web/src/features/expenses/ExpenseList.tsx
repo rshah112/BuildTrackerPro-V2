@@ -32,6 +32,21 @@ function payStatus(e: Expense): { label: string; tone: 'success' | 'warn'; open:
   return { label: 'Open', tone: 'warn', open: true }
 }
 
+/** Due / overdue chip for an expense that still owes money, from its expected-payment or due
+ *  date. Surfaces the dates that now live behind "More details" so cash flow is scannable. */
+function dueInfo(e: Expense): { label: string; overdue: boolean } | null {
+  if (balanceDue(e) <= 0) return null
+  const iso = e.expectedPaymentDate || e.dueDate
+  const [y, m, d] = (iso?.slice(0, 10) ?? '').split('-').map(Number)
+  if (!y || !m || !d) return null
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const diff = Math.round((new Date(y, m - 1, d).getTime() - start.getTime()) / 86_400_000)
+  if (diff < 0) return { label: `Overdue ${Math.abs(diff)}d`, overdue: true }
+  if (diff === 0) return { label: 'Due today', overdue: false }
+  return { label: `Due ${fmtDate(`${y}-${m}-${d}`, { month: 'short', day: 'numeric' })}`, overdue: false }
+}
+
 export function ExpenseList({ projectId, lineItems }: { projectId: string; lineItems: BudgetLineItem[] }) {
   const { data: expenses = [], isLoading, error } = useExpenses(projectId)
   const removeExpense = useRemoveExpense()
@@ -128,32 +143,35 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
         />
       ) : (
         <ul className="card-list">
-          {visible.map((e) => (
-            <li key={e.id} className="expense-row">
-              <button className="expense-row-open" onClick={() => editor.openEdit(e)}>
-                <div className="expense-row-main">
-                  <strong>{e.vendorName || 'Unnamed vendor'}</strong>
-                  <span className="muted">
-                    {fmtDate(e.date)} · {e.categoryName || 'Uncategorized'}
-                    {e.budgetLineItemTitle ? ` · ${e.budgetLineItemTitle}` : ''}
-                  </span>
-                </div>
-                <div className="expense-row-amount">
-                  <div className="expense-row-badges">
-                    {(() => {
-                      const st = payStatus(e)
-                      return <Badge tone={st.tone}>{st.label}</Badge>
-                    })()}
-                    {e.receiptObjectKey && <FileText size={15} className="muted" role="img" aria-label="Has receipt" />}
+          {visible.map((e) => {
+            const st = payStatus(e)
+            const due = dueInfo(e)
+            return (
+              <li key={e.id} className="expense-row">
+                <button className="expense-row-open" onClick={() => editor.openEdit(e)}>
+                  <div className="expense-row-main">
+                    <strong>{e.vendorName || 'Unnamed vendor'}</strong>
+                    <span className="muted">
+                      {fmtDate(e.date)} · {e.categoryName || 'Uncategorized'}
+                      {e.budgetLineItemTitle ? ` · ${e.budgetLineItemTitle}` : ''}
+                    </span>
                   </div>
-                  <strong>{fmt(e.amount)}</strong>
-                </div>
-              </button>
-              <button className="expense-row-del" onClick={() => removeAndSync(e)} aria-label="Delete expense">
-                <Trash2 size={17} aria-hidden />
-              </button>
-            </li>
-          ))}
+                  <div className="expense-row-amount">
+                    <div className="expense-row-badges">
+                      <Badge tone={st.tone}>{st.label}</Badge>
+                      {due && <span className={`expense-due${due.overdue ? ' overdue' : ''}`}>{due.label}</span>}
+                      {e.receiptObjectKey && <FileText size={15} className="muted" role="img" aria-label="Has receipt" />}
+                    </div>
+                    <strong>{fmt(e.amount)}</strong>
+                    {st.label === 'Partial' && <span className="expense-left">{fmt(balanceDue(e))} left</span>}
+                  </div>
+                </button>
+                <button className="expense-row-del" onClick={() => removeAndSync(e)} aria-label="Delete expense">
+                  <Trash2 size={17} aria-hidden />
+                </button>
+              </li>
+            )
+          })}
         </ul>
       )}
 

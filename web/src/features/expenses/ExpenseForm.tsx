@@ -1,20 +1,24 @@
-import { useRef, useState, type ChangeEvent } from 'react'
-import { ScanLine } from 'lucide-react'
+import { useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { ScanLine, Upload, ChevronDown } from 'lucide-react'
 import type { BudgetLineItem, Expense } from '../../domain/types'
+import { PAYMENT_METHODS } from '../../domain/enums'
 import { balanceDue } from '../../lib/expenseMath'
 import { fmt } from '../../lib/money'
 import { uploadBlob, signedDownloadUrl } from '../../lib/r2'
-import { scanReceipt } from '../../lib/receiptOcr'
+import { scanReceipt, looksLikeInvoice } from '../../lib/receiptOcr'
+import { getLastUsed, setLastUsed } from '../../lib/lastUsed'
 import { Field } from '../../components/ui/Field'
 import { Select } from '../../components/ui/Select'
+import { Combobox, type ComboOption } from '../../components/ui/Combobox'
 import { CurrencyField } from '../../components/ui/CurrencyField'
+import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { Button } from '../../components/ui/Button'
-import { FileUploadField } from '../../components/ui/FileUploadField'
 import { Form } from '../../components/ui/Form'
 import { useToast } from '../../components/ui/Toast'
 import { useEntityForm } from '../../lib/useEntityForm'
 import { resolvePaidAmount } from './paidAmount'
-import { useCreateExpense, useUpdateExpense } from './useExpenses'
+import { useCreateExpense, useUpdateExpense, useExpenses } from './useExpenses'
+import { useVendors } from '../vendors/useVendors'
 import { useLoan } from '../loan/useLoan'
 
 type Draft = Partial<Omit<Expense, 'id' | 'owner'>>
@@ -40,7 +44,9 @@ function blank(projectId: string): Draft {
     budgetLineItemId: null,
     budgetLineItemTitle: '',
     notes: '',
-    isPaid: true,
+    // Smart default: a fresh expense is Unpaid (a bill to track). Scanning a receipt flips it
+    // to Paid; scanning an invoice keeps it Unpaid — see runExtraction.
+    isPaid: false,
     receiptObjectKey: null,
     fundingSource: '',
   }
@@ -63,15 +69,59 @@ export function ExpenseForm({
   // Once the user edits "Amount paid", honor their literal value (incl. $0) instead of
   // re-deriving the full-amount default on every render.
   const [paidTouched, setPaidTouched] = useState(false)
-  // Funding source (personal vs loan) only matters once the project is financed.
+  // Editing an existing expense reveals the exact paid amount/date; new entries assume
+  // "paid in full today" until the user taps Adjust.
+  const [adjustPaid, setAdjustPaid] = useState(!!initial)
+  // Auto-opened when OCR fills a tucked-away field (invoice # / due date) so it's visible.
+  const [moreOpen, setMoreOpen] = useState(false)
   const hasLoan = (useLoan(projectId).data ?? []).length > 0
   const scanRef = useRef<HTMLInputElement>(null)
+  const uploadRef = useRef<HTMLInputElement>(null)
   const [scanning, setScanning] = useState(false)
   const toast = useToast()
 
+  // Vendor suggestions: every distinct name from the vendor list + past expenses.
+  const vendorsData = useVendors(projectId).data
+  const expensesData = useExpenses(projectId).data
+  const vendorOptions = useMemo<ComboOption[]>(() => {
+    const map = new Map<string, string | undefined>()
+    for (const v of vendorsData ?? []) if (v.name) map.set(v.name, v.trade || undefined)
+    for (const e of expensesData ?? []) if (e.vendorName && !map.has(e.vendorName)) map.set(e.vendorName, undefined)
+    return [...map.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([name, trade]) => ({ value: name, label: name, hint: trade }))
+  }, [vendorsData, expensesData])
+
+  // Budget lines as a searchable, category-grouped picker (sorted so groups stay contiguous).
+  const lineOptions = useMemo<ComboOption[]>(() => {
+    const sorted = [...lineItems].sort(
+      (a, b) => (a.categoryName || '').localeCompare(b.categoryName || '') || a.title.localeCompare(b.title),
+    )
+    return [
+      { value: '', label: 'Unassigned' },
+      ...sorted.map((li) => ({
+        value: li.id,
+        label: li.title,
+        hint: li.roomTag || undefined,
+        group: li.categoryName || 'Uncategorized',
+      })),
+    ]
+  }, [lineItems])
+
+  const methodOptions = useMemo<ComboOption[]>(() => PAYMENT_METHODS.map((m) => ({ value: m, label: m })), [])
+
+  const blankDraft = useMemo<Draft>(
+    () => ({
+      ...blank(projectId),
+      paymentMethod: getLastUsed('expense.paymentMethod') ?? '',
+      fundingSource: getLastUsed('expense.fundingSource') ?? '',
+    }),
+    [projectId],
+  )
+
   const { d, setD, text, date, busy, submit, submitError } = useEntityForm<Expense, Draft>({
     initial,
-    blank: blank(projectId),
+    blank: blankDraft,
     create: useCreateExpense(),
     update: useUpdateExpense(),
     onSaved,
@@ -83,6 +133,9 @@ export function ExpenseForm({
       const receiptObjectKey = receiptFile
         ? (await uploadBlob(receiptFile, 'receipt')).key
         : draft.receiptObjectKey ?? null
+      // Remember the sticky payment choices so the next entry pre-fills them.
+      if (isPaid && draft.paymentMethod) setLastUsed('expense.paymentMethod', draft.paymentMethod)
+      if (hasLoan && draft.fundingSource) setLastUsed('expense.fundingSource', draft.fundingSource)
       return {
         ...draft,
         projectId,
@@ -95,8 +148,6 @@ export function ExpenseForm({
         categoryName: selected?.categoryName ?? draft.categoryName ?? '',
         roomTag: selected?.roomTag ?? draft.roomTag ?? '',
         receiptObjectKey,
-        // Persist an explicit funding source (the select shows "Personal" by default but
-        // leaves the draft '' until touched) so the stored row matches what was shown.
         fundingSource: draft.fundingSource || 'personal',
       }
     },
@@ -115,8 +166,9 @@ export function ExpenseForm({
     : resolvePaidAmount(d.isPaid ?? false, d.amountPaid ?? 0, d.amount ?? 0)
   const balance = balanceDue({ amount: d.amount ?? 0, amountPaid: paidValue, isPaid: d.isPaid ?? false })
 
-  const chooseLineItem = (e: ChangeEvent<HTMLSelectElement>) => {
-    const item = lineItems.find((li) => li.id === e.target.value)
+  const selectedLine = lineItems.find((li) => li.id === d.budgetLineItemId)
+  const chooseLine = (value: string) => {
+    const item = lineItems.find((li) => li.id === value)
     setD((p) => ({
       ...p,
       budgetLineItemId: item?.id ?? null,
@@ -125,91 +177,119 @@ export function ExpenseForm({
       roomTag: item?.roomTag ?? p.roomTag ?? '',
     }))
   }
+  const setPaid = (paid: boolean) =>
+    setD((p) => ({ ...p, isPaid: paid, paidDate: paid ? p.paidDate || today() : null }))
 
-  // OCR a receipt photo and pre-fill empty fields (the user confirms). Also attaches the
-  // scanned image as the receipt so one tap both reads and saves it.
-  const onScan = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
+  // OCR a scanned/uploaded receipt or invoice (image or PDF) and pre-fill empty fields. Also
+  // attaches the file as the receipt and sets Paid via the receipt-vs-invoice heuristic.
+  const runExtraction = async (file: File | null | undefined) => {
     if (!file) return
     setScanning(true)
     try {
       const r = await scanReceipt(file)
       setReceiptFile(file)
+      const invoice = looksLikeInvoice(r)
       setD((p) => ({
         ...p,
         vendorName: p.vendorName?.trim() ? p.vendorName : r.vendor ?? p.vendorName,
         amount: (p.amount ?? 0) > 0 ? p.amount : r.amount ?? p.amount,
         date: r.date ?? p.date,
+        invoiceNumber: p.invoiceNumber?.trim() ? p.invoiceNumber : r.invoiceNumber ?? p.invoiceNumber ?? '',
+        dueDate: p.dueDate ?? r.dueDate ?? null,
+        isPaid: !invoice,
+        paidDate: invoice ? null : p.paidDate || today(),
       }))
-      const found = [r.vendor && 'vendor', r.amount != null && 'amount', r.date && 'date'].filter(Boolean)
+      if (r.invoiceNumber || r.dueDate) setMoreOpen(true)
+      const found = [
+        r.vendor && 'vendor',
+        r.amount != null && 'amount',
+        r.date && 'date',
+        r.invoiceNumber && 'invoice #',
+      ].filter(Boolean)
       toast.success(
-        found.length ? `Scanned — filled ${found.join(', ')}. Double-check the values.` : 'Couldn’t read it — enter the details manually.',
+        found.length
+          ? `${invoice ? 'Invoice' : 'Receipt'} read — filled ${found.join(', ')}. Double-check the values.`
+          : 'Couldn’t read it — enter the details manually.',
       )
     } catch (err) {
-      toast.error((err as Error).message || 'Receipt scan failed')
+      toast.error((err as Error).message || 'Couldn’t read that file')
     } finally {
       setScanning(false)
     }
+  }
+  const onPick = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    runExtraction(file)
   }
 
   return (
     <Form onSubmit={submit}>
       <Form.Section>
-        <Field label="Vendor">
-          {(p) => <input {...p} value={d.vendorName ?? ''} onChange={text('vendorName')} required autoFocus />}
-        </Field>
+        <input ref={scanRef} type="file" accept="image/*" capture="environment" hidden onChange={onPick} />
+        <input ref={uploadRef} type="file" accept="image/*,application/pdf" hidden onChange={onPick} />
+        <div className="upload-choices">
+          <Button type="button" variant="secondary" loading={scanning} leadingIcon={<ScanLine size={16} />} onClick={() => scanRef.current?.click()}>
+            Scan
+          </Button>
+          <Button type="button" variant="secondary" loading={scanning} leadingIcon={<Upload size={16} />} onClick={() => uploadRef.current?.click()}>
+            Upload receipt / invoice
+          </Button>
+        </div>
+        {(receiptFile || d.receiptObjectKey) && (
+          <div className="row-between">
+            <p className="muted" style={{ margin: 0 }}>{receiptFile ? receiptFile.name : 'Receipt attached'}</p>
+            {d.receiptObjectKey && !receiptFile && (
+              <Button type="button" size="sm" variant="secondary" onClick={openReceipt}>
+                View
+              </Button>
+            )}
+          </div>
+        )}
+
+        <Combobox
+          label="Vendor"
+          value={d.vendorName ?? ''}
+          options={vendorOptions}
+          onChange={(v) => setD((p) => ({ ...p, vendorName: v }))}
+          allowCustom
+          placeholder="Search or add a vendor"
+        />
         <CurrencyField label="Amount" value={d.amount ?? 0} onChange={(v) => setD((p) => ({ ...p, amount: v }))} />
+        <Combobox
+          label="Budget line"
+          value={d.budgetLineItemId ?? ''}
+          options={lineOptions}
+          onChange={chooseLine}
+          placeholder="Search your budget lines"
+          emptyText="No matching budget line"
+          hint={
+            selectedLine
+              ? `Category: ${selectedLine.categoryName || 'Uncategorized'}`
+              : lineItems.length === 0
+                ? 'No budget lines yet — add them in Budget first.'
+                : 'Type to find a line; category fills in automatically.'
+          }
+        />
         <div className="form-grid">
-          <Field label="Invoice #">
-            {(p) => <input {...p} value={d.invoiceNumber ?? ''} onChange={text('invoiceNumber')} />}
-          </Field>
           <Field label="Date">
             {(p) => <input type="date" {...p} value={dateValue(d.date)} onChange={date('date')} required />}
           </Field>
+          <div className="field">
+            <span className="field-label">Status</span>
+            <SegmentedControl
+              ariaLabel="Paid status"
+              value={d.isPaid ? 'paid' : 'unpaid'}
+              onChange={(v) => setPaid(v === 'paid')}
+              segments={[
+                { value: 'unpaid', label: 'Unpaid' },
+                { value: 'paid', label: 'Paid' },
+              ]}
+            />
+          </div>
         </div>
-        <div className="form-grid">
-          <Field label="Due date">
-            {(p) => <input type="date" {...p} value={dateValue(d.dueDate)} onChange={date('dueDate')} />}
-          </Field>
-          <Field label="Expected payment" hint="When you expect to pay (drives cash flow). Defaults to the due date.">
-            {(p) => (
-              <input
-                type="date"
-                {...p}
-                value={dateValue(d.expectedPaymentDate)}
-                onChange={date('expectedPaymentDate')}
-              />
-            )}
-          </Field>
-        </div>
-      </Form.Section>
-
-      <Form.Section title="Allocation">
-        <Field
-          label="Budget line"
-          hint={lineItems.length === 0 ? 'No budget line items yet — add them in Budget first.' : undefined}
-        >
-          {(p) => (
-            <Select {...p} value={d.budgetLineItemId ?? ''} onChange={chooseLineItem}>
-              <option value="">Unassigned</option>
-              {lineItems.map((li) => (
-                <option key={li.id} value={li.id}>
-                  {li.categoryName} / {li.title}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-        <div className="form-grid">
-          <Field label="Category">
-            {(p) => <input {...p} value={d.categoryName ?? ''} onChange={text('categoryName')} />}
-          </Field>
-          <Field label="Room tag">{(p) => <input {...p} value={d.roomTag ?? ''} onChange={text('roomTag')} />}</Field>
-        </div>
-      </Form.Section>
-
-      <Form.Section title="Payment">
+        {/* Funding source matters even on unpaid bills (a loan-funded invoice), so it lives in
+            the fast path when a loan exists — not behind the Paid state. */}
         {hasLoan && (
           <Field label="Funding source" hint="Track personal funds vs construction-loan spend.">
             {(p) => (
@@ -220,73 +300,77 @@ export function ExpenseForm({
             )}
           </Field>
         )}
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={d.isPaid ?? false}
-            onChange={(e) =>
-              setD((p) => ({ ...p, isPaid: e.target.checked, paidDate: e.target.checked ? p.paidDate || today() : null }))
-            }
-          />
-          Paid
-        </label>
-        {d.isPaid && (
-          <>
-            <CurrencyField
-              label="Amount paid"
-              value={paidValue}
-              onChange={(v) => {
-                setPaidTouched(true)
-                setD((p) => ({ ...p, amountPaid: v }))
-              }}
-            />
-            <div className="form-grid">
+      </Form.Section>
+
+      {d.isPaid && (
+        <Form.Section title="Payment">
+          {adjustPaid ? (
+            <>
+              <CurrencyField
+                label="Amount paid"
+                value={paidValue}
+                onChange={(v) => {
+                  setPaidTouched(true)
+                  setD((p) => ({ ...p, amountPaid: v }))
+                }}
+              />
               <Field label="Paid date">
                 {(p) => <input type="date" {...p} value={dateValue(d.paidDate)} onChange={date('paidDate')} />}
               </Field>
-              <Field label="Payment method">
-                {(p) => <input {...p} value={d.paymentMethod ?? ''} onChange={text('paymentMethod')} />}
-              </Field>
-            </div>
-            <Field label="Reference">
-              {(p) => <input {...p} value={d.paymentReference ?? ''} onChange={text('paymentReference')} />}
-            </Field>
-          </>
-        )}
-        <p className="muted">Balance due: {fmt(balance)}</p>
-      </Form.Section>
-
-      <Form.Section title="Receipt & notes">
-        <input ref={scanRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onScan} />
-        <Button
-          type="button"
-          variant="secondary"
-          loading={scanning}
-          leadingIcon={<ScanLine size={16} />}
-          onClick={() => scanRef.current?.click()}
-        >
-          Scan receipt to autofill
-        </Button>
-        <FileUploadField
-          label="Receipt"
-          cameraAccept="image/*"
-          cameraLabel="Take photo"
-          fileAccept="image/*,application/pdf"
-          fileLabel="Choose file"
-          onPick={setReceiptFile}
-        />
-        {(receiptFile || d.receiptObjectKey) && (
-          <div className="row-between">
-            <p className="muted" style={{ margin: 0 }}>{receiptFile ? receiptFile.name : 'Receipt attached'}</p>
-            {d.receiptObjectKey && !receiptFile && (
-              <Button type="button" size="sm" variant="secondary" onClick={openReceipt}>
-                View receipt
+              <p className="muted">Balance due: {fmt(balance)}</p>
+            </>
+          ) : (
+            <div className="row-between">
+              <p className="muted" style={{ margin: 0 }}>Paid in full today</p>
+              <Button type="button" size="sm" variant="secondary" onClick={() => setAdjustPaid(true)}>
+                Adjust
               </Button>
-            )}
+            </div>
+          )}
+          <Combobox
+            label="Payment method"
+            value={d.paymentMethod ?? ''}
+            options={methodOptions}
+            onChange={(v) => setD((p) => ({ ...p, paymentMethod: v }))}
+            allowCustom
+            placeholder="Check, ACH, Credit card…"
+          />
+        </Form.Section>
+      )}
+
+      <details className="more-details" open={moreOpen} onToggle={(e) => setMoreOpen((e.target as HTMLDetailsElement).open)}>
+        <summary>
+          <span>More details</span>
+          <ChevronDown size={16} aria-hidden />
+        </summary>
+        <div className="more-details-body">
+          <div className="form-grid">
+            <Field label="Invoice #">
+              {(p) => <input {...p} value={d.invoiceNumber ?? ''} onChange={text('invoiceNumber')} />}
+            </Field>
+            <Field label="Due date">
+              {(p) => <input type="date" {...p} value={dateValue(d.dueDate)} onChange={date('dueDate')} />}
+            </Field>
           </div>
-        )}
-        <Field label="Notes">{(p) => <textarea {...p} value={d.notes ?? ''} onChange={text('notes')} />}</Field>
-      </Form.Section>
+          <div className="form-grid">
+            <Field label="Expected payment" hint="Drives cash flow. Defaults to the due date.">
+              {(p) => <input type="date" {...p} value={dateValue(d.expectedPaymentDate)} onChange={date('expectedPaymentDate')} />}
+            </Field>
+            <Field label="Room tag">
+              {(p) => <input {...p} value={d.roomTag ?? ''} onChange={text('roomTag')} />}
+            </Field>
+          </div>
+          {!selectedLine && (
+            <Field label="Category" hint="Used when no budget line is selected.">
+              {(p) => <input {...p} value={d.categoryName ?? ''} onChange={text('categoryName')} />}
+            </Field>
+          )}
+          <Field label="Reference">
+            {(p) => <input {...p} value={d.paymentReference ?? ''} onChange={text('paymentReference')} />}
+          </Field>
+          <Field label="Notes">{(p) => <textarea {...p} value={d.notes ?? ''} onChange={text('notes')} />}</Field>
+        </div>
+      </details>
 
       {submitError && (
         <p role="alert" className="error-banner">

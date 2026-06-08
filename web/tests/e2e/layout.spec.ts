@@ -44,6 +44,8 @@ test('currency "$" prefix never overlaps the entered amount', async ({ page }) =
 
 test('paired date fields stay equal height and do not overlap', async ({ page }) => {
   await loginAndOpenExpense(page)
+  // Due date / Expected payment now live under the "More details" disclosure.
+  await page.getByText('More details').click()
   const due = await page.getByLabel('Due date').boundingBox()
   const exp = await page.getByLabel('Expected payment').boundingBox()
   expect(due).not.toBeNull()

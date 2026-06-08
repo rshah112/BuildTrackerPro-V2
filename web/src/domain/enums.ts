@@ -50,3 +50,9 @@ export type ProjectTaskStatus = (typeof PROJECT_TASK_STATUSES)[number]
 // (treated as personal). Only surfaced in the UI when the project has a construction loan.
 export const FUNDING_SOURCES = ['personal', 'loan'] as const
 export type FundingSource = (typeof FUNDING_SOURCES)[number]
+
+// Suggestions for the expense form's payment-method picker (a Combobox that also accepts a
+// custom value). NOT a DB check-constraint — payment_method is free text — so this is purely
+// a convenience list; the last-used value is remembered via lib/lastUsed.
+export const PAYMENT_METHODS = ['Check', 'ACH / bank transfer', 'Credit card', 'Cash', 'Wire', 'Zelle'] as const
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number]
