@@ -248,7 +248,77 @@ async function extractText(file: File | Blob): Promise<string> {
   return await imageOcr(file)
 }
 
+/** Render the file to a downscaled JPEG data URL for the vision model: a PDF's first page is
+ *  rasterized via pdf.js; an image is drawn to a canvas and scaled to ≤1600px. */
+async function fileToImageDataUrl(file: File | Blob): Promise<string | null> {
+  const MAX = 1600
+  if (isPdf(file)) {
+    const doc = await loadPdf(file)
+    const page = await doc.getPage(1)
+    const viewport = page.getViewport({ scale: 2 })
+    const canvas = document.createElement('canvas')
+    canvas.width = viewport.width
+    canvas.height = viewport.height
+    await page.render({ canvas, viewport }).promise
+    return canvas.toDataURL('image/jpeg', 0.85)
+  }
+  const url = URL.createObjectURL(file)
+  try {
+    const img = new Image()
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = () => reject(new Error('image decode failed'))
+      img.src = url
+    })
+    const scale = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale))
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    return canvas.toDataURL('image/jpeg', 0.85)
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+/** Ask the server (Cloudflare Workers AI vision) to extract structured fields. Returns null if
+ *  the endpoint is unconfigured/unreachable/unhelpful, so the caller can fall back to local OCR. */
+async function serverExtract(image: string): Promise<ReceiptScan | null> {
+  const { supabase } = await import('./supabase')
+  const { data } = await supabase.auth.getSession()
+  const res = await fetch('/api/ocr', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${data.session?.access_token ?? ''}` },
+    body: JSON.stringify({ image }),
+  })
+  if (!res.ok) return null
+  const j = (await res.json().catch(() => null)) as Partial<ReceiptScan> | null
+  if (!j) return null
+  return {
+    vendor: j.vendor ?? null,
+    amount: typeof j.amount === 'number' ? j.amount : null,
+    date: j.date ?? null,
+    invoiceNumber: j.invoiceNumber ?? null,
+    dueDate: j.dueDate ?? null,
+    raw: '',
+  }
+}
+
 export async function scanReceipt(file: File | Blob): Promise<ReceiptScan> {
+  // Prefer server-side vision OCR — far more accurate on real invoices and device-independent.
+  // Silently falls back to on-device OCR if it's unconfigured, offline, or returns nothing useful.
+  try {
+    const image = await fileToImageDataUrl(file)
+    if (image) {
+      const r = await serverExtract(image)
+      if (r && (r.vendor || r.amount != null || r.invoiceNumber)) return r
+    }
+  } catch {
+    // ignore — fall through to local OCR
+  }
+
   const text = await extractText(file)
   return {
     vendor: parseVendor(text),
