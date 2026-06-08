@@ -52,10 +52,31 @@ function extractJson(s: string): Record<string, unknown> | null {
   }
 }
 
+const MONTHS: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+}
+const pad = (n: number | string) => String(n).padStart(2, '0')
+
+// The vision model returns the date in whatever format the document used (e.g. 06/05/2026,
+// June 5 2026), so normalize any common format to ISO yyyy-mm-dd (what the form expects).
 function normDate(v: unknown): string | null {
   if (typeof v !== 'string') return null
-  const m = v.match(/\d{4}-\d{2}-\d{2}/)
-  return m ? m[0] : null
+  const s = v.trim()
+  let m = s.match(/(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})/) // ISO-ish
+  if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`
+  m = s.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/) // M/D/Y
+  if (m) {
+    let y = Number(m[3])
+    if (y < 100) y += 2000
+    const mo = Number(m[1])
+    const d = Number(m[2])
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return `${y}-${pad(mo)}-${pad(d)}`
+  }
+  m = s.match(/([A-Za-z]{3,})\.?\s+(\d{1,2}),?\s+(20\d{2})/) // "June 5, 2026"
+  if (m && MONTHS[m[1].slice(0, 3).toLowerCase()]) return `${m[3]}-${pad(MONTHS[m[1].slice(0, 3).toLowerCase()])}-${pad(m[2])}`
+  m = s.match(/(\d{1,2})\s+([A-Za-z]{3,})\.?,?\s+(20\d{2})/) // "5 June 2026"
+  if (m && MONTHS[m[2].slice(0, 3).toLowerCase()]) return `${m[3]}-${pad(MONTHS[m[2].slice(0, 3).toLowerCase()])}-${pad(m[1])}`
+  return null
 }
 
 function normAmount(v: unknown): number | null {
