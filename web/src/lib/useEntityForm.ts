@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react'
+import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 
 const DEFAULT_ERROR = 'Save failed — please try again.'
 
@@ -34,7 +34,12 @@ export function useEntityForm<TEntity extends { id: string }, TDraft extends obj
   const { initial, blank, create, update, transform, onSaved, onDone } = opts
   const [d, setD] = useState<TDraft>((initial as unknown as TDraft) ?? blank)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const busy = create.isPending || update.isPending
+  // Hard re-entry guard: submit() runs an async transform (receipt upload, vendor auto-create)
+  // BEFORE the mutation flips isPending, so without this a rapid double-tap fires two creates
+  // (duplicate rows). The ref blocks re-entry synchronously; the state drives the disabled UI.
+  const submittingRef = useRef(false)
+  const [submitting, setSubmitting] = useState(false)
+  const busy = submitting || create.isPending || update.isPending
 
   const set = <K extends keyof TDraft>(k: K, v: TDraft[K]) => setD((p) => ({ ...p, [k]: v }))
   /** Bind a text/select control: `<input value={d.x} onChange={text('x')} />`. */
@@ -45,6 +50,9 @@ export function useEntityForm<TEntity extends { id: string }, TDraft extends obj
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    if (submittingRef.current) return // ignore double-taps while a save is already in flight
+    submittingRef.current = true
+    setSubmitting(true)
     setSubmitError(null)
     try {
       // transform may upload an attachment (ExpenseForm receipt) and can reject; the
@@ -58,6 +66,9 @@ export function useEntityForm<TEntity extends { id: string }, TDraft extends obj
       onDone()
     } catch (err) {
       setSubmitError((err as Error)?.message || DEFAULT_ERROR)
+    } finally {
+      submittingRef.current = false
+      setSubmitting(false)
     }
   }
 

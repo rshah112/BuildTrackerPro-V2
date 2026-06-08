@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import type { Vendor } from '../../domain/types'
+import { table } from '../../data/table'
 import { useVendors, useCreateVendor } from './useVendors'
 
 /** Case-insensitive, trim-tolerant lookup of a vendor by name. Pure so it's unit-testable and
@@ -21,7 +22,12 @@ export function useEnsureVendor(projectId: string) {
     async (name: string | undefined | null, opts?: { trade?: string }): Promise<Vendor | null> => {
       const clean = name?.trim()
       if (!clean) return null
-      const existing = findVendorByName(vendors, clean)
+      // Fast path: the cached list already has it.
+      const cached = findVendorByName(vendors, clean)
+      if (cached) return cached
+      // Confirm against the server before creating — the cache may not yet reflect a vendor just
+      // created from another quick entry (or may not have loaded), which would duplicate it.
+      const existing = findVendorByName(await table<Vendor>('vendors').list({ projectId }), clean)
       if (existing) return existing
       return await create.mutateAsync({
         projectId,

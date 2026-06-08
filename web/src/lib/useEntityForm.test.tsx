@@ -85,4 +85,21 @@ describe('useEntityForm', () => {
     )
     expect(result.current.busy).toBe(true)
   })
+
+  it('ignores a double-tap while a save is in flight (no duplicate create)', async () => {
+    let resolve!: (v: Entity) => void
+    const create = { mutateAsync: vi.fn(() => new Promise<Entity>((r) => (resolve = r))), isPending: false }
+    const update = { mutateAsync: vi.fn(), isPending: false }
+    const onDone = vi.fn()
+    const { result } = renderHook(() =>
+      useEntityForm<Entity, Draft>({ blank: { name: 'x' }, create, update, onDone }),
+    )
+    await act(async () => {
+      result.current.submit(noEvt) // first tap: starts the (still-pending) create
+      result.current.submit(noEvt) // second tap: must be ignored by the re-entry guard
+      resolve({ id: 'n1', name: 'x' })
+    })
+    expect(create.mutateAsync).toHaveBeenCalledTimes(1)
+    expect(onDone).toHaveBeenCalledTimes(1)
+  })
 })
