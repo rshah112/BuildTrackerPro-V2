@@ -7,7 +7,8 @@
 // and accurate, no OCR), and a scanned/image PDF (pdfjs rasterizes page 1, then Tesseract).
 // The pdf.js worker is bundled (Vite `?url`) so digital-PDF parsing works offline.
 
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import './installWithResolvers' // main-thread Promise.withResolvers polyfill (pdf.js v6 needs it)
+import PdfjsWorker from './pdfWorker?worker'
 
 export interface ReceiptScan {
   vendor: string | null
@@ -135,9 +136,14 @@ async function imageOcr(file: File | Blob): Promise<string> {
   return data.text || ''
 }
 
+// Reuse one worker across PDFs. It's our custom entry (pdfWorker.ts) that polyfills
+// Promise.withResolvers before loading pdf.js's worker, so parsing works on iOS Safari < 17.4.
+let pdfWorker: Worker | null = null
+
 async function loadPdf(file: File | Blob) {
   const pdfjs = await import('pdfjs-dist')
-  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
+  if (!pdfWorker) pdfWorker = new PdfjsWorker()
+  pdfjs.GlobalWorkerOptions.workerPort = pdfWorker
   const data = await file.arrayBuffer()
   return await pdfjs.getDocument({ data }).promise
 }

@@ -184,10 +184,10 @@ export function ExpenseForm({
   // attaches the file as the receipt and sets Paid via the receipt-vs-invoice heuristic.
   const runExtraction = async (file: File | null | undefined) => {
     if (!file) return
+    setReceiptFile(file) // attach immediately so a failed/unsupported read still keeps the file
     setScanning(true)
     try {
       const r = await scanReceipt(file)
-      setReceiptFile(file)
       const invoice = looksLikeInvoice(r)
       setD((p) => ({
         ...p,
@@ -209,10 +209,11 @@ export function ExpenseForm({
       toast.success(
         found.length
           ? `${invoice ? 'Invoice' : 'Receipt'} read — filled ${found.join(', ')}. Double-check the values.`
-          : 'Couldn’t read it — enter the details manually.',
+          : 'Attached — couldn’t read it automatically. Enter the details below.',
       )
     } catch (err) {
-      toast.error((err as Error).message || 'Couldn’t read that file')
+      console.error('Receipt/invoice extraction failed', err)
+      toast.error('Attached the file, but couldn’t read it automatically — enter the details below.')
     } finally {
       setScanning(false)
     }
