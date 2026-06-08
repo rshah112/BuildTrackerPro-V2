@@ -98,14 +98,20 @@ export function Combobox({
       const vTop = vv?.offsetTop ?? 0
       const vH = vv?.height ?? window.innerHeight
       const margin = 8
-      const below = vTop + vH - r.bottom
-      const above = r.top - vTop
-      const openUp = below < 220 && above > below
-      const maxHeight = Math.max(120, Math.min(300, (openUp ? above : below) - margin))
-      // Always a clamped `top` in viewport coords (the list is portaled to <body>, so no
-      // transformed ancestor can offset it) — guarantees the popover stays fully on-screen.
-      const desired = openUp ? r.top - maxHeight - 4 : r.bottom + 4
-      const top = Math.min(Math.max(desired, vTop + margin), vTop + vH - maxHeight - margin)
+      const gap = 4
+      // Usable space on each side of the input (within the screen-edge margin).
+      const below = vTop + vH - r.bottom - margin
+      const above = r.top - vTop - margin
+      // Prefer opening downward; flip up only when there's little room below and more above.
+      const openUp = below < 200 && above > below
+      // Cap the height to the room available on the CHOSEN side, so the list is never taller than
+      // its space. (The old code forced a 120px minimum and then clamped on-screen, which is what
+      // shoved a flipped-up list back DOWN over the input you were typing in.)
+      const maxHeight = Math.min(300, Math.max(0, (openUp ? above : below) - gap))
+      // Flip-up anchors the list's BOTTOM just above the input (top = inputTop − gap − height), so
+      // it can never cover the field; flip-down sits just below it. Both stay fully on-screen by
+      // construction (maxHeight is bounded by the side's space), so no extra clamp is needed.
+      const top = openUp ? r.top - gap - maxHeight : r.bottom + gap
       setPos({ position: 'fixed', left: Math.max(margin, r.left), width: r.width, top, maxHeight })
     }
     place()
