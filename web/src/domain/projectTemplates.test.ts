@@ -11,11 +11,15 @@ describe('projectTemplates', () => {
 
   it('allocates a category target ≈ percent × budget', () => {
     const { categories } = makeBudgetDraft('customHome', 1_000_000)
-    expect(categories.length).toBe(8)
-    // Site Work is 7.6% of $1,000,000 = $76,000 (±rounding of its line items)
+    expect(categories.length).toBe(9)
+    // Professional Fees is 3% of $1,000,000 = $30,000 (carved out of Site Work)
+    const prof = categories.find((c) => c.name === 'Professional Fees')!
+    expect(prof.targetBudget).toBeGreaterThan(29_000)
+    expect(prof.targetBudget).toBeLessThan(31_000)
+    // Site Work is now 4.6% of $1,000,000 = $46,000 (±rounding of its line items)
     const site = categories.find((c) => c.name === 'Site Work')!
-    expect(site.targetBudget).toBeGreaterThan(75_000)
-    expect(site.targetBudget).toBeLessThan(77_000)
+    expect(site.targetBudget).toBeGreaterThan(45_000)
+    expect(site.targetBudget).toBeLessThan(47_000)
   })
 
   it('line items roll up to ~the full budget (rounding aside)', () => {

@@ -2,7 +2,9 @@
 // Each template's category `percent` is its share of the construction budget (sums to 100);
 // each line item's `share` is normalized WITHIN its category. Used to pre-populate a new
 // project's budget categories + line items from the chosen template type and budget amount.
-// Generated from ParamusBuild/Data/ProjectTemplateService.swift — do not hand-edit the data.
+// Generated from ParamusBuild/Data/ProjectTemplateService.swift. PWA divergence: the customHome
+// template carves a dedicated "Professional Fees" category (Architect, Engineering, Permits) out
+// of "Site Work" — percent-neutral. Re-mirror this if regenerating from the Swift source.
 import type { ProjectTemplateType } from './enums'
 
 export interface TemplateItem {
@@ -19,17 +21,27 @@ export interface TemplateCategoryDef {
 export const PROJECT_TEMPLATES: Partial<Record<ProjectTemplateType, TemplateCategoryDef[]>> = {
   "customHome": [
     {
-      "name": "Site Work",
-      "percent": 7.6,
+      "name": "Professional Fees",
+      "percent": 3,
       "items": [
+        {
+          "title": "Architect",
+          "share": 0.9
+        },
+        {
+          "title": "Structural & MEP Engineering",
+          "share": 0.5
+        },
         {
           "title": "Permits and Municipal Fees",
           "share": 1.6
-        },
-        {
-          "title": "Architecture and Engineering",
-          "share": 1.4
-        },
+        }
+      ]
+    },
+    {
+      "name": "Site Work",
+      "percent": 4.6,
+      "items": [
         {
           "title": "Soil Testing and Geotech Report",
           "share": 0.4
