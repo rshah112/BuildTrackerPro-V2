@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { signedDownloadUrl } from '../../lib/r2'
 import { Modal } from './Sheet'
@@ -17,6 +17,7 @@ export function FilePreview({
   objectKey,
   title,
   fileName,
+  autoFallback = false,
   footer,
 }: {
   open: boolean
@@ -25,6 +26,9 @@ export function FilePreview({
   title?: string
   /** Drives the renderer (image vs pdf vs other). Omit for photos (treated as an image). */
   fileName?: string
+  /** For files of unknown type (e.g. receipts — image OR PDF, no stored extension): try the
+   *  image renderer first, then fall back to the PDF iframe if the image can't load. */
+  autoFallback?: boolean
   footer?: ReactNode
 }) {
   const { data: url, isLoading, isError } = useQuery({
@@ -36,8 +40,12 @@ export function FilePreview({
     retry: 1,
   })
 
-  const isImage = !fileName || IMG_RE.test(fileName)
-  const isPdf = !!fileName && PDF_RE.test(fileName)
+  // For unknown-type files, optimistically render as an image and fall back to the PDF iframe
+  // if it can't load. Tracking the failed key (not a bool) auto-resets when the file changes.
+  const [failedKey, setFailedKey] = useState<string | null>(null)
+
+  const isPdf = (!!fileName && PDF_RE.test(fileName)) || (autoFallback && failedKey === objectKey)
+  const isImage = !isPdf && (!fileName || IMG_RE.test(fileName))
 
   return (
     <Modal open={open} onClose={onClose} title={title} footer={footer}>
@@ -50,7 +58,12 @@ export function FilePreview({
       ) : isLoading || !url ? (
         <div className="preview-loading skeleton" aria-hidden />
       ) : isImage ? (
-        <img className="preview-img" src={url} alt={title || fileName || 'Preview'} />
+        <img
+          className="preview-img"
+          src={url}
+          alt={title || fileName || 'Preview'}
+          onError={autoFallback ? () => setFailedKey(objectKey) : undefined}
+        />
       ) : isPdf ? (
         <iframe className="preview-frame" src={url} title={title || fileName || 'Document'} />
       ) : (

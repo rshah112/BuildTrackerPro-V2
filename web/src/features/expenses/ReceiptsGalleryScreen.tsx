@@ -1,11 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Receipt } from 'lucide-react'
+import type { Expense } from '../../domain/types'
 import { fmt } from '../../lib/money'
 import { fmtDate } from '../../lib/date'
-import { signedDownloadUrl } from '../../lib/r2'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { EmptyState, ListState } from '../../components/ui/Feedback'
-import { useToast } from '../../components/ui/Toast'
+import { FilePreview } from '../../components/ui/FilePreview'
 import { useCurrentProject } from '../projects/currentProject'
 import { PhotoThumb } from '../photos/PhotoThumb'
 import { useExpenses } from './useExpenses'
@@ -13,7 +13,8 @@ import { useExpenses } from './useExpenses'
 export function ReceiptsGalleryScreen() {
   const { projectId } = useCurrentProject()
   const { data: expenses = [], isLoading, error } = useExpenses(projectId!)
-  const toast = useToast()
+  // Tap a receipt to preview it in-app (window.open(_blank) silently fails in an installed PWA).
+  const [preview, setPreview] = useState<Expense | null>(null)
 
   const withReceipts = useMemo(
     () =>
@@ -22,16 +23,6 @@ export function ReceiptsGalleryScreen() {
         .sort((a, b) => b.date.localeCompare(a.date)),
     [expenses],
   )
-
-  const open = async (key: string | null) => {
-    if (!key) return
-    try {
-      const url = await signedDownloadUrl(key)
-      if (url) window.open(url, '_blank', 'noopener')
-    } catch {
-      toast.error('Couldn’t open the receipt')
-    }
-  }
 
   if (!projectId) return null
 
@@ -56,7 +47,7 @@ export function ReceiptsGalleryScreen() {
             <div key={e.id} className="photo-cell">
               <button
                 className="photo-open"
-                onClick={() => open(e.receiptObjectKey)}
+                onClick={() => setPreview(e)}
                 aria-label={`Receipt: ${e.vendorName || 'Expense'} ${fmt(e.amount)} on ${fmtDate(e.date)}`}
               >
                 <PhotoThumb objectKey={e.receiptObjectKey} alt={`${e.vendorName || 'Expense'} receipt`} />
@@ -66,6 +57,14 @@ export function ReceiptsGalleryScreen() {
           ))}
         </div>
       </ListState>
+
+      <FilePreview
+        open={!!preview}
+        onClose={() => setPreview(null)}
+        objectKey={preview?.receiptObjectKey ?? null}
+        title={preview ? `${preview.vendorName || 'Receipt'} · ${fmt(preview.amount)}` : undefined}
+        autoFallback
+      />
     </section>
   )
 }
