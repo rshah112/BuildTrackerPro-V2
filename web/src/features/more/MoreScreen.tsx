@@ -23,6 +23,7 @@ import {
   Activity,
   PieChart,
   Settings,
+  Calculator,
   type LucideIcon,
 } from 'lucide-react'
 import { signOut } from '../auth/useSession'
@@ -48,6 +49,7 @@ const PROJECT_LINKS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/rooms', label: 'By room', icon: Grid2x2 },
   { to: '/cashflow', label: 'Cash flow', icon: CalendarClock },
   { to: '/export', label: 'Export & backup', icon: FileDown },
+  { to: '/tax-1099', label: 'Tax / 1099 prep', icon: Calculator },
   { to: '/trash', label: 'Trash', icon: Trash2 },
 ]
 

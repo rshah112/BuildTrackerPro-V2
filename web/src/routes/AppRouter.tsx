@@ -31,6 +31,7 @@ const LoanScreen = lazy(() => import('../features/loan/LoanScreen').then((m) => 
 const PhasesScreen = lazy(() => import('../features/phases/PhasesScreen').then((m) => ({ default: m.PhasesScreen })))
 const PortfolioScreen = lazy(() => import('../features/portfolio/PortfolioScreen').then((m) => ({ default: m.PortfolioScreen })))
 const NotificationSettingsScreen = lazy(() => import('../features/notifications/NotificationSettingsScreen').then((m) => ({ default: m.NotificationSettingsScreen })))
+const TaxReportScreen = lazy(() => import('../features/tax/TaxReportScreen').then((m) => ({ default: m.TaxReportScreen })))
 
 export function AppRouter() {
   return (
@@ -65,6 +66,7 @@ export function AppRouter() {
           <Route path="/loan" element={<RequireProject><LoanScreen /></RequireProject>} />
           <Route path="/phases" element={<RequireProject><PhasesScreen /></RequireProject>} />
           <Route path="/export" element={<RequireProject><ExportScreen /></RequireProject>} />
+          <Route path="/tax-1099" element={<RequireProject><TaxReportScreen /></RequireProject>} />
           <Route path="/portfolio" element={<PortfolioScreen />} />
           <Route path="/notification-settings" element={<NotificationSettingsScreen />} />
           <Route path="/more" element={<MoreScreen />} />
