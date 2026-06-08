@@ -69,3 +69,16 @@ describe('Combobox (free mode)', () => {
     expect((screen.getByLabelText('Vendor') as HTMLInputElement).value).toBe('Home Depot')
   })
 })
+
+describe('Combobox (onCreate)', () => {
+  it('offers "+ Create" for an unmatched query and reports the typed text', () => {
+    const onCreate = vi.fn()
+    render(<Combobox label="Budget line" value="" options={OPTIONS} onChange={() => {}} onCreate={onCreate} />)
+    const input = screen.getByLabelText('Budget line')
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: 'Roof trusses' } })
+    const create = screen.getByText(/Create/)
+    fireEvent.mouseDown(create)
+    expect(onCreate).toHaveBeenCalledWith('Roof trusses')
+  })
+})

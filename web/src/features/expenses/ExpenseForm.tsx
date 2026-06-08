@@ -22,6 +22,8 @@ import { useVendors } from '../vendors/useVendors'
 import { useEnsureVendor } from '../vendors/useEnsureVendor'
 import { VendorPicker } from '../vendors/VendorPicker'
 import { useLoan } from '../loan/useLoan'
+import { useCreateLineItem } from '../budget/useBudget'
+import { RoomTagPicker } from '../rooms/RoomTagPicker'
 
 type Draft = Partial<Omit<Expense, 'id' | 'owner'>>
 
@@ -90,10 +92,19 @@ export function ExpenseForm({
     [expensesData],
   )
   const ensureVendor = useEnsureVendor(projectId)
+  const createLineItem = useCreateLineItem()
+  // Budget lines created inline via the picker's "+ Create" this session — merged into the options
+  // immediately so the new line is selectable and shows its label before the list refetches.
+  const [createdLines, setCreatedLines] = useState<BudgetLineItem[]>([])
+  const allLines = useMemo(
+    () => [...lineItems, ...createdLines.filter((c) => !lineItems.some((l) => l.id === c.id))],
+    [lineItems, createdLines],
+  )
+  const projectRooms = useMemo(() => [...new Set(allLines.map((li) => li.roomTag).filter(Boolean))], [allLines])
 
   // Budget lines as a searchable, category-grouped picker (sorted so groups stay contiguous).
   const lineOptions = useMemo<ComboOption[]>(() => {
-    const sorted = [...lineItems].sort(
+    const sorted = [...allLines].sort(
       (a, b) => (a.categoryName || '').localeCompare(b.categoryName || '') || a.title.localeCompare(b.title),
     )
     return [
@@ -105,7 +116,7 @@ export function ExpenseForm({
         group: li.categoryName || 'Uncategorized',
       })),
     ]
-  }, [lineItems])
+  }, [allLines])
 
   const methodOptions = useMemo<ComboOption[]>(() => PAYMENT_METHODS.map((m) => ({ value: m, label: m })), [])
 
@@ -172,9 +183,9 @@ export function ExpenseForm({
     : resolvePaidAmount(d.isPaid ?? false, d.amountPaid ?? 0, d.amount ?? 0)
   const balance = balanceDue({ amount: d.amount ?? 0, amountPaid: paidValue, isPaid: d.isPaid ?? false })
 
-  const selectedLine = lineItems.find((li) => li.id === d.budgetLineItemId)
+  const selectedLine = allLines.find((li) => li.id === d.budgetLineItemId)
   const chooseLine = (value: string) => {
-    const item = lineItems.find((li) => li.id === value)
+    const item = allLines.find((li) => li.id === value)
     setD((p) => ({
       ...p,
       budgetLineItemId: item?.id ?? null,
@@ -182,6 +193,34 @@ export function ExpenseForm({
       categoryName: item?.categoryName ?? p.categoryName ?? '',
       roomTag: item?.roomTag ?? p.roomTag ?? '',
     }))
+  }
+  // Inline quick-add: spin up a STUB budget line ($0 budget, current/Uncategorized category) from
+  // the typed name and select it — the owner sets the budget amount later in Budget. Same "type it
+  // and it becomes a real, editable record" idea as the vendor auto-create.
+  const createLine = async (title: string) => {
+    const li = await createLineItem.mutateAsync({
+      projectId,
+      categoryName: d.categoryName?.trim() || 'Uncategorized',
+      costCode: '',
+      title,
+      roomTag: d.roomTag ?? '',
+      budget: 0,
+      actual: 0,
+      committed: 0,
+      notes: '',
+      isPinned: false,
+      isAllowance: false,
+      allowanceAmount: 0,
+    } as Partial<BudgetLineItem>)
+    setCreatedLines((p) => [...p, li])
+    setD((p) => ({
+      ...p,
+      budgetLineItemId: li.id,
+      budgetLineItemTitle: li.title,
+      categoryName: li.categoryName,
+      roomTag: li.roomTag || p.roomTag || '',
+    }))
+    toast.success(`Added “${li.title}” to your budget — set its amount in Budget anytime.`)
   }
   const setPaid = (paid: boolean) =>
     setD((p) => ({ ...p, isPaid: paid, paidDate: paid ? p.paidDate || today() : null }))
@@ -266,14 +305,13 @@ export function ExpenseForm({
           value={d.budgetLineItemId ?? ''}
           options={lineOptions}
           onChange={chooseLine}
-          placeholder="Search your budget lines"
+          onCreate={createLine}
+          placeholder="Search or add a budget line"
           emptyText="No matching budget line"
           hint={
             selectedLine
               ? `Category: ${selectedLine.categoryName || 'Uncategorized'}`
-              : lineItems.length === 0
-                ? 'No budget lines yet — add them in Budget first.'
-                : 'Type to find a line; category fills in automatically.'
+              : 'Type to find a line — or add a new one and set its budget later.'
           }
         />
         <div className="form-grid">
@@ -361,9 +399,11 @@ export function ExpenseForm({
             <Field label="Expected payment" hint="Drives cash flow. Defaults to the due date.">
               {(p) => <input type="date" {...p} value={dateValue(d.expectedPaymentDate)} onChange={date('expectedPaymentDate')} />}
             </Field>
-            <Field label="Room tag">
-              {(p) => <input {...p} value={d.roomTag ?? ''} onChange={text('roomTag')} />}
-            </Field>
+            <RoomTagPicker
+              value={d.roomTag ?? ''}
+              rooms={projectRooms}
+              onChange={(r) => setD((p) => ({ ...p, roomTag: r }))}
+            />
           </div>
           {!selectedLine && (
             <Field label="Category" hint="Used when no budget line is selected.">

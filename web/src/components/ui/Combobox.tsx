@@ -43,6 +43,7 @@ export function Combobox({
   hint,
   error,
   emptyText = 'No matches',
+  onCreate,
 }: {
   label: string
   value: string
@@ -53,6 +54,9 @@ export function Combobox({
   hint?: string
   error?: string
   emptyText?: string
+  /** When set, an empty filter shows a "+ Create '<query>'" action that calls this with the typed
+   *  text — used to spin up a stub record (e.g. a budget line item) inline without leaving. */
+  onCreate?: (query: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -202,9 +206,24 @@ export function Combobox({
           {open && pos && createPortal(
             <ul className="combobox-list" id={listId} role="listbox" style={pos}>
               {filtered.length === 0 ? (
-                <li className="combobox-empty" role="presentation">
-                  {allowCustom && query.trim() ? `Use “${query.trim()}”` : emptyText}
-                </li>
+                onCreate && query.trim() ? (
+                  <li
+                    className="combobox-option is-active"
+                    role="option"
+                    aria-selected
+                    onMouseDown={(e) => {
+                      e.preventDefault() // keep focus on the input; beat the blur
+                      onCreate(query.trim())
+                      setOpen(false)
+                    }}
+                  >
+                    <span className="combobox-option-label">+ Create “{query.trim()}”</span>
+                  </li>
+                ) : (
+                  <li className="combobox-empty" role="presentation">
+                    {allowCustom && query.trim() ? `Use “${query.trim()}”` : emptyText}
+                  </li>
+                )
               ) : (
                 filtered.map((o, i) => {
                   const showGroup = o.group && o.group !== filtered[i - 1]?.group
