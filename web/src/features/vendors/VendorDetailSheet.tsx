@@ -6,6 +6,7 @@ import { Sheet } from '../../components/ui/Sheet'
 import { Button } from '../../components/ui/Button'
 import { Stat } from '../../components/ui/Stat'
 import { vendorRollup } from './vendorRollup'
+import { coiStatus } from './coi'
 
 /** Vendor 360: tap a vendor to see their total invoiced / paid / open across the project plus
  *  their linked expenses, bids, and tasks — with tap-to-call/email and a jump to edit contact
@@ -29,6 +30,7 @@ export function VendorDetailSheet({
 }) {
   const roll = vendor ? vendorRollup(vendor, expenses, bids, tasks) : null
   const nothing = roll && roll.expenses.length === 0 && roll.bids.length === 0 && roll.tasks.length === 0
+  const coi = vendor ? coiStatus(vendor.insuranceExpiry) : 'none'
 
   return (
     <Sheet open={open} onClose={onClose} title={vendor?.name ?? 'Vendor'}>
@@ -50,11 +52,42 @@ export function VendorDetailSheet({
             </span>
           </div>
 
+          {(coi === 'expired' || coi === 'expiring') && (
+            <p role="alert" className="error-banner">
+              {coi === 'expired' ? 'Insurance certificate has EXPIRED' : 'Insurance certificate expires within 30 days'}{' '}
+              — request an updated COI.
+            </p>
+          )}
+
           <div className="metric-grid compact">
             <Stat label="Invoiced" value={fmt(roll.invoiced)} />
             <Stat label="Paid" value={fmt(roll.paid)} />
             <Stat label="Open" value={fmt(roll.open)} />
           </div>
+
+          {(vendor.taxId || vendor.licenseNumber || vendor.insuranceExpiry) && (
+            <section>
+              <h3 className="section-label">Compliance</h3>
+              <ul className="plain-list">
+                <li className="kv-row">
+                  <span className="muted">W-9 / Tax ID</span>
+                  <span>{vendor.taxId ? '✓ on file' : '—'}</span>
+                </li>
+                {vendor.licenseNumber && (
+                  <li className="kv-row">
+                    <span className="muted">License</span>
+                    <span>{vendor.licenseNumber}</span>
+                  </li>
+                )}
+                <li className="kv-row">
+                  <span className="muted">Insurance (COI)</span>
+                  <span className={coi === 'expired' || coi === 'expiring' ? 'danger-text' : undefined}>
+                    {vendor.insuranceExpiry ? `expires ${fmtDate(vendor.insuranceExpiry)}` : 'not tracked'}
+                  </span>
+                </li>
+              </ul>
+            </section>
+          )}
 
           {roll.expenses.length > 0 && (
             <section>

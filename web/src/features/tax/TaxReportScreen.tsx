@@ -10,6 +10,8 @@ import { EmptyState, ListState } from '../../components/ui/Feedback'
 import { fmt } from '../../lib/money'
 import { useCurrentProject } from '../projects/currentProject'
 import { useExpenses } from '../expenses/useExpenses'
+import { useVendors } from '../vendors/useVendors'
+import { findVendorByName } from '../vendors/useEnsureVendor'
 import { vendor1099Rollup, REPORTABLE_THRESHOLD } from './tax1099'
 
 const YEARS: number[] = (() => {
@@ -20,6 +22,7 @@ const YEARS: number[] = (() => {
 export function TaxReportScreen() {
   const { projectId } = useCurrentProject()
   const { data: expenses = [], isLoading, error } = useExpenses(projectId!)
+  const { data: vendors = [] } = useVendors(projectId!)
   const [year, setYear] = useState(YEARS[0])
   const rows = useMemo(() => vendor1099Rollup(expenses, year), [expenses, year])
 
@@ -67,17 +70,24 @@ export function TaxReportScreen() {
           footnote={`Payments of ${fmt(REPORTABLE_THRESHOLD)}+ to an unincorporated vendor are generally 1099-NEC reportable — collect a W-9 from each flagged vendor. Cash-basis, by paid date.`}
         >
           <ul className="plain-list">
-            {rows.map((r) => (
-              <li key={r.vendor} className="kv-row">
-                <span>
-                  {r.vendor} <span className="muted">· {r.count} payment{r.count === 1 ? '' : 's'}</span>
-                </span>
-                <span className="expense-row-amount">
-                  {r.reportable && <Badge tone="warn">1099</Badge>}
-                  <strong className="tnum">{fmt(r.paid)}</strong>
-                </span>
-              </li>
-            ))}
+            {rows.map((r) => {
+              const hasW9 = !!findVendorByName(vendors, r.vendor)?.taxId
+              return (
+                <li key={r.vendor} className="kv-row">
+                  <span>
+                    {r.vendor}{' '}
+                    <span className="muted">
+                      · {r.count} payment{r.count === 1 ? '' : 's'}
+                      {r.reportable ? (hasW9 ? ' · W-9 ✓' : ' · W-9 needed') : ''}
+                    </span>
+                  </span>
+                  <span className="expense-row-amount">
+                    {r.reportable && <Badge tone={hasW9 ? 'success' : 'warn'}>1099</Badge>}
+                    <strong className="tnum">{fmt(r.paid)}</strong>
+                  </span>
+                </li>
+              )
+            })}
           </ul>
         </SectionCard>
       </ListState>

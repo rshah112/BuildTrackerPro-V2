@@ -15,6 +15,9 @@ const blank = (projectId: string): Draft => ({
   phone: '',
   email: '',
   notes: '',
+  taxId: '',
+  licenseNumber: '',
+  insuranceExpiry: null,
 })
 
 export function VendorForm({
@@ -27,7 +30,7 @@ export function VendorForm({
   onDone: () => void
 }) {
   const qc = useQueryClient()
-  const { d, text, busy, submit } = useEntityForm<Vendor, Draft>({
+  const { d, text, date, busy, submit } = useEntityForm<Vendor, Draft>({
     initial,
     blank: blank(projectId),
     create: useCreateVendor(),
@@ -60,6 +63,19 @@ export function VendorForm({
             {(p) => <input type="email" {...p} value={d.email ?? ''} onChange={text('email')} />}
           </Field>
         </div>
+        <div className="form-grid">
+          <Field label="Tax ID (W-9)" hint="EIN or SSN — for 1099 prep.">
+            {(p) => <input {...p} value={d.taxId ?? ''} onChange={text('taxId')} autoComplete="off" />}
+          </Field>
+          <Field label="License #">
+            {(p) => <input {...p} value={d.licenseNumber ?? ''} onChange={text('licenseNumber')} />}
+          </Field>
+        </div>
+        <Field label="Insurance expiry (COI)" hint="You’ll get a warning as it nears expiry.">
+          {(p) => (
+            <input type="date" {...p} value={(d.insuranceExpiry ?? '').slice(0, 10)} onChange={date('insuranceExpiry')} />
+          )}
+        </Field>
         <Field label="Notes">{(p) => <textarea {...p} value={d.notes ?? ''} onChange={text('notes')} />}</Field>
       </Form.Section>
       <Form.Actions busy={busy} onCancel={onDone} />

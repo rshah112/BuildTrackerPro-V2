@@ -106,6 +106,11 @@ export interface Vendor {
   phone: string
   email: string
   notes: string
+  /** W-9 tax id (EIN/SSN) for 1099 prep. */
+  taxId: string
+  licenseNumber: string
+  /** Certificate-of-insurance expiry date (null = not tracked). */
+  insuranceExpiry: ISODateString | null
 }
 
 export interface ChangeOrder {
