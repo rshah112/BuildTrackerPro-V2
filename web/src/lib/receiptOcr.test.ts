@@ -44,6 +44,12 @@ describe('parseAmount', () => {
   it('handles thousands separators', () => {
     expect(parseAmount('Grand Total 1,250.00')).toBe(1250)
   })
+  it('ignores bare ids/years and picks the currency-shaped amount in the fallback', () => {
+    expect(parseAmount('PO 12345\nInvoice 2026\n$89.99')).toBe(89.99)
+  })
+  it('reads a "Please pay" total even without the word "total"', () => {
+    expect(parseAmount('Account 100200\nPlease pay $4,800.00 by Friday')).toBe(4800)
+  })
 })
 
 describe('parseDate', () => {
@@ -70,6 +76,12 @@ describe('parseVendor', () => {
   })
   it('returns null when nothing looks like a name', () => {
     expect(parseVendor('12.00\n34\n  ')).toBeNull()
+  })
+  it('skips the "INVOICE" title and address, picks the business name', () => {
+    expect(parseVendor('INVOICE\nAcme Construction LLC\n123 Main St\nDate: 06/01/2026')).toBe('Acme Construction LLC')
+  })
+  it('falls back to an email/website domain when no line qualifies', () => {
+    expect(parseVendor('Order #5\nbilling@acme-supply.com\n$10.00 99887')).toBe('Acme Supply')
   })
 })
 

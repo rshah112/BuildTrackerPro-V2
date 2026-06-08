@@ -21,7 +21,13 @@ export interface ReceiptScan {
   raw: string
 }
 
-const MONEY_RE = /(\d{1,3}(?:,\d{3})+(?:\.\d{2})?|\d+\.\d{2})/g
+// Money tokens: optional $, optional thousands separators, optional 1–2 decimals. The bare
+// `\d+` arm catches un-formatted amounts (e.g. "5000") — those are only trusted on a labeled
+// total line, never in the largest-number fallback (where they'd often be an invoice/account #).
+const MONEY_RE = /\$?\s?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+\.\d{1,2}|\d+)/g
+// Labels that mark the grand total / amount owed. `\btotal\b` deliberately excludes "subtotal".
+const TOTAL_RE = /\b(grand\s*total|balance\s*due|amount\s*due|total\s*due|amount\s*payable|please\s*pay|pay\s*this\s*amount|total)\b/i
+const SUBTOTAL_RE = /sub\s*-?\s*total/i
 
 /** @internal exported for unit tests. */
 export function parseMoney(s: string): number | null {
@@ -29,23 +35,38 @@ export function parseMoney(s: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-/** Largest amount on a line mentioning "total" (excluding "subtotal"), else the largest
- *  amount anywhere — on most receipts the grand total is also the biggest figure. On invoices,
- *  "balance due"/"amount due" also wins. */
+interface MoneyTok {
+  val: number
+  /** Has a $, comma, or decimal — i.e. looks like currency, not a bare id/year/qty. */
+  shaped: boolean
+}
+function moneyOnLine(line: string): MoneyTok[] {
+  const out: MoneyTok[] = []
+  for (const m of line.matchAll(MONEY_RE)) {
+    const val = parseMoney(m[1])
+    if (val != null) out.push({ val, shaped: /[$.,]/.test(m[0]) })
+  }
+  return out
+}
+
+/** The amount on a labeled total line (grand total / balance due / amount due / total, excluding
+ *  sub-total) wins; otherwise the largest *currency-shaped* figure ($, comma, or decimal) — so an
+ *  invoice #, account #, phone number, or year is never mistaken for the amount. */
 export function parseAmount(text: string): number | null {
-  const lines = text.split('\n')
-  let totalLine = -1
-  for (const line of lines) {
-    const lower = line.toLowerCase()
-    const isTotal = (lower.includes('total') && !lower.includes('subtotal')) || lower.includes('amount due') || lower.includes('balance due')
-    if (isTotal) {
-      const nums = (line.match(MONEY_RE) ?? []).map(parseMoney).filter((n): n is number => n != null)
-      if (nums.length) totalLine = Math.max(totalLine, ...nums)
+  let best: number | null = null
+  for (const line of text.split('\n')) {
+    if (SUBTOTAL_RE.test(line) || !TOTAL_RE.test(line)) continue
+    const toks = moneyOnLine(line)
+    const shaped = toks.filter((t) => t.shaped)
+    const pool = shaped.length ? shaped : toks // trust a bare number only if it's the lone figure
+    if (pool.length) {
+      const v = Math.max(...pool.map((t) => t.val))
+      if (best == null || v > best) best = v
     }
   }
-  if (totalLine >= 0) return totalLine
-  const all = (text.match(MONEY_RE) ?? []).map(parseMoney).filter((n): n is number => n != null)
-  return all.length ? Math.max(...all) : null
+  if (best != null) return best
+  const shaped = text.split('\n').flatMap(moneyOnLine).filter((t) => t.shaped).map((t) => t.val)
+  return shaped.length ? Math.max(...shaped) : null
 }
 
 function pad(n: number): string {
@@ -105,17 +126,41 @@ export function parseInvoiceNumber(text: string): string | null {
   return null
 }
 
-/** The vendor is usually the first substantial text line (store/biller name at the top). */
+// Business-entity / trade-company words that signal a biller name (kept tight so line-item
+// words like "Lumber 2x4" don't score as the vendor).
+const VENDOR_BIZ = /\b(inc|llc|ltd|co|corp|corporation|company|services|construction|contracting|builders?|supply|associates|group|enterprises|&)\b/i
+// Header/footer boilerplate that is never the vendor name.
+const VENDOR_SKIP = /^(invoice|tax invoice|receipt|sales receipt|statement|estimate|quote|order|bill to|ship to|sold to|remit to|customer|account|date|due|terms|subtotal|total|page)\b/i
+
+/** Best guess at the biller/store name. Scans the top lines, skips boilerplate, dates, addresses,
+ *  phone/email/URL lines and pure-number lines, and prefers a business-looking name nearest the
+ *  top (header). Falls back to an email/website domain (acme-supply.com → "Acme Supply"). */
 export function parseVendor(text: string): string | null {
-  for (const raw of text.split('\n')) {
-    const line = raw.trim()
-    if (line.length < 3) continue
-    if (!/[a-z]/i.test(line)) continue // skip pure number/symbol lines
-    if (/^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}/.test(line)) continue // skip a leading date line
-    if (/(receipt|invoice|order|cash|card|tel|phone)/i.test(line) && line.length < 8) continue
-    return line.slice(0, 80)
-  }
-  return null
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+  let best: string | null = null
+  let bestScore = -1
+  lines.slice(0, 12).forEach((line, i) => {
+    if (line.length < 3 || line.length > 60) return
+    if (!/[a-zA-Z]{2,}/.test(line)) return // need real letters, not just digits/symbols
+    if (/^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}/.test(line)) return // date
+    if (/^\d+\s+\S/.test(line)) return // street address ("123 Main St")
+    if (/(@|www\.|https?:\/\/)/i.test(line)) return // email/URL — handled by the fallback
+    if (/\b(tel|phone|fax)\b/i.test(line)) return
+    if (VENDOR_SKIP.test(line)) return
+    let s = 10 - i // earlier lines (header) score higher
+    if (VENDOR_BIZ.test(line)) s += 5
+    if (/^[A-Z0-9 &.,'-]+$/.test(line)) s += 2 // an ALL-CAPS header line
+    if (s > bestScore) {
+      bestScore = s
+      best = line.slice(0, 80)
+    }
+  })
+  if (best) return best
+  const dom = text.match(/[\w.+-]+@([\w-]+)\.[a-z]{2,}|(?:www\.|https?:\/\/)([\w-]+)\.[a-z]{2,}/i)
+  const name = dom?.[1] || dom?.[2]
+  return name && name.length > 1
+    ? name.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).slice(0, 80)
+    : null
 }
 
 /** Looks like a bill to pay (default Unpaid) rather than a receipt for something already paid
@@ -148,29 +193,44 @@ async function loadPdf(file: File | Blob) {
   return await pdfjs.getDocument({ data }).promise
 }
 
-/** Read the embedded text layer of a digital PDF (first few pages), reconstructing line
- *  breaks from each item's end-of-line flag so the line-based parsers above still work. */
+/** Read the embedded text layer of a digital PDF (first few pages) and reconstruct READING ORDER
+ *  from each item's position. pdf.js returns text items in content-stream order, NOT top-to-bottom,
+ *  so relying on `hasEOL` jumbles the page — the header (vendor) and footer (total) end up
+ *  scattered and the line-based parsers miss them. We instead sort by Y (top→bottom; PDF Y grows
+ *  upward) then X (left→right) and group items into visual lines by their Y. */
 async function pdfText(file: File | Blob): Promise<string> {
   const doc = await loadPdf(file)
   const pages = Math.min(doc.numPages, 3)
-  let out = ''
+  const lines: string[] = []
   for (let i = 1; i <= pages; i++) {
     const page = await doc.getPage(i)
     const content = await page.getTextContent()
-    for (const item of content.items as Array<{ str?: string; hasEOL?: boolean }>) {
-      if (typeof item.str !== 'string') continue
-      out += item.str + (item.hasEOL ? '\n' : ' ')
+    const items = (content.items as Array<{ str?: string; transform?: number[] }>)
+      .filter((it) => typeof it.str === 'string' && it.str.trim() !== '' && Array.isArray(it.transform))
+      .map((it) => ({ x: it.transform![4], y: Math.round(it.transform![5]), s: it.str as string }))
+      .sort((a, b) => b.y - a.y || a.x - b.x)
+    let lineY: number | null = null
+    let cur: string[] = []
+    for (const it of items) {
+      if (lineY === null) lineY = it.y
+      else if (Math.abs(it.y - lineY) > 3) {
+        lines.push(cur.join(' '))
+        cur = []
+        lineY = it.y
+      }
+      cur.push(it.s)
     }
-    out += '\n'
+    if (cur.length) lines.push(cur.join(' '))
   }
-  return out
+  return lines.join('\n')
 }
 
-/** Scanned (image-only) PDF: rasterize page 1 at 2× and OCR it. */
+/** Scanned (image-only) PDF: rasterize page 1 at 2.5× (sharper small header/footer text for OCR)
+ *  and run it through Tesseract. */
 async function pdfOcr(file: File | Blob): Promise<string> {
   const doc = await loadPdf(file)
   const page = await doc.getPage(1)
-  const viewport = page.getViewport({ scale: 2 })
+  const viewport = page.getViewport({ scale: 2.5 })
   const canvas = document.createElement('canvas')
   canvas.width = viewport.width
   canvas.height = viewport.height
