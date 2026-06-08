@@ -1,23 +1,19 @@
-// Vercel Edge function: server-side receipt/invoice extraction via Cloudflare Workers AI.
+// Vercel Node function: server-side receipt/invoice extraction via Cloudflare Workers AI.
 // PDFs → text extracted with unpdf (pure-JS, no canvas/worker) → a text model. Images → a
-// vision model. Runs entirely server-side so it does NOT depend on the client's pdf.js, which
-// is unreliable in installed iOS PWAs. Requires a Supabase JWT (same as r2-sign). Returns 501
-// when CF_AI_TOKEN is unset, so it's safe before setup (client falls back to manual entry).
+// vision model. Runs server-side so it does NOT depend on the client's pdf.js (unreliable in
+// installed iOS PWAs). Node runtime (not edge) because unpdf's PDF.js is validated there.
+// Requires a Supabase JWT (same as r2-sign). Returns 501 when CF_AI_TOKEN is unset.
 
 import { createClient } from '@supabase/supabase-js'
 import { extractText as extractPdfText, getDocumentProxy } from 'unpdf'
 
-export const config = { runtime: 'edge' }
+export const config = { maxDuration: 30 }
 
 const VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct'
 const TEXT_MODEL = '@cf/meta/llama-3.1-8b-instruct'
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
-}
-
-async function userIdFromRequest(req: Request): Promise<string | null> {
-  const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '')
+async function userIdFromAuth(authHeader: string): Promise<string | null> {
+  const token = (authHeader ?? '').replace(/^Bearer\s+/i, '')
   if (!token) return null
   const url =
     process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? 'https://wzbtxwnvplpnwmavfdwx.supabase.co'
@@ -82,45 +78,44 @@ const FIELDS =
   'vendor = the business/biller name. amount = the grand total / total due / balance due as a plain number (no currency symbol). ' +
   'date = the receipt or invoice date. dueDate = the payment due date. Use null for anything not present. Output only the JSON object.'
 
-function b64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64)
-  const u = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i)
-  return u
-}
-
 async function runModel(accountId: string, token: string, model: string, payload: unknown): Promise<string | null> {
   const cf = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`, {
     method: 'POST',
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify(payload),
   })
-  if (!cf.ok) return null
+  if (!cf.ok) {
+    console.error('[ocr] CF model error', model, cf.status)
+    return null
+  }
   const data = (await cf.json().catch(() => null)) as { result?: { response?: string } | string } | null
   return typeof data?.result === 'string' ? data.result : data?.result?.response ?? null
 }
 
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default async function handler(req: any, res: any) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' })
 
-  const userId = await userIdFromRequest(req)
-  if (!userId) return json({ error: 'unauthorized' }, 401)
+  const userId = await userIdFromAuth(req.headers?.authorization ?? '')
+  if (!userId) return res.status(401).json({ error: 'unauthorized' })
 
   const accountId = process.env.CF_ACCOUNT_ID ?? process.env.R2_ACCOUNT_ID
   const token = process.env.CF_AI_TOKEN
-  if (!accountId || !token) return json({ error: 'ocr not configured' }, 501)
+  if (!accountId || !token) return res.status(501).json({ error: 'ocr not configured' })
 
-  const body = (await req.json().catch(() => null)) as { data?: string; contentType?: string; filename?: string } | null
-  const data = body?.data
-  if (!data || typeof data !== 'string') return json({ error: 'no data' }, 400)
-  const contentType = body?.contentType ?? ''
-  const isPdf = contentType === 'application/pdf' || /\.pdf$/i.test(body?.filename ?? '')
+  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body ?? {}
+  const data: unknown = body.data
+  if (!data || typeof data !== 'string') return res.status(400).json({ error: 'no data' })
+  const contentType: string = body.contentType ?? ''
+  const isPdf = contentType === 'application/pdf' || /\.pdf$/i.test(body.filename ?? '')
 
   let out: string | null = null
+  let pdfTextLen = 0
   try {
     if (isPdf) {
-      const pdf = await getDocumentProxy(b64ToBytes(data))
+      const pdf = await getDocumentProxy(new Uint8Array(Buffer.from(data, 'base64')))
       const { text } = await extractPdfText(pdf, { mergePages: true })
+      pdfTextLen = text?.length ?? 0
       if (text && text.trim().length > 10) {
         out = await runModel(accountId, token, TEXT_MODEL, {
           messages: [
@@ -140,14 +135,16 @@ export default async function handler(req: Request): Promise<Response> {
         max_tokens: 400,
       })
     }
-  } catch {
-    return json({ error: 'ocr failed' }, 502)
+  } catch (e) {
+    console.error('[ocr] failed', { isPdf, message: (e as Error)?.message })
+    return res.status(502).json({ error: 'ocr failed' })
   }
 
   const parsed = out ? extractJson(out) : null
-  if (!parsed) return json({ error: 'no data' }, 422)
+  console.log('[ocr] result', { isPdf, pdfTextLen, outLen: out?.length ?? 0, parsed: !!parsed })
+  if (!parsed) return res.status(422).json({ error: 'no data', isPdf, pdfTextLen })
 
-  return json({
+  return res.status(200).json({
     vendor: typeof parsed.vendor === 'string' && parsed.vendor.trim() ? parsed.vendor.trim().slice(0, 80) : null,
     amount: normAmount(parsed.amount),
     date: normDate(parsed.date),
