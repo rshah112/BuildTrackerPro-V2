@@ -1,10 +1,12 @@
-import type { ChangeEvent } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { useState, type ChangeEvent } from 'react'
+import { Plus, Trash2, FileText } from 'lucide-react'
 import type { Bid, BidLine, Vendor } from '../../domain/types'
 import { fmt, sumBy } from '../../lib/money'
+import { uploadBlob, signedDownloadUrl } from '../../lib/r2'
 import { Field } from '../../components/ui/Field'
 import { Select } from '../../components/ui/Select'
 import { CurrencyField } from '../../components/ui/CurrencyField'
+import { FileUploadField } from '../../components/ui/FileUploadField'
 import { Button } from '../../components/ui/Button'
 import { Form } from '../../components/ui/Form'
 import { useEntityForm } from '../../lib/useEntityForm'
@@ -40,13 +42,26 @@ export function BidForm({
   initial?: Bid
   onDone: () => void
 }) {
-  const { d, setD, set, text, busy, submit } = useEntityForm<Bid, Draft>({
+  const [bidFile, setBidFile] = useState<File | null>(null)
+  const { d, setD, set, text, busy, submit, submitError } = useEntityForm<Bid, Draft>({
     initial,
     blank: blank(projectId, packageId),
     create: useCreateBid(),
     update: useUpdateBid(),
+    // Upload an attached bid PDF/image to R2 (presigned) and store its object key + name.
+    transform: async (draft) => {
+      if (!bidFile) return draft
+      const { key } = await uploadBlob(bidFile, 'bid')
+      return { ...draft, fileObjectKey: key, fileName: draft.fileName?.trim() || bidFile.name }
+    },
     onDone,
   })
+
+  const openFile = async () => {
+    if (!d.fileObjectKey) return
+    const url = await signedDownloadUrl(d.fileObjectKey)
+    if (url) window.open(url, '_blank', 'noopener')
+  }
 
   const chooseVendor = (e: ChangeEvent<HTMLSelectElement>) => {
     const v = vendors.find((x) => x.id === e.target.value)
@@ -82,7 +97,27 @@ export function BidForm({
           </Field>
         )}
         <CurrencyField label="Amount" value={d.amount ?? 0} onChange={(v) => set('amount', v)} />
-        <Field label="File name">{(p) => <input {...p} value={d.fileName ?? ''} onChange={text('fileName')} />}</Field>
+        <FileUploadField
+          label="Bid document"
+          fileAccept="image/*,application/pdf"
+          fileLabel={bidFile || d.fileObjectKey ? 'Replace file' : 'Attach PDF / image'}
+          fileIcon={<FileText size={16} />}
+          hint="The vendor's quote — stored securely so you can pull it up later."
+          onPick={(f) => {
+            setBidFile(f)
+            if (f) setD((p) => ({ ...p, fileName: p.fileName?.trim() ? p.fileName : f.name }))
+          }}
+        />
+        {(bidFile || d.fileObjectKey) && (
+          <div className="row-between">
+            <p className="muted" style={{ margin: 0 }}>{bidFile ? bidFile.name : d.fileName || 'File attached'}</p>
+            {d.fileObjectKey && !bidFile && (
+              <Button type="button" size="sm" variant="secondary" onClick={openFile}>
+                View
+              </Button>
+            )}
+          </div>
+        )}
         <Field label="Notes">{(p) => <textarea {...p} value={d.notes ?? ''} onChange={text('notes')} />}</Field>
       </Form.Section>
 
@@ -106,6 +141,11 @@ export function BidForm({
         </div>
       </Form.Section>
 
+      {submitError && (
+        <p role="alert" className="error-banner">
+          {submitError}
+        </p>
+      )}
       <Form.Actions busy={busy} onCancel={onDone} />
     </Form>
   )

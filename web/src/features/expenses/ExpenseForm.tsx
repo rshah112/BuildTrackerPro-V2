@@ -128,6 +128,7 @@ export function ExpenseForm({
     onDone,
     transform: async (draft) => {
       const amount = draft.amount ?? 0
+      if (!(amount > 0)) throw new Error('Enter an amount greater than $0.')
       const isPaid = draft.isPaid ?? false
       const selected = lineItems.find((li) => li.id === draft.budgetLineItemId)
       const receiptObjectKey = receiptFile

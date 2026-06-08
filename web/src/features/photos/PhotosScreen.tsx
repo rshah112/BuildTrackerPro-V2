@@ -21,7 +21,7 @@ import { PhotoForm } from './PhotoForm'
 
 export function PhotosScreen() {
   const { projectId } = useCurrentProject()
-  const { data: photos = [], isLoading } = usePhotos(projectId!)
+  const { data: photos = [], isLoading, error } = usePhotos(projectId!)
   const { data: projects = [] } = useProjects()
   const { data: categories = [] } = useCategories(projectId!)
   const remove = useRemovePhoto()
@@ -32,6 +32,16 @@ export function PhotosScreen() {
   const [preview, setPreview] = useState<PhotoAttachment | null>(null)
 
   if (!projectId) return null
+
+  if (error)
+    return (
+      <section>
+        <ScreenHeader title="Photos" />
+        <p role="alert" className="error-banner">
+          Couldn’t load photos: {(error as Error).message}
+        </p>
+      </section>
+    )
 
   const project = projects.find((p) => p.id === projectId)
   const rooms = roomsForTemplate(project?.templateType ?? 'customHome')

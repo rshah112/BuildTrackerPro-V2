@@ -1,9 +1,11 @@
+import { useQueryClient } from '@tanstack/react-query'
 import type { BudgetLineItem } from '../../domain/types'
 import { Field } from '../../components/ui/Field'
 import { CurrencyField } from '../../components/ui/CurrencyField'
 import { Form } from '../../components/ui/Form'
 import { useEntityForm } from '../../lib/useEntityForm'
 import { useCreateLineItem, useUpdateLineItem } from './useBudget'
+import { cascadeLineItemTitle } from './cascadeLineItemTitle'
 
 type Draft = Partial<Omit<BudgetLineItem, 'id' | 'owner' | 'createdAt'>>
 
@@ -33,11 +35,25 @@ export function LineItemForm({
   initial?: BudgetLineItem
   onDone: () => void
 }) {
+  const qc = useQueryClient()
   const { d, setD, text, busy, submit } = useEntityForm<BudgetLineItem, Draft>({
     initial,
     blank: blank(projectId, categoryName),
     create: useCreateLineItem(),
     update: useUpdateLineItem(),
+    // A title change must propagate to the denormalized budgetLineItemTitle on expenses/COs/docs
+    // (otherwise list rows and the Excel export show the old name). The id link is unaffected, so
+    // money is never wrong — this is display consistency.
+    onSaved: async (saved) => {
+      if (initial && saved.title !== initial.title) {
+        await cascadeLineItemTitle(saved.id, saved.title)
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: ['expenses'] }),
+          qc.invalidateQueries({ queryKey: ['change_orders'] }),
+          qc.invalidateQueries({ queryKey: ['project_documents'] }),
+        ])
+      }
+    },
     onDone,
   })
   const money = (k: keyof Draft) => (v: number) => setD((p) => ({ ...p, [k]: v }))

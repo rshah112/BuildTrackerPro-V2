@@ -42,12 +42,21 @@ export function addDays(iso: string, days: number): string {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
 }
 
+export interface CashFlowOptions {
+  /** When false, items whose expected date is already past (overdue) are EXCLUDED rather than
+   *  clamped forward into the window — use this when overdue is surfaced separately so the same
+   *  dollars aren't counted in both an "Overdue" and a "Due next 14 days" view. Default true. */
+  includeOverdue?: boolean
+}
+
 /** Upcoming payments within the next FORECAST_DAYS, sorted by date then amount desc. */
 export function cashFlowPayments(
   expenses: Expense[],
   changeOrders: ChangeOrder[],
   todayISO: string,
+  opts: CashFlowOptions = {},
 ): CashFlowPayment[] {
+  const includeOverdue = opts.includeOverdue ?? true
   const start = day(todayISO)
   const end = addDays(start, FORECAST_DAYS)
 
@@ -56,7 +65,9 @@ export function cashFlowPayments(
     if (due <= 0) return []
     const expected = e.expectedPaymentDate ?? e.dueDate
     if (!expected) return []
-    const forecastDay = max(day(expected), start)
+    const expDay = day(expected)
+    if (!includeOverdue && expDay < start) return []
+    const forecastDay = max(expDay, start)
     if (!(forecastDay < end)) return []
     return [
       {
@@ -73,7 +84,9 @@ export function cashFlowPayments(
 
   const orderPayments: CashFlowPayment[] = changeOrders.flatMap((o) => {
     if (o.status === 'paid' || !o.expectedPaymentDate) return []
-    const forecastDay = max(day(o.expectedPaymentDate), start)
+    const expDay = day(o.expectedPaymentDate)
+    if (!includeOverdue && expDay < start) return []
+    const forecastDay = max(expDay, start)
     if (!(forecastDay < end)) return []
     return [
       {
@@ -97,8 +110,9 @@ export function cashFlowForecast(
   expenses: Expense[],
   changeOrders: ChangeOrder[],
   todayISO: string,
+  opts: CashFlowOptions = {},
 ): CashFlowDay[] {
-  const payments = cashFlowPayments(expenses, changeOrders, todayISO)
+  const payments = cashFlowPayments(expenses, changeOrders, todayISO, opts)
   const start = day(todayISO)
   return Array.from({ length: FORECAST_DAYS }, (_, offset) => {
     const date = addDays(start, offset)
@@ -125,6 +139,7 @@ export function nextFourteenDaysDue(
   expenses: Expense[],
   changeOrders: ChangeOrder[],
   todayISO: string,
+  opts: CashFlowOptions = {},
 ): number {
-  return sumBy(cashFlowPayments(expenses, changeOrders, todayISO), (p) => p.amount)
+  return sumBy(cashFlowPayments(expenses, changeOrders, todayISO, opts), (p) => p.amount)
 }

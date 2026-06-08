@@ -6,6 +6,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  min-height: 44px; /* iOS/WCAG touch target — applies to every size incl. sm action buttons */
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   font: inherit;

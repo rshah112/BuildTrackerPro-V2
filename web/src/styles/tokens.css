@@ -49,7 +49,9 @@
   --color-surface-raised: var(--neutral-0);
   --color-text: #1c1c1e;
   --color-text-muted: #6b6b72;
-  --color-text-faint: var(--neutral-400);
+  /* Darkened from neutral-400 (#a8a8b0, ~2.3:1 on white — failed WCAG AA) so form hints and
+     other faint text clear the 4.5:1 normal-text bar on both white and the #f2f2f7 app bg. */
+  --color-text-faint: #5e5e66;
   --color-border: #e3e3e8;
   --color-border-strong: var(--neutral-300);
 
@@ -150,7 +152,8 @@
   --color-surface-raised: #2a2a2e;
   --color-text: #f5f5f7;
   --color-text-muted: #9a9aa2;
-  --color-text-faint: #6b6b72;
+  /* Lightened from #6b6b72 (~3.2:1 on the dark surface — failed AA) to clear 4.5:1. */
+  --color-text-faint: #8d8d95;
   --color-border: #38383a;
   --color-border-strong: #48484a;
 

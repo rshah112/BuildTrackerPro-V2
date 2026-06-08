@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { diff, fmt, sumBy } from '../../lib/money'
+import { actualSpend, committedSpend } from '../../lib/budgetAggregates'
 import { lineItemHealth } from '../../lib/budgetMath'
 import { nextFourteenDaysDue, localToday } from '../cashflow/cashFlow'
 import { loadProjectExport, downloadBlob, safeFileName } from './exportData'
@@ -27,8 +28,9 @@ export async function downloadInsightsPdf(projectId: string): Promise<void> {
   y += 8
 
   const budgetTotal = sumBy(d.lineItems, (li) => li.budget)
-  const actualTotal = sumBy(d.lineItems, (li) => li.actual)
-  const committedTotal = sumBy(d.lineItems, (li) => li.committed)
+  // Same basis as the Dashboard so the report reconciles (see workbook.ts).
+  const actualTotal = actualSpend(d.lineItems, d.expenses, d.allowanceSelections, d.changeOrders)
+  const committedTotal = committedSpend(d.lineItems, d.changeOrders)
   const limit = d.project.constructionBudget + d.project.contingencyBudget
   const usedPct = limit > 0 ? Math.round((actualTotal / limit) * 100) : 0
 

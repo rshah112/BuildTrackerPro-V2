@@ -36,7 +36,10 @@ describe('table mapping', () => {
       'expenses',
     ).create({ budgetLineItemId: 'a', amount: 5, isPaid: true })
 
-    expect(state.lastPayload).toEqual({ budget_line_item_id: 'a', amount: 5, is_paid: true })
+    // A client-generated id is always sent now (so an offline/lost-ack create replay is idempotent);
+    // the rest of the payload is still snake_cased.
+    expect(state.lastPayload).toMatchObject({ budget_line_item_id: 'a', amount: 5, is_paid: true })
+    expect(typeof (state.lastPayload as { id?: string }).id).toBe('string')
     expect(row).toEqual({ id: '1', budgetLineItemId: 'a', amount: 5, isPaid: true })
   })
 

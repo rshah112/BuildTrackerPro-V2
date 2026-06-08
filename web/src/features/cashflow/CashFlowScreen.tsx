@@ -31,8 +31,13 @@ export function CashFlowScreen() {
 
 
   const today = localToday()
-  const days = cashFlowForecast(expenses, changeOrders, today).filter((d) => d.payments.length > 0)
-  const total = nextFourteenDaysDue(expenses, changeOrders, today)
+  // Overdue items are shown in their own card below, so EXCLUDE them here (don't clamp them
+  // forward into the 14-day window) — otherwise the same dollars appear in both "Overdue" and
+  // "Due next 14 days", and again in today's forecast card.
+  const days = cashFlowForecast(expenses, changeOrders, today, { includeOverdue: false }).filter(
+    (d) => d.payments.length > 0,
+  )
+  const total = nextFourteenDaysDue(expenses, changeOrders, today, { includeOverdue: false })
 
   // Overdue: still-owing items whose date is already in the past (outside the forward window).
   const overdueExpenses = expenses.filter((e) => {

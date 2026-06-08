@@ -95,11 +95,16 @@ export function DashboardScreen() {
       (e) => e.amount,
     )
 
-    // --- Estimated Final Cost (EAC): spent + committed + still-to-spend budget + pending COs ---
-    const lineBudgetTotal = sumBy(lineItems, (i) => i.budget)
-    const uncommittedRemaining = Math.max(0, lineBudgetTotal - actual - committed)
+    // --- Estimated Final Cost (EAC): spent + committed + still-to-spend BASE budget + pending COs ---
+    // Estimate-to-complete is the unspent BASE-budget scope; contingency is a separate reserve
+    // shown in the burn-down below, not "still to spend". Anchoring BOTH the estimate and the
+    // comparison to baseBudget means an on-plan project reads ~$0 (instead of the old bug, which
+    // measured "still to spend" against the base but compared against base+contingency and so
+    // reported a healthy project as ~the whole contingency "under budget"). Change-order/overrun
+    // exposure is what now shows as "over" — which the contingency reserve below is there to absorb.
+    const uncommittedRemaining = Math.max(0, baseBudget - actual - committed)
     const estimatedFinalCost = actual + committed + uncommittedRemaining + pending
-    const eacVsBudget = estimatedFinalCost - budgetLimit // + = projected over, − = under
+    const eacVsBudget = estimatedFinalCost - baseBudget // + = projected over base, − = under
 
     // --- Contingency burn-down: how much of the contingency the overage has eaten ---
     const contingency = project?.contingencyBudget ?? 0
@@ -318,7 +323,9 @@ export function DashboardScreen() {
         <p className="panel-lead">
           {eacVsBudget > 0
             ? `Projected ${fmt(eacVsBudget)} over budget`
-            : `Projected ${fmt(Math.abs(eacVsBudget))} under budget`}
+            : eacVsBudget < 0
+              ? `Projected ${fmt(Math.abs(eacVsBudget))} under budget`
+              : 'Projected on budget'}
           {sqft > 0 && ` · ${fmt(eacPsf)}/sqft (${fmt(actualPsf)}/sqft spent)`}
         </p>
         {contingency > 0 && (

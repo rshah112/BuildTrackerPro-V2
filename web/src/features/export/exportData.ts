@@ -36,8 +36,13 @@ export interface ProjectExport {
   exportedAt: string
 }
 
-/** Loads every row for a project (RLS-scoped to the owner) for export/backup. */
-export async function loadProjectExport(projectId: string): Promise<ProjectExport> {
+/** Loads every row for a project (RLS-scoped to the owner) for export/backup. `trashed`
+ *  defaults to 'exclude' (active rows only) for the Excel/PDF reports; the JSON backup passes
+ *  'all' so a "full backup" actually captures soft-deleted (trashed) rows too. */
+export async function loadProjectExport(
+  projectId: string,
+  opts?: { trashed?: 'exclude' | 'only' | 'all' },
+): Promise<ProjectExport> {
   const f = { projectId }
   const [
     project,
@@ -57,20 +62,20 @@ export async function loadProjectExport(projectId: string): Promise<ProjectExpor
     phases,
   ] = await Promise.all([
     table<Project>('projects').get(projectId),
-    table<BudgetCategory>('budget_categories').list(f),
-    table<BudgetLineItem>('budget_line_items').list(f),
-    table<Expense>('expenses').list(f),
-    table<ChangeOrder>('change_orders').list(f),
-    table<AllowanceSelection>('allowance_selections').list(f),
-    table<Vendor>('vendors').list(f),
-    table<ProjectTask>('project_tasks').list(f),
-    table<BidPackage>('bid_packages').list(f),
-    table<Bid>('bids').list(f),
-    table<PhotoAttachment>('photo_attachments').list(f),
-    table<ProjectDocument>('project_documents').list(f),
-    table<ConstructionLoan>('construction_loans').list(f),
-    table<LoanDraw>('loan_draws').list(f),
-    table<Phase>('phases').list(f),
+    table<BudgetCategory>('budget_categories').list(f, opts),
+    table<BudgetLineItem>('budget_line_items').list(f, opts),
+    table<Expense>('expenses').list(f, opts),
+    table<ChangeOrder>('change_orders').list(f, opts),
+    table<AllowanceSelection>('allowance_selections').list(f, opts),
+    table<Vendor>('vendors').list(f, opts),
+    table<ProjectTask>('project_tasks').list(f, opts),
+    table<BidPackage>('bid_packages').list(f, opts),
+    table<Bid>('bids').list(f, opts),
+    table<PhotoAttachment>('photo_attachments').list(f, opts),
+    table<ProjectDocument>('project_documents').list(f, opts),
+    table<ConstructionLoan>('construction_loans').list(f, opts),
+    table<LoanDraw>('loan_draws').list(f, opts),
+    table<Phase>('phases').list(f, opts),
   ])
 
   if (!project) throw new Error('Project not found')

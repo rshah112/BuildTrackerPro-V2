@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import { lineItemHealth, variance } from '../../lib/budgetMath'
 import { diff, sumBy } from '../../lib/money'
+import { actualSpend, committedSpend } from '../../lib/budgetAggregates'
 import { effectiveAmountPaid } from '../../lib/expenseMath'
 import { cashFlowPayments, localToday } from '../cashflow/cashFlow'
 import { loadProjectExport, downloadBlob, safeFileName, type ProjectExport } from './exportData'
@@ -14,8 +15,12 @@ function buildWorkbook(d: ProjectExport): XLSX.WorkBook {
   const pkgTitle = new Map(d.bidPackages.map((p) => [p.id, p.scopeTitle]))
 
   const budgetTotal = sumBy(d.lineItems, (li) => li.budget)
-  const actualTotal = sumBy(d.lineItems, (li) => li.actual)
-  const committedTotal = sumBy(d.lineItems, (li) => li.committed)
+  // Reconcile with the Dashboard/Portfolio headline KPIs: actualSpend() also counts expenses
+  // not mapped to a line item, allowance selections, and paid change orders; committedSpend()
+  // adds open commitments + approved (unpaid) change orders. The per-row Line Items sheet below
+  // still shows the stored li.actual / li.committed for line-by-line detail.
+  const actualTotal = actualSpend(d.lineItems, d.expenses, d.allowanceSelections, d.changeOrders)
+  const committedTotal = committedSpend(d.lineItems, d.changeOrders)
 
   const summary = XLSX.utils.aoa_to_sheet([
     ['Project', d.project.name],

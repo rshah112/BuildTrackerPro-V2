@@ -8,8 +8,11 @@ import { initTheme } from './lib/theme.ts'
 import { ToastProvider } from './components/ui/Toast.tsx'
 import { ConfirmProvider } from './components/ui/Confirm.tsx'
 import { reloadOnceForChunk } from './lib/chunkReload.ts'
+import { initSync } from './data/sync.ts'
 
 initTheme()
+// Hydrate the offline write outbox and replay any queued mutations (now + on reconnect).
+initSync()
 
 // iOS-only app: pinch- and double-tap-zoom break the fixed layout, and Safari ignores
 // `user-scalable=no` outside installed-PWA mode — so block the gestures directly. Safari's

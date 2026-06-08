@@ -82,6 +82,26 @@ describe('actualSpend de-dups allowance expenses against selections', () => {
     // 300 (a) + 600 (allowance selection) + 100 (paid CO); the 50 expense on b is dropped
     expect(total).toBe(1000)
   })
+
+  it('also excludes a TITLE-linked allowance expense (no id) when the allowance has selections', () => {
+    const items = [
+      item({ id: 'a' }),
+      item({ id: 'b', title: 'Tile', categoryName: 'Finishes', isAllowance: true, allowanceAmount: 500 }),
+    ]
+    const total = actualSpend(
+      items,
+      [
+        exp({ amount: 300, budgetLineItemId: 'a' }),
+        // tied to the allowance by title+category only (budgetLineItemId stays null)
+        exp({ amount: 400, budgetLineItemId: null, budgetLineItemTitle: 'Tile', categoryName: 'Finishes' }),
+      ],
+      [{ lineItemId: 'b', amount: 600 }],
+      [],
+    )
+    // 300 (a) + 600 (selection); the 400 title-linked allowance expense is dropped — it was
+    // double-counted before the fix.
+    expect(total).toBe(900)
+  })
 })
 
 describe('committedSpend', () => {

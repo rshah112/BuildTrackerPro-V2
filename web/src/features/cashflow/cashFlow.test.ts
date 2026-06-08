@@ -71,3 +71,18 @@ describe('cashFlowForecast + nextFourteenDaysDue', () => {
     expect(nextFourteenDaysDue(exps, cos, TODAY)).toBe(3800)
   })
 })
+
+describe('includeOverdue option', () => {
+  it('excludes overdue items instead of clamping them forward when includeOverdue is false', () => {
+    const exps = [
+      expense({ id: 'past', amount: 500, dueDate: '2026-05-20' }), // overdue (before TODAY)
+      expense({ id: 'soon', amount: 300, dueDate: '2026-06-05' }), // within window
+    ]
+    // default: overdue is clamped into the window → both counted (the cross-tile double-count)
+    expect(nextFourteenDaysDue(exps, [], TODAY)).toBe(800)
+    expect(cashFlowPayments(exps, [], TODAY).map((p) => p.id).sort()).toEqual(['expense-past', 'expense-soon'])
+    // includeOverdue:false → only the genuinely in-window item
+    expect(nextFourteenDaysDue(exps, [], TODAY, { includeOverdue: false })).toBe(300)
+    expect(cashFlowPayments(exps, [], TODAY, { includeOverdue: false }).map((p) => p.id)).toEqual(['expense-soon'])
+  })
+})

@@ -9,7 +9,8 @@ interface BackupFile extends ProjectExport {
 
 /** Download a full JSON snapshot of the project (all entities). */
 export async function downloadBackup(projectId: string): Promise<void> {
-  const data = await loadProjectExport(projectId)
+  // 'all' → a full backup includes trashed (soft-deleted) rows, not just active ones.
+  const data = await loadProjectExport(projectId, { trashed: 'all' })
   const file: BackupFile = { backupVersion: BACKUP_VERSION, ...data }
   const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' })
   downloadBlob(blob, `${safeFileName(data.project.name)}-backup-${data.exportedAt.slice(0, 10)}.json`)

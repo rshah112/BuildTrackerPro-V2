@@ -31,12 +31,14 @@ interface ExpenseRow {
   vendor_name: string
   due_date: string | null
   expected_payment_date: string | null
+  project_id: string
 }
 interface CoRow {
   title: string
   amount: number
   status: string
   expected_payment_date: string | null
+  project_id: string
 }
 interface SubRow {
   id: string
@@ -103,9 +105,11 @@ function expenseBalance(e: ExpenseRow): number {
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  // If a CRON_SECRET is configured, require it (Vercel Cron sends it automatically).
+  // Require CRON_SECRET. Vercel Cron sends it automatically as `Authorization: Bearer <secret>`.
+  // Fail CLOSED when it is unset so this service-role-backed endpoint is never publicly callable
+  // (an unset secret previously skipped the check, leaving it open to anyone with the URL).
   const secret = process.env.CRON_SECRET
-  if (secret && req.headers['authorization'] !== `Bearer ${secret}`) {
+  if (!secret || req.headers['authorization'] !== `Bearer ${secret}`) {
     return send(res, 401, { ok: false, error: 'unauthorized' })
   }
   if (!SERVICE_ROLE || !VAPID_PRIVATE) {
@@ -143,26 +147,32 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       continue
     }
     const soon = addDays(today, pref.lead_days)
-    const [{ data: exp }, { data: cos }] = await Promise.all([
+    const [{ data: exp }, { data: cos }, { data: trashedProjects }] = await Promise.all([
       supa
         .from('expenses')
-        .select('amount,amount_paid,is_paid,vendor_name,due_date,expected_payment_date')
+        .select('amount,amount_paid,is_paid,vendor_name,due_date,expected_payment_date,project_id')
         .eq('owner', owner)
         .is('deleted_at', null),
       supa
         .from('change_orders')
-        .select('title,amount,status,expected_payment_date')
+        .select('title,amount,status,expected_payment_date,project_id')
         .eq('owner', owner)
         .is('deleted_at', null),
+      // Don't nag about items that live inside a TRASHED project.
+      supa.from('projects').select('id').eq('owner', owner).not('deleted_at', 'is', null),
     ])
+    const trashed = new Set(((trashedProjects ?? []) as { id: string }[]).map((p) => p.id))
 
     let overdue = 0
     let dueSoon = 0
     let total = 0
     for (const e of (exp ?? []) as ExpenseRow[]) {
+      if (trashed.has(e.project_id)) continue
       const bal = expenseBalance(e)
       if (bal <= 0) continue
-      const expected = e.expected_payment_date ?? e.due_date
+      // Compare date-only: expected_payment_date is a timestamptz, and a same-day time component
+      // would sort after the date-only `soon`/`today` strings and miss the boundary day.
+      const expected = (e.expected_payment_date ?? e.due_date)?.slice(0, 10)
       if (!expected) continue
       if (expected < today) {
         if (!pref.remind_overdue) continue
@@ -176,11 +186,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     }
     if (pref.remind_change_orders) {
       for (const o of (cos ?? []) as CoRow[]) {
-        if (o.status === 'paid' || !o.expected_payment_date) continue
-        if (o.expected_payment_date < today) {
+        if (o.status === 'paid' || !o.expected_payment_date || trashed.has(o.project_id)) continue
+        const expected = o.expected_payment_date.slice(0, 10)
+        if (expected < today) {
           overdue++
           total += o.amount
-        } else if (o.expected_payment_date <= soon) {
+        } else if (expected <= soon) {
           dueSoon++
           total += o.amount
         }

@@ -13,6 +13,22 @@ export default defineConfig({
       // (notificationclick routing + a Phase-2 web-push receiver) via importScripts.
       workbox: {
         importScripts: ['notify-sw.js'],
+        // Precache the self-hosted font too (woff2 isn't in Workbox's default glob) so the
+        // Archivo display face renders offline instead of falling back to system text.
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // R2 receipt/photo images: cache what's been viewed so it still renders offline within
+        // the signed-URL window. Cross-origin <img> fetches are opaque (status 0).
+        runtimeCaching: [
+          {
+            urlPattern: /\.r2\.cloudflarestorage\.com\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'r2-media',
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
       manifest: {
         name: 'HomeBuild Pro',
@@ -29,6 +45,12 @@ export default defineConfig({
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
           { src: '/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+        // Long-press app-icon shortcuts to the highest-frequency field actions.
+        shortcuts: [
+          { name: 'Add expense', short_name: 'Expense', url: '/expenses', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Cash flow', short_name: 'Cash flow', url: '/cashflow', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Receipts', short_name: 'Receipts', url: '/receipts', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
         ],
       },
     }),

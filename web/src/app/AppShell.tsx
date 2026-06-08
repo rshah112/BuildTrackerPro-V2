@@ -13,6 +13,7 @@ import { NotifyPrompt } from '../features/notifications/NotifyPrompt'
 import { DueReminders } from '../features/notifications/DueReminders'
 import { notifState, type NotifState } from '../lib/notifications'
 import { ErrorBoundary } from './ErrorBoundary'
+import { SyncIndicator } from './SyncIndicator'
 
 export function AppShell() {
   const queryClient = useQueryClient()
@@ -40,10 +41,16 @@ export function AppShell() {
       </a>
       <header className="app-header">
         <span className="brand">HomeBuild&nbsp;Pro</span>
-        <Link to="/projects" className="header-link">
-          <FolderKanban size={16} aria-hidden />
-          Projects
-        </Link>
+        <span
+          className="app-header-actions"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}
+        >
+          <SyncIndicator />
+          <Link to="/projects" className="header-link">
+            <FolderKanban size={16} aria-hidden />
+            Projects
+          </Link>
+        </span>
       </header>
       <main className="app-main" id="main">
         <PageTransition>
