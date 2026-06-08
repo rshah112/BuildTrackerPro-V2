@@ -29,7 +29,8 @@ test('templates, search, line-item detail/duplicate, funding source', async ({ p
 
   await page.getByRole('link', { name: 'Budget' }).click()
   await expect(page.locator('.budget-cat').first()).toBeVisible()
-  await expect(page.locator('.budget-cat')).toHaveCount(8) // seeded categories
+  await expect(page.locator('.budget-cat')).toHaveCount(9) // seeded categories (incl. Professional Fees)
+  await expect(page.getByText('Professional Fees')).toBeVisible()
   await expect(page.getByText('Interior Finishes')).toBeVisible()
 
   // --- Budget search ---

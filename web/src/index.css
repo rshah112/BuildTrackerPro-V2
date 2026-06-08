@@ -27,6 +27,8 @@ body {
   /* Keep over-drag inside the app so the custom pull-to-refresh doesn't fight the
      browser's native top-of-page refresh. */
   overscroll-behavior-y: contain;
+  /* iOS-only app: no double-tap-to-zoom anywhere (pinch is blocked in main.tsx). */
+  touch-action: manipulation;
 }
 body {
   margin: 0;

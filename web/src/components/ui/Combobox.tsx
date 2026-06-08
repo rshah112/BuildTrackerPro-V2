@@ -1,4 +1,16 @@
-import { Fragment, useEffect, useId, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
+import {
+  Fragment,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FocusEvent,
+  type KeyboardEvent,
+} from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown } from 'lucide-react'
 import { Field } from './Field'
 import { matchesQuery } from '../../lib/search'
@@ -47,7 +59,9 @@ export function Combobox({
   const [active, setActive] = useState(0)
   const listId = useId()
   const wrapRef = useRef<HTMLDivElement>(null)
+  const controlRef = useRef<HTMLDivElement>(null)
   const optionRefs = useRef<(HTMLLIElement | null)[]>([])
+  const [pos, setPos] = useState<CSSProperties | null>(null)
 
   const selected = options.find((o) => o.value === value)
   const selectedLabel = allowCustom ? value : selected?.label ?? ''
@@ -63,6 +77,52 @@ export function Combobox({
   useEffect(() => {
     if (open) optionRefs.current[active]?.scrollIntoView?.({ block: 'nearest' })
   }, [active, open])
+
+  // Position the dropdown as a fixed popover anchored to the input. On mobile the on-screen
+  // keyboard + sticky Save/Cancel footer leave almost no room below, so open UPWARD when below
+  // is tight and size to the visible (visualViewport) height — this clears the keyboard and
+  // floats above the footer instead of being crushed between them.
+  // Measure-then-position before paint is the canonical useLayoutEffect use (the {open && pos}
+  // render gate hides the pre-measure frame), so the set-state-in-effect rule is a false positive.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useLayoutEffect(() => {
+    if (!open) {
+      setPos(null)
+      return
+    }
+    const place = () => {
+      const el = controlRef.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      const vv = window.visualViewport
+      const vTop = vv?.offsetTop ?? 0
+      const vH = vv?.height ?? window.innerHeight
+      const margin = 8
+      const below = vTop + vH - r.bottom
+      const above = r.top - vTop
+      const openUp = below < 220 && above > below
+      const maxHeight = Math.max(120, Math.min(300, (openUp ? above : below) - margin))
+      // Always a clamped `top` in viewport coords (the list is portaled to <body>, so no
+      // transformed ancestor can offset it) — guarantees the popover stays fully on-screen.
+      const desired = openUp ? r.top - maxHeight - 4 : r.bottom + 4
+      const top = Math.min(Math.max(desired, vTop + margin), vTop + vH - maxHeight - margin)
+      setPos({ position: 'fixed', left: Math.max(margin, r.left), width: r.width, top, maxHeight })
+    }
+    place()
+    // Reposition only on resize / keyboard (visualViewport) — NOT on page scroll, which would
+    // move the popover mid-tap and make options never "settle" (flaky to click). The dropdown is
+    // short-lived; if the body scrolls it just closes via the input losing focus.
+    const onMove = () => place()
+    window.addEventListener('resize', onMove)
+    window.visualViewport?.addEventListener('resize', onMove)
+    window.visualViewport?.addEventListener('scroll', onMove)
+    return () => {
+      window.removeEventListener('resize', onMove)
+      window.visualViewport?.removeEventListener('resize', onMove)
+      window.visualViewport?.removeEventListener('scroll', onMove)
+    }
+  }, [open])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const openList = () => {
     setQuery(allowCustom ? value : '')
@@ -108,7 +168,7 @@ export function Combobox({
     <Field label={label} hint={hint} error={error}>
       {(p) => (
         <div className="combobox" ref={wrapRef} onBlur={onBlur}>
-          <div className="combobox-control">
+          <div className="combobox-control" ref={controlRef}>
             <input
               {...p}
               type="text"
@@ -133,8 +193,8 @@ export function Combobox({
             />
             <ChevronDown className="combobox-chevron" size={18} aria-hidden />
           </div>
-          {open && (
-            <ul className="combobox-list" id={listId} role="listbox">
+          {open && pos && createPortal(
+            <ul className="combobox-list" id={listId} role="listbox" style={pos}>
               {filtered.length === 0 ? (
                 <li className="combobox-empty" role="presentation">
                   {allowCustom && query.trim() ? `Use “${query.trim()}”` : emptyText}
@@ -171,7 +231,8 @@ export function Combobox({
                   )
                 })
               )}
-            </ul>
+            </ul>,
+            document.body,
           )}
         </div>
       )}
