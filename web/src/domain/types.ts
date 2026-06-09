@@ -96,6 +96,8 @@ export interface Expense {
   receiptObjectKey: string | null
   /** '' (unset/personal), 'personal', or 'loan' — see FUNDING_SOURCES. */
   fundingSource?: string
+  /** Retainage withheld on this expense, held until completion (excluded from cash-flow "due"). */
+  retainageAmount?: number
 }
 
 export interface Vendor {

@@ -450,6 +450,9 @@ export function DashboardScreen() {
             <li>
               <strong>{fmt(allowanceRisk)}</strong> allowance overage
             </li>
+            <li>
+              <strong>{fmt(sumBy(expenses, (e) => e.retainageAmount ?? 0))}</strong> retainage held
+            </li>
           </ul>
         </SectionCard>
         )}

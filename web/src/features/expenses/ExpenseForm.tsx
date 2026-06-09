@@ -53,6 +53,7 @@ function blank(projectId: string): Draft {
     isPaid: false,
     receiptObjectKey: null,
     fundingSource: '',
+    retainageAmount: 0,
   }
 }
 
@@ -413,6 +414,11 @@ export function ExpenseForm({
           <Field label="Reference">
             {(p) => <input {...p} value={d.paymentReference ?? ''} onChange={text('paymentReference')} />}
           </Field>
+          <CurrencyField
+            label="Retainage held"
+            value={d.retainageAmount ?? 0}
+            onChange={(v) => setD((p) => ({ ...p, retainageAmount: v }))}
+          />
           <Field label="Notes">{(p) => <textarea {...p} value={d.notes ?? ''} onChange={text('notes')} />}</Field>
         </div>
       </details>

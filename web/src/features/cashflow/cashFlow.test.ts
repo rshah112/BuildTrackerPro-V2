@@ -72,6 +72,14 @@ describe('cashFlowForecast + nextFourteenDaysDue', () => {
   })
 })
 
+describe('retainage', () => {
+  it('excludes withheld retainage from the upcoming due amount', () => {
+    const exps = [expense({ id: 'e1', amount: 1000, retainageAmount: 100, dueDate: '2026-06-05' })]
+    const ps = cashFlowPayments(exps, [], TODAY)
+    expect(ps[0].amount).toBe(900) // 1000 balance − 100 retainage held
+  })
+})
+
 describe('includeOverdue option', () => {
   it('excludes overdue items instead of clamping them forward when includeOverdue is false', () => {
     const exps = [

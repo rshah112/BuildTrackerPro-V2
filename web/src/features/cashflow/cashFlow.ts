@@ -61,7 +61,9 @@ export function cashFlowPayments(
   const end = addDays(start, FORECAST_DAYS)
 
   const expensePayments: CashFlowPayment[] = expenses.flatMap((e) => {
-    const due = balanceDue(e)
+    // Retainage is held until completion — not a near-term obligation — so exclude it from the
+    // upcoming "due" amount (cent-exact).
+    const due = dollars(Math.max(0, cents(balanceDue(e)) - cents(e.retainageAmount ?? 0)))
     if (due <= 0) return []
     const expected = e.expectedPaymentDate ?? e.dueDate
     if (!expected) return []
