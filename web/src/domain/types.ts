@@ -14,6 +14,7 @@ import type {
   ProjectDocumentKind,
   ProjectDocumentStatus,
   ProjectTaskStatus,
+  LienWaiverType,
 } from './enums'
 
 export type UUID = string
@@ -251,6 +252,22 @@ export interface Phase {
   pctComplete: number
   sortOrder: number
   targetDate: ISODateString | null
+  notes: string
+  createdAt: ISODateString
+  deletedAt?: ISODateString | null
+}
+
+export interface LienWaiver {
+  id: UUID
+  owner: UUID
+  projectId: UUID
+  vendorName: string
+  expenseId: UUID | null
+  amount: number
+  waiverType: LienWaiverType
+  /** Work covered through this date. */
+  throughDate: ISODateString | null
+  received: boolean
   notes: string
   createdAt: ISODateString
   deletedAt?: ISODateString | null

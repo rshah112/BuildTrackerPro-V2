@@ -46,6 +46,21 @@ export type ProjectDocumentStatus = (typeof PROJECT_DOCUMENT_STATUSES)[number]
 export const PROJECT_TASK_STATUSES = ['todo', 'inProgress', 'blocked', 'done'] as const
 export type ProjectTaskStatus = (typeof PROJECT_TASK_STATUSES)[number]
 
+// The four standard construction lien-waiver types: conditional vs unconditional × progress vs final.
+export const LIEN_WAIVER_TYPES = [
+  'conditional_progress',
+  'unconditional_progress',
+  'conditional_final',
+  'unconditional_final',
+] as const
+export type LienWaiverType = (typeof LIEN_WAIVER_TYPES)[number]
+export const LIEN_WAIVER_TYPE_LABEL: Record<LienWaiverType, string> = {
+  conditional_progress: 'Conditional · Progress',
+  unconditional_progress: 'Unconditional · Progress',
+  conditional_final: 'Conditional · Final',
+  unconditional_final: 'Unconditional · Final',
+}
+
 // How an expense was funded — personal funds (cash/CC) vs the construction loan. '' = unset
 // (treated as personal). Only surfaced in the UI when the project has a construction loan.
 export const FUNDING_SOURCES = ['personal', 'loan'] as const

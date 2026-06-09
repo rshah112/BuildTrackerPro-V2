@@ -32,6 +32,7 @@ const PhasesScreen = lazy(() => import('../features/phases/PhasesScreen').then((
 const PortfolioScreen = lazy(() => import('../features/portfolio/PortfolioScreen').then((m) => ({ default: m.PortfolioScreen })))
 const NotificationSettingsScreen = lazy(() => import('../features/notifications/NotificationSettingsScreen').then((m) => ({ default: m.NotificationSettingsScreen })))
 const TaxReportScreen = lazy(() => import('../features/tax/TaxReportScreen').then((m) => ({ default: m.TaxReportScreen })))
+const LienWaiversScreen = lazy(() => import('../features/lienWaivers/LienWaiversScreen').then((m) => ({ default: m.LienWaiversScreen })))
 
 export function AppRouter() {
   return (
@@ -67,6 +68,7 @@ export function AppRouter() {
           <Route path="/phases" element={<RequireProject><PhasesScreen /></RequireProject>} />
           <Route path="/export" element={<RequireProject><ExportScreen /></RequireProject>} />
           <Route path="/tax-1099" element={<RequireProject><TaxReportScreen /></RequireProject>} />
+          <Route path="/lien-waivers" element={<RequireProject><LienWaiversScreen /></RequireProject>} />
           <Route path="/portfolio" element={<PortfolioScreen />} />
           <Route path="/notification-settings" element={<NotificationSettingsScreen />} />
           <Route path="/more" element={<MoreScreen />} />
