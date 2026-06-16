@@ -182,7 +182,7 @@ export function DocumentsScreen() {
                       </div>
                       <Badge tone={STATUS_TONE[doc.status]}>{STATUS_LABEL[doc.status]}</Badge>
                     </button>
-                    <button className="expense-row-del" onClick={() => editor.openEdit(doc)} aria-label="Edit document">
+                    <button className="expense-row-act" onClick={() => editor.openEdit(doc)} aria-label="Edit document">
                       <Pencil size={16} aria-hidden />
                     </button>
                     <button className="expense-row-del" onClick={() => del(doc)} aria-label="Delete document">

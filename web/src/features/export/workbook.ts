@@ -4,6 +4,7 @@ import { diff, sumBy } from '../../lib/money'
 import { actualSpend, committedSpend } from '../../lib/budgetAggregates'
 import { effectiveAmountPaid } from '../../lib/expenseMath'
 import { cashFlowPayments, localToday } from '../cashflow/cashFlow'
+import { landAcquisitionCost, allInProjectCost } from '../projects/projectCost'
 import { loadProjectExport, downloadBlob, safeFileName, type ProjectExport } from './exportData'
 
 const dateOnly = (v?: string | null) => (v ? v.slice(0, 10) : '')
@@ -35,6 +36,11 @@ function buildWorkbook(d: ProjectExport): XLSX.WorkBook {
     ['Actual to date', actualTotal],
     ['Committed', committedTotal],
     ['Variance (actual − budget)', diff(actualTotal, budgetTotal)],
+    [],
+    ['Lot / land purchase price', d.project.purchasePrice],
+    ['Closing costs', d.project.closingCosts],
+    ['Land & acquisition total', landAcquisitionCost(d.project)],
+    ['All-in project cost', allInProjectCost(d.project)],
     [],
     ['Categories', d.categories.length],
     ['Line items', d.lineItems.length],

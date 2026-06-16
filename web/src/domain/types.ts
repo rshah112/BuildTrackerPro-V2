@@ -29,6 +29,7 @@ export interface Project {
   priority: ProjectPriority
   templateType: ProjectTemplateType
   purchasePrice: number
+  closingCosts: number
   squareFootage: number | null
   lotDimensions: string
   proposedBuildDimensions: string

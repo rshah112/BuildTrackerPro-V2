@@ -13,6 +13,7 @@ import { useToast } from '../../components/ui/Toast'
 import { useCurrentProject } from './currentProject'
 import { useProjects, useUpdateProject } from './useProjects'
 import { ProjectForm } from './ProjectForm'
+import { landAcquisitionCost, constructionCost, allInProjectCost } from './projectCost'
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   if (value === '' || value === null || value === undefined) return null
@@ -80,9 +81,30 @@ export function ProjectInfoScreen() {
         <div className="stat-list">
           <Row label="Construction budget" value={fmt(project.constructionBudget)} />
           <Row label="Contingency" value={fmt(project.contingencyBudget)} />
-          <Row label="Purchase price" value={project.purchasePrice ? fmt(project.purchasePrice) : ''} />
         </div>
       </SectionCard>
+
+      <SectionCard title="Land & acquisition">
+        <div className="stat-list">
+          <Row label="Lot / land purchase price" value={project.purchasePrice ? fmt(project.purchasePrice) : ''} />
+          <Row label="Closing costs" value={project.closingCosts ? fmt(project.closingCosts) : ''} />
+          {landAcquisitionCost(project) > 0 && (
+            <div className="kv-row">
+              <span className="muted">Acquisition total</span>
+              <strong>{fmt(landAcquisitionCost(project))}</strong>
+            </div>
+          )}
+        </div>
+      </SectionCard>
+
+      {allInProjectCost(project) > 0 && (
+        <SectionCard title="All-in project cost" trailing={<strong>{fmt(allInProjectCost(project))}</strong>}>
+          <p className="panel-lead">
+            {fmt(constructionCost(project))} construction + contingency · {fmt(landAcquisitionCost(project))} land
+            &amp; acquisition.
+          </p>
+        </SectionCard>
+      )}
 
       <SectionCard title="Structure">
         <div className="stat-list">

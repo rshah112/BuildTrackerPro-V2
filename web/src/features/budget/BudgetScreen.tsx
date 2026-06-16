@@ -223,7 +223,6 @@ export function BudgetScreen() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        leadingIcon={<Plus size={14} />}
                         onClick={() => setEditing({ kind: 'newLineItem', categoryName: cat.name })}
                       >
                         + Line item

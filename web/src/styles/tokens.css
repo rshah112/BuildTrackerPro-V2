@@ -27,38 +27,41 @@
   --brand-500: #ea580c;
   --brand-600: #c2410c;
   --brand-700: #9a3412;
+  --brand-800: #7c2d12;
 
-  /* Neutral ramp */
+  /* Neutral ramp — warmed a touch ("ledger paper") so white cards lift off the
+     canvas and the orange brand sits in a friendlier room. */
   --neutral-0: #ffffff;
-  --neutral-50: #f7f7f8;
-  --neutral-100: #ececef;
-  --neutral-200: #e2e2e7;
-  --neutral-300: #cfcfd6;
-  --neutral-400: #a8a8b0;
-  --neutral-500: #8a8a92;
-  --neutral-600: #636369;
-  --neutral-700: #45454a;
-  --neutral-800: #2c2c2e;
-  --neutral-900: #1c1c1e;
-  --neutral-950: #0c0c0d;
+  --neutral-50: #f8f7f5;
+  --neutral-100: #efedea;
+  --neutral-200: #e5e3df;
+  --neutral-300: #d2cfca;
+  --neutral-400: #aaa7a1;
+  --neutral-500: #8c8983;
+  --neutral-600: #64615c;
+  --neutral-700: #46443f;
+  --neutral-800: #2d2b28;
+  --neutral-900: #1d1c1a;
+  --neutral-950: #0d0c0b;
 
   /* Semantic surfaces / text */
-  --color-bg: #f2f2f7;
+  --color-bg: #f4f3f0;
   --color-surface: var(--neutral-0);
   --color-surface-2: var(--neutral-50);
   --color-surface-raised: var(--neutral-0);
-  --color-text: #1c1c1e;
-  --color-text-muted: #6b6b72;
-  /* Darkened from neutral-400 (#a8a8b0, ~2.3:1 on white — failed WCAG AA) so form hints and
-     other faint text clear the 4.5:1 normal-text bar on both white and the #f2f2f7 app bg. */
-  --color-text-faint: #5e5e66;
-  --color-border: #e3e3e8;
+  --color-text: #1d1c1a;
+  --color-text-muted: #6c6963;
+  /* Kept dark enough that form hints and other faint text clear the 4.5:1
+     normal-text bar on both white and the warm app bg. */
+  --color-text-faint: #5f5d57;
+  --color-border: #e6e4e0;
   --color-border-strong: var(--neutral-300);
 
   --color-brand: var(--brand-500);
   --color-brand-hover: var(--brand-600);
   --color-brand-contrast: #ffffff;
   --color-brand-tint: var(--brand-50);
+  --color-brand-bg: var(--brand-50);
 
   --color-success: #1a7f37;
   --color-success-bg: #dcfce7;
@@ -69,10 +72,11 @@
   --color-info: #2563eb;
   --color-info-bg: #dbeafe;
 
-  /* Elevation */
-  --shadow-sm: 0 1px 2px rgba(20, 20, 24, 0.06), 0 1px 1px rgba(20, 20, 24, 0.04);
-  --shadow-md: 0 4px 14px rgba(20, 20, 24, 0.08);
-  --shadow-lg: 0 16px 40px rgba(20, 20, 24, 0.18);
+  /* Elevation — warm-tinted, layered: a tight contact shadow plus a soft ambient
+     falloff, so cards read as paper on a desk instead of grey smudges. */
+  --shadow-sm: 0 1px 2px rgba(45, 38, 28, 0.05), 0 2px 6px rgba(45, 38, 28, 0.04);
+  --shadow-md: 0 2px 4px rgba(45, 38, 28, 0.05), 0 8px 24px rgba(45, 38, 28, 0.07);
+  --shadow-lg: 0 4px 10px rgba(45, 38, 28, 0.08), 0 20px 48px rgba(45, 38, 28, 0.18);
 
   /* Blueprint motif — a faint structural grid for hero / login atmosphere. Drawn
      from the border token so it adapts to theme; opacity kept low so it reads as
@@ -113,6 +117,9 @@
   --text-xl: 1.375rem;
   --text-2xl: 1.75rem;
   --text-3xl: 2.125rem;
+  /* Screen titles: scale with viewport so long names ("New Home Construction")
+     never shove header actions off a 375px screen. */
+  --text-display: clamp(1.55rem, 6.2vw, 2.125rem);
   --font-weight-medium: 550;
   --font-weight-semibold: 650;
   --font-weight-bold: 760;
@@ -145,22 +152,24 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
   /* Surface ladder: a hair off pure-black so cards read as lifted planes rather
-     than floating on a void, while staying OLED-friendly. */
-  --color-bg: #08080a;
-  --color-surface: #18181b;
-  --color-surface-2: #242427;
-  --color-surface-raised: #2a2a2e;
+     than floating on a void, while staying OLED-friendly. Borders carry the
+     elevation story at night (shadows barely register on near-black). */
+  --color-bg: #0a0a0c;
+  --color-surface: #1b1b1f;
+  --color-surface-2: #26262b;
+  --color-surface-raised: #2d2d33;
   --color-text: #f5f5f7;
-  --color-text-muted: #9a9aa2;
-  /* Lightened from #6b6b72 (~3.2:1 on the dark surface — failed AA) to clear 4.5:1. */
-  --color-text-faint: #8d8d95;
-  --color-border: #38383a;
-  --color-border-strong: #48484a;
+  --color-text-muted: #a0a0a8;
+  /* Light enough to clear 4.5:1 on the dark surface. */
+  --color-text-faint: #8f8f97;
+  --color-border: #303036;
+  --color-border-strong: #46464d;
 
   --color-brand: #ff7a45;
   --color-brand-hover: #ff9466;
   --color-brand-contrast: #1c1c1e;
   --color-brand-tint: rgba(255, 122, 69, 0.16);
+  --color-brand-bg: rgba(255, 122, 69, 0.16);
 
   --color-success: #4ade80;
   --color-success-bg: rgba(74, 222, 128, 0.16);

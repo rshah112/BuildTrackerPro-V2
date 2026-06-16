@@ -87,12 +87,12 @@ export function VendorsScreen() {
                 </div>
               </button>
               {v.phone && (
-                <a className="expense-row-del" href={`tel:${v.phone}`} aria-label={`Call ${v.name}`}>
+                <a className="expense-row-act" href={`tel:${v.phone}`} aria-label={`Call ${v.name}`}>
                   <Phone size={17} aria-hidden />
                 </a>
               )}
               {v.email && (
-                <a className="expense-row-del" href={`mailto:${v.email}`} aria-label={`Email ${v.name}`}>
+                <a className="expense-row-act" href={`mailto:${v.email}`} aria-label={`Email ${v.name}`}>
                   <Mail size={17} aria-hidden />
                 </a>
               )}

@@ -18,6 +18,7 @@ const blank: Draft = {
   priority: 'normal',
   templateType: 'custom',
   purchasePrice: 0,
+  closingCosts: 0,
   squareFootage: null,
   constructionBudget: 0,
   contingencyBudget: 0,
@@ -132,7 +133,19 @@ export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: (c
           value={d.contingencyBudget ?? 0}
           onChange={money('contingencyBudget')}
         />
-        <CurrencyField label="Purchase price" value={d.purchasePrice ?? 0} onChange={money('purchasePrice')} />
+      </Form.Section>
+
+      <Form.Section title="Land & acquisition">
+        <CurrencyField
+          label="Lot / land purchase price"
+          value={d.purchasePrice ?? 0}
+          onChange={money('purchasePrice')}
+        />
+        <CurrencyField label="Closing costs" value={d.closingCosts ?? 0} onChange={money('closingCosts')} />
+        <p className="muted">
+          Tracked separately from the construction budget — added to your all-in project cost, not to
+          construction variance.
+        </p>
       </Form.Section>
 
       <Form.Section title="Structure">

@@ -1,6 +1,7 @@
 import type { Project } from '../../domain/types'
 import { fmt } from '../../lib/money'
 import { fmtDate } from '../../lib/date'
+import { landAcquisitionCost, allInProjectCost } from './projectCost'
 
 const esc = (s: unknown) =>
   String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
@@ -14,7 +15,10 @@ export function printProjectBrief(project: Project): void {
     ['Template', project.templateType],
     ['Construction budget', fmt(project.constructionBudget)],
     ['Contingency', fmt(project.contingencyBudget)],
-    ['Purchase price', project.purchasePrice ? fmt(project.purchasePrice) : '—'],
+    ['Lot / land purchase price', project.purchasePrice ? fmt(project.purchasePrice) : '—'],
+    ['Closing costs', project.closingCosts ? fmt(project.closingCosts) : '—'],
+    ['Land & acquisition total', landAcquisitionCost(project) ? fmt(landAcquisitionCost(project)) : '—'],
+    ['All-in project cost', allInProjectCost(project) ? fmt(allInProjectCost(project)) : '—'],
     ['Square footage', project.squareFootage ? `${project.squareFootage.toLocaleString()} sqft` : '—'],
     ['Stories', project.stories ? String(project.stories) : '—'],
     ['Footprint', project.footprint || '—'],

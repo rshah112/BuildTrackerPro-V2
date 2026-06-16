@@ -50,9 +50,13 @@
   background: var(--color-brand-hover);
 }
 .btn-secondary {
-  background: var(--color-surface-2);
+  background: var(--color-surface);
   color: var(--color-text);
-  border-color: var(--color-border);
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-sm);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-surface-2);
 }
 .btn-ghost {
   background: transparent;
@@ -276,7 +280,7 @@
   display: inline-flex;
   gap: 0.15rem;
   padding: 0.2rem;
-  background: var(--color-surface-2);
+  background: color-mix(in srgb, var(--color-text) 6%, var(--color-bg));
   border-radius: var(--radius-md);
   width: 100%;
 }
@@ -452,8 +456,8 @@
   display: inline-flex;
   padding: 0.9rem;
   border-radius: var(--radius-full);
-  background: var(--color-surface-2);
-  color: var(--color-text-muted);
+  background: var(--color-brand-tint);
+  color: var(--color-brand);
   margin-bottom: 0.25rem;
 }
 .empty-title {
@@ -543,10 +547,16 @@
   display: flex;
   align-items: center;
   gap: 1.25rem;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  /* A whisper of brand wash from the top-left corner gives the hero its own
+     atmosphere without becoming a poster. */
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-brand) 6%, var(--color-surface)) 0%,
+    var(--color-surface) 58%
+  );
+  border: 1px solid color-mix(in srgb, var(--color-brand) 14%, var(--color-border));
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
   padding: 1.25rem;
   margin: 1rem 0;
 }
@@ -560,7 +570,7 @@
   background-size: var(--blueprint-size) var(--blueprint-size);
   -webkit-mask-image: radial-gradient(125% 125% at 0% 0%, #000 0%, transparent 62%);
   mask-image: radial-gradient(125% 125% at 0% 0%, #000 0%, transparent 62%);
-  opacity: 0.7;
+  opacity: 0.8;
   pointer-events: none;
 }
 .hero-card > * {
@@ -587,6 +597,7 @@
   stroke: var(--color-danger);
 }
 .donut-label {
+  font-family: var(--font-display);
   font-size: 2rem;
   font-weight: var(--font-weight-bold);
   fill: var(--color-text);
@@ -690,9 +701,15 @@
 }
 .expense-row-main .muted {
   font-size: var(--text-sm);
+  /* Two lines before truncating — phone numbers and line-item names were getting
+     chopped to near-uselessness ("Cabin…") at 375px on a single line. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .expense-row-amount {
   display: grid;
@@ -743,18 +760,34 @@
   text-decoration: line-through;
   color: var(--color-text-muted);
 }
-.expense-row-del {
+/* Trailing row actions. Neutral at rest — a row of quiet glyphs, not a strip of
+   alarms. Delete only turns red when engaged; red is reserved for the destructive
+   moment, not the resting state. */
+.expense-row-del,
+.expense-row-act {
   display: flex;
   align-items: center;
   padding: 0 0.9rem;
   background: transparent;
   border: none;
   border-left: 1px solid var(--color-border);
-  color: var(--color-danger);
+  color: var(--color-text-faint);
   cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+.expense-row-act:hover {
+  color: var(--color-brand);
+}
+.expense-row-act:active {
+  background: var(--color-brand-tint);
+  color: var(--color-brand);
+}
+.expense-row-del:hover {
+  color: var(--color-danger);
 }
 .expense-row-del:active {
   background: var(--color-danger-bg);
+  color: var(--color-danger);
 }
 
 /* Stacked action buttons (e.g. empty-state with two choices). */
@@ -1002,7 +1035,30 @@
 .budget-cat-actions {
   display: flex;
   gap: 0.15rem;
-  padding: 0 0.6rem 0.5rem 2.2rem;
+  padding: 0.1rem 0.6rem 0.4rem 2.2rem;
+}
+/* Per-category actions repeat on every card — mute them so twenty cards don't
+   shout twenty Edit/Delete rows. Color returns on touch. */
+.budget-cat-actions .btn-ghost,
+.lineitem-acts .btn-ghost {
+  color: var(--color-text-muted);
+}
+.budget-cat-actions .btn-ghost:hover:not(:disabled),
+.lineitem-acts .btn-ghost:hover:not(:disabled) {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.budget-cat-actions .btn-danger,
+.lineitem-acts .btn-danger {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+.budget-cat-actions .btn-danger:hover:not(:disabled),
+.budget-cat-actions .btn-danger:active,
+.lineitem-acts .btn-danger:hover:not(:disabled),
+.lineitem-acts .btn-danger:active {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
 }
 .progress.thin {
   height: 0.4rem;
@@ -1267,7 +1323,8 @@
   width: 100%;
   padding: 0.55rem 2rem 0.55rem 2.25rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  /* Pill silhouette — instantly reads as "search", distinct from form inputs. */
+  border-radius: var(--radius-full);
   background: var(--color-surface);
   font: inherit;
   margin: 0;
@@ -1354,7 +1411,15 @@
 .list-row:active {
   background: var(--color-surface-2);
 }
+/* iOS-Settings-style tinted squircle so the long More list scans by shape+color. */
 .list-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 0.55rem;
+  background: var(--color-brand-tint);
   color: var(--color-brand);
   flex-shrink: 0;
 }
@@ -1434,7 +1499,9 @@
   .btn-spinner,
   .page-transition,
   .budget-cat-caret,
-  .donut-arc {
+  .donut-arc,
+  .progress span,
+  .tab::before {
     animation: none;
     transition: none;
   }

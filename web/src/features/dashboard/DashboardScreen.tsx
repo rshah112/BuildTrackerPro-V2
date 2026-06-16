@@ -26,6 +26,7 @@ import { fmtDate } from '../../lib/date'
 import { useLineItems } from '../budget/useBudget'
 import { useCurrentProject } from '../projects/currentProject'
 import { useProjects } from '../projects/useProjects'
+import { landAcquisitionCost, allInProjectCost } from '../projects/projectCost'
 import { useExpenses } from '../expenses/useExpenses'
 import { usePhotos } from '../photos/usePhotos'
 import { PhotoThumb } from '../photos/PhotoThumb'
@@ -67,6 +68,10 @@ export function DashboardScreen() {
     const budgetLimit = project
       ? project.constructionBudget + project.contingencyBudget
       : sumBy(lineItems, (i) => i.budget)
+    // Land acquisition (lot + closing) is tracked separately from the build budget; combine them
+    // only for the all-in headline so construction variance stays clean. See projectCost.ts.
+    const landAcq = project ? landAcquisitionCost(project) : 0
+    const allInCost = project ? allInProjectCost(project) : budgetLimit
     const baseBudget = project?.constructionBudget ?? sumBy(lineItems, (i) => i.budget)
     const actual = actualSpend(lineItems, expenses, allowanceSelections, changeOrders)
     const committed = committedSpend(lineItems, changeOrders)
@@ -143,6 +148,8 @@ export function DashboardScreen() {
     return {
       project,
       budgetLimit,
+      landAcq,
+      allInCost,
       baseBudget,
       actual,
       committed,
@@ -207,6 +214,8 @@ export function DashboardScreen() {
   const {
     project,
     budgetLimit,
+    landAcq,
+    allInCost,
     baseBudget,
     actual,
     committed,
@@ -287,6 +296,12 @@ export function DashboardScreen() {
             <span className="muted">Budget</span>
             <strong>{fmt(budgetLimit)}</strong>
           </div>
+          {landAcq > 0 && (
+            <div className="hero-figure">
+              <span className="muted">All-in (incl. land)</span>
+              <strong>{fmt(allInCost)}</strong>
+            </div>
+          )}
         </div>
       </div>
 
