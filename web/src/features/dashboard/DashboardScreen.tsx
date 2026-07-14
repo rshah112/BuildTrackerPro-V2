@@ -3,31 +3,26 @@ import { Link } from 'react-router-dom'
 import { SlidersHorizontal } from 'lucide-react'
 import { useRows } from '../../data/hooks'
 import type { AllowanceSelection, ChangeOrder, Expense, Project } from '../../domain/types'
-import {
-  actualSpend,
-  allowanceOverage,
-  cashPaidTotal,
-  committedSpend,
-  pendingExposure,
-} from '../../lib/budgetAggregates'
+import { allowanceOverage } from '../../lib/budgetAggregates'
 import { lineItemHealth } from '../../lib/budgetMath'
-import { fmt, sumBy } from '../../lib/money'
+import { diff, fmt, sum, sumBy } from '../../lib/money'
+import { categoryFinancialSummary, projectFinancialSummary } from '../../lib/financialSummary'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
 import { Skeleton } from '../../components/ui/Feedback'
-import { Stat, TrendDelta } from '../../components/ui/Stat'
+import { TrendDelta } from '../../components/ui/Stat'
+import { SummaryStrip } from '../../components/ui/SummaryStrip'
 import { SectionCard } from '../../components/ui/SectionCard'
 import { Donut } from '../../components/charts/Donut'
 import { BarRow } from '../../components/charts/BarRow'
 import { Sparkline } from '../../components/charts/Sparkline'
 import { fmtDate } from '../../lib/date'
-import { balanceDue, retainageHeld } from '../../lib/expenseMath'
+import { balanceDue, payableBalance, retainageHeld } from '../../lib/expenseMath'
 import { useLineItems } from '../budget/useBudget'
 import { useCurrentProject } from '../projects/currentProject'
 import { useProjects } from '../projects/useProjects'
-import { landAcquisitionCost, allInProjectCost } from '../projects/projectCost'
 import { useExpenses } from '../expenses/useExpenses'
 import { usePhotos } from '../photos/usePhotos'
 import { PhotoThumb } from '../photos/PhotoThumb'
@@ -66,29 +61,37 @@ export function DashboardScreen() {
   // (react-query returns stable array refs between refetches, so this is effective).
   const view = useMemo(() => {
     const project = projects.find((p) => p.id === projectId) as Project | undefined
-    const budgetLimit = project
-      ? project.constructionBudget + project.contingencyBudget
-      : sumBy(lineItems, (i) => i.budget)
-    // Land acquisition (lot + closing) is tracked separately from the build budget; combine them
-    // only for the all-in headline so construction variance stays clean. See projectCost.ts.
-    const landAcq = project ? landAcquisitionCost(project) : 0
-    const allInCost = project ? allInProjectCost(project) : budgetLimit
-    const baseBudget = project?.constructionBudget ?? sumBy(lineItems, (i) => i.budget)
-    const actual = actualSpend(lineItems, expenses, allowanceSelections, changeOrders)
-    const committed = committedSpend(lineItems, changeOrders, expenses)
-    const paid = cashPaidTotal(expenses, changeOrders)
-    const pending = pendingExposure(changeOrders, expenses)
+    const financial = projectFinancialSummary({
+      project: project ?? {
+        constructionBudget: sumBy(lineItems, (item) => item.budget),
+        contingencyBudget: 0,
+      },
+      lineItems,
+      expenses,
+      changeOrders,
+      allowanceSelections,
+    })
+    const budgetLimit = financial.constructionLimit
+    // Land is reported only in the explicitly labelled all-in figure; construction
+    // performance continues to compare against the build budget and contingency.
+    const landAcq = financial.landAcquisition
+    const allInCost = financial.allInBudget
+    const baseBudget = financial.baseBudget
+    const actual = financial.actual
+    const committed = financial.committed
+    const paid = financial.cashPaid
+    const pending = financial.pending
     const allowanceRisk = allowanceOverage(lineItems, allowanceSelections, expenses)
-    const projected = actual + committed + pending
-    const remaining = budgetLimit - projected
-    const usedPct = budgetLimit > 0 ? Math.round((projected / budgetLimit) * 100) : 0
+    const projected = financial.projected
+    const remaining = financial.remaining
+    const usedPct = financial.usedPct
     const tone = healthTone(projected, budgetLimit)
 
     const overBudgetItems = lineItems.filter((li) => lineItemHealth(li) === 'overBudget')
     const nearLimitItems = lineItems.filter((li) => lineItemHealth(li) === 'nearLimit')
     const openExpenses = expenses.filter((e) => balanceDue(e) > 0)
     const pendingOrders = changeOrders.filter((c) => c.status === 'pending')
-    const due14 = nextFourteenDaysDue(expenses, changeOrders, localToday())
+    const due14 = nextFourteenDaysDue(expenses, changeOrders, localToday(), { includeOverdue: false })
     const recentExpenses = [...expenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
 
     // Spend logged in the trailing 7 days — a momentum read on the Actual spend KPI.
@@ -101,50 +104,52 @@ export function DashboardScreen() {
       (e) => e.amount,
     )
 
-    // --- Estimated Final Cost (EAC): spent + committed + still-to-spend BASE budget + pending COs ---
-    // Estimate-to-complete is the unspent BASE-budget scope; contingency is a separate reserve
-    // shown in the burn-down below, not "still to spend". Anchoring BOTH the estimate and the
-    // comparison to baseBudget means an on-plan project reads ~$0 (instead of the old bug, which
-    // measured "still to spend" against the base but compared against base+contingency and so
-    // reported a healthy project as ~the whole contingency "under budget"). Change-order/overrun
-    // exposure is what now shows as "over" — which the contingency reserve below is there to absorb.
-    const uncommittedRemaining = Math.max(0, baseBudget - actual - committed)
-    const estimatedFinalCost = actual + committed + uncommittedRemaining + pending
-    const eacVsBudget = estimatedFinalCost - baseBudget // + = projected over base, − = under
-
-    // --- Contingency burn-down: how much of the contingency the overage has eaten ---
-    const contingency = project?.contingencyBudget ?? 0
-    const overBase = Math.max(0, actual + committed - baseBudget) // spend past the base budget
-    const contingencyUsed = Math.min(contingency, overBase)
-    const contingencyRemaining = Math.max(0, contingency - overBase)
-    const contingencyPct = contingency > 0 ? Math.round((contingencyUsed / contingency) * 100) : 0
+    const estimatedFinalCost = financial.estimatedFinalCost
+    const eacVsBudget = financial.estimatedVariance
+    const contingency = financial.contingencyBudget
+    const contingencyUsed = financial.contingencyUsed
+    const contingencyRemaining = financial.contingencyRemaining
+    const contingencyPct = financial.contingencyUsedPct
 
     // --- Cost per square foot ---
     const sqft = project?.squareFootage ?? 0
     const actualPsf = sqft > 0 ? actual / sqft : 0
     const eacPsf = sqft > 0 ? estimatedFinalCost / sqft : 0
 
-    // Spend by category (top 5 by actual).
-    const byCategory = new Map<string, { actual: number; budget: number }>()
-    for (const li of lineItems) {
-      const c = byCategory.get(li.categoryName) ?? { actual: 0, budget: 0 }
-      c.actual += li.actual
-      c.budget += li.budget
-      byCategory.set(li.categoryName, c)
-    }
-    const categoryBars = [...byCategory.entries()]
-      .filter(([name]) => name)
-      .map(([name, v]) => ({ name, ...v }))
-      .sort((a, b) => b.actual - a.actual)
+    // Category view uses the same allowance-aware exposure definition as Budget.
+    const categoryBars = [...new Set(lineItems.map((item) => item.categoryName))]
+      .filter(Boolean)
+      .map((name) => ({ name, ...categoryFinancialSummary(name, lineItems) }))
+      .sort((a, b) => b.exposure - a.exposure)
       .slice(0, 5)
 
     // Cumulative spend over time.
     const cumulative: number[] = []
     let running = 0
     for (const e of [...expenses].sort((a, b) => a.date.localeCompare(b.date))) {
-      running += e.amount
+      running = sum([running, e.amount])
       cumulative.push(running)
     }
+
+    const todayForOverdue = localToday()
+    const invoicedOrderIds = new Set(
+      expenses.flatMap((expense) => (expense.changeOrderId ? [expense.changeOrderId] : [])),
+    )
+    const overdueExpenses = expenses.filter((expense) => {
+      const date = expense.expectedPaymentDate ?? expense.dueDate
+      return payableBalance(expense) > 0 && date != null && date.slice(0, 10) < todayForOverdue
+    })
+    const overdueOrders = changeOrders.filter(
+      (order) =>
+        order.status !== 'paid' &&
+        !invoicedOrderIds.has(order.id) &&
+        order.expectedPaymentDate != null &&
+        order.expectedPaymentDate.slice(0, 10) < todayForOverdue,
+    )
+    const overdueTotal = sum([
+      sumBy(overdueExpenses, payableBalance),
+      sumBy(overdueOrders, (order) => order.amount),
+    ])
 
     return {
       project,
@@ -166,6 +171,8 @@ export function DashboardScreen() {
       openExpenses,
       pendingOrders,
       due14,
+      overdueTotal,
+      overdueCount: overdueExpenses.length + overdueOrders.length,
       recentExpenses,
       spendThisWeek,
       estimatedFinalCost,
@@ -232,6 +239,8 @@ export function DashboardScreen() {
     openExpenses,
     pendingOrders,
     due14,
+    overdueTotal,
+    overdueCount,
     recentExpenses,
     spendThisWeek,
     estimatedFinalCost,
@@ -248,7 +257,7 @@ export function DashboardScreen() {
     running,
   } = view
 
-  const upcoming = cashFlowPayments(expenses, changeOrders, localToday()).slice(0, 5)
+  const upcoming = cashFlowPayments(expenses, changeOrders, localToday(), { includeOverdue: false }).slice(0, 5)
   const recentPhotos = [...photos]
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
     .slice(0, 6)
@@ -258,8 +267,8 @@ export function DashboardScreen() {
   return (
     <section className="dashboard">
       <ScreenHeader
-        title={project?.name || 'Dashboard'}
-        subtitle={project?.address || undefined}
+        title="Overview"
+        subtitle={project ? [project.name, project.address].filter(Boolean).join(' · ') : undefined}
         trailing={
           <span className="dash-header-actions">
             <Badge tone="neutral">{project?.status ?? 'active'}</Badge>
@@ -277,16 +286,21 @@ export function DashboardScreen() {
       />
 
       <div className="hero-card">
+        <div className="hero-card-copy">
+          <span className="hero-eyebrow">Financial position</span>
+          <h2>Risk-adjusted project exposure</h2>
+          <p>Incurred cost, open commitments, and pending change orders against the authorized build budget.</p>
+        </div>
         <Donut
           value={projected}
           max={budgetLimit}
           tone={tone}
           label={`${usedPct}%`}
-          sublabel="of budget"
+          sublabel="of authorized"
         />
         <div className="hero-figures">
           <div className="hero-figure">
-            <span className="muted">Projected</span>
+            <span className="muted">Projected exposure</span>
             <strong className={tone === 'danger' ? 'danger-text' : undefined}>{fmt(projected)}</strong>
           </div>
           <div className="hero-figure">
@@ -307,30 +321,26 @@ export function DashboardScreen() {
       </div>
 
       {prefs.metrics && (
-      <div className="metric-grid">
-        <Stat label="Budget" value={fmt(baseBudget)} sub={`${fmt(project?.contingencyBudget ?? 0)} contingency`} />
-        <Stat
-          label="Actual spend"
-          value={fmt(actual)}
-          sub={`${fmt(paid)} cash paid`}
-          delta={
-            spendThisWeek > 0 ? (
-              <TrendDelta value={spendThisWeek} label="this week" format={fmt} />
-            ) : undefined
-          }
+        <SummaryStrip
+          label="Project financial summary"
+          metrics={[
+            { label: 'Base budget', value: fmt(baseBudget), detail: `${fmt(contingency)} contingency reserve` },
+            {
+              label: 'Incurred cost',
+              value: fmt(actual),
+              detail: spendThisWeek > 0 ? <TrendDelta value={spendThisWeek} label="in the last 7 days" format={fmt} /> : 'No spend in the last 7 days',
+            },
+            { label: 'Cash paid', value: fmt(paid), detail: `${fmt(Math.max(0, diff(actual, paid)))} incurred, not yet paid`, tone: 'success' },
+            { label: 'Open commitments', value: fmt(committed), detail: `${fmt(pending)} pending CO exposure` },
+            { label: 'Remaining', value: fmt(remaining), detail: `${usedPct}% of authorized budget used`, tone: remaining < 0 ? 'danger' : usedPct >= 90 ? 'warn' : 'success' },
+          ]}
         />
-        <Stat label="Committed" value={fmt(committed)} sub={`${fmt(pending)} pending COs`} />
-        <Stat
-          label="Remaining"
-          value={fmt(remaining)}
-          sub={`${usedPct}% used`}
-          tone={remaining < 0 ? 'danger' : 'default'}
-        />
-      </div>
       )}
 
+      <div className="dashboard-grid">
       {prefs.eac && (
       <SectionCard
+        className="dash-span-4"
         title="Estimated final cost"
         trailing={
           <strong className={eacVsBudget > 0 ? 'danger-text' : undefined}>{fmt(estimatedFinalCost)}</strong>
@@ -366,6 +376,7 @@ export function DashboardScreen() {
 
       {prefs.phases && phases.length > 0 && (
         <SectionCard
+          className="dash-span-8"
           title="Phase Pulse"
           trailing={<strong>{phaseStats.overall}%</strong>}
           footnote={
@@ -395,16 +406,16 @@ export function DashboardScreen() {
       )}
 
       {prefs.category && categoryBars.length > 0 && (
-        <SectionCard title="Spend by category">
+        <SectionCard className="dash-span-8" title="Budget exposure by category" trailing={<Link to="/budget" className="card-link inline-link">View budget ›</Link>}>
           <div className="barrow-list">
             {categoryBars.map((c) => (
               <BarRow
                 key={c.name}
                 label={c.name}
-                value={c.actual}
-                max={c.budget || c.actual}
-                valueText={`${fmt(c.actual)} / ${fmt(c.budget)}`}
-                tone={c.actual > c.budget && c.budget > 0 ? 'danger' : 'brand'}
+                value={c.exposure}
+                max={c.effectiveBudget || c.exposure}
+                valueText={`${fmt(c.exposure)} / ${fmt(c.effectiveBudget)}`}
+                tone={c.status === 'overBudget' ? 'danger' : c.status === 'nearLimit' ? 'warn' : 'brand'}
               />
             ))}
           </div>
@@ -412,13 +423,17 @@ export function DashboardScreen() {
       )}
 
       {prefs.trend && cumulative.length >= 2 && (
-        <SectionCard title="Spend over time" trailing={<strong>{fmt(running)}</strong>}>
-          <Sparkline values={cumulative} />
+        <SectionCard className="dash-span-4" title="Invoiced spend over time" trailing={<strong>{fmt(running)}</strong>}>
+          <Sparkline
+            values={cumulative}
+            ariaLabel={`Cumulative invoiced spend increased from ${fmt(cumulative[0])} to ${fmt(cumulative[cumulative.length - 1])}`}
+          />
+          <p className="panel-foot">Cumulative invoice amounts, ordered by transaction date.</p>
         </SectionCard>
       )}
 
       {prefs.upcoming && upcoming.length > 0 && (
-        <SectionCard title="Upcoming payments" trailing={<strong>{fmt(due14)}</strong>}>
+        <SectionCard className="dash-span-5" title="Upcoming payments" trailing={<Link to="/cashflow" className="card-link inline-link">{fmt(due14)} ›</Link>}>
           <ul className="plain-list">
             {upcoming.map((p) => (
               <li key={p.id} className="kv-row">
@@ -433,7 +448,7 @@ export function DashboardScreen() {
       )}
 
       {prefs.recentPhotos && recentPhotos.length > 0 && (
-        <SectionCard title="Recent photos">
+        <SectionCard className="dash-span-6" title="Recent photos" trailing={<Link to="/photos" className="card-link inline-link">View all ›</Link>}>
           <div className="photo-grid">
             {recentPhotos.map((ph) => (
               <div key={ph.id} className="photo-cell">
@@ -444,44 +459,37 @@ export function DashboardScreen() {
         </SectionCard>
       )}
 
-      <div className="two-column">
         {prefs.attention && (
-        <SectionCard title="Attention">
-          <ul className="stat-list">
-            <li>
-              <strong>{overBudgetItems.length}</strong> over budget line items
-            </li>
-            <li>
-              <strong>{nearLimitItems.length}</strong> line items near limit
-            </li>
-            <li>
-              <strong>{openExpenses.length}</strong> open expenses
-            </li>
-            <li>
-              <strong>{pendingOrders.length}</strong> pending change orders
-            </li>
-            <li>
-              <strong>{fmt(due14)}</strong> due in the next 14 days
-            </li>
-            <li>
-              <strong>{fmt(allowanceRisk)}</strong> allowance overage
-            </li>
-            <li>
-              <strong>{fmt(sumBy(expenses, retainageHeld))}</strong> retainage held
-            </li>
+        <SectionCard className="dash-span-7" title="Attention" trailing={<Badge tone={overdueCount > 0 || overBudgetItems.length > 0 ? 'danger' : 'neutral'}>{overdueCount + overBudgetItems.length + pendingOrders.length} priority</Badge>}>
+          <ul className="attention-list">
+            {overdueCount > 0 && (
+              <li><Link to="/cashflow"><span><Badge tone="danger">Overdue</Badge><strong>{overdueCount} payment{overdueCount === 1 ? '' : 's'} need attention</strong><small>{fmt(overdueTotal)} payable past due</small></span><span aria-hidden>›</span></Link></li>
+            )}
+            {overBudgetItems.length > 0 && (
+              <li><Link to="/budget"><span><Badge tone="danger">Over budget</Badge><strong>{overBudgetItems.length} line item{overBudgetItems.length === 1 ? '' : 's'} exceed budget</strong><small>Review exposure and remaining scope</small></span><span aria-hidden>›</span></Link></li>
+            )}
+            {nearLimitItems.length > 0 && (
+              <li><Link to="/budget"><span><Badge tone="warn">Near limit</Badge><strong>{nearLimitItems.length} line item{nearLimitItems.length === 1 ? '' : 's'} at 90% or more</strong><small>Commitments are included in this risk check</small></span><span aria-hidden>›</span></Link></li>
+            )}
+            {pendingOrders.length > 0 && (
+              <li><Link to="/change-orders"><span><Badge tone="warn">Pending</Badge><strong>{pendingOrders.length} change order{pendingOrders.length === 1 ? '' : 's'} awaiting decision</strong><small>{fmt(pending)} potential budget exposure</small></span><span aria-hidden>›</span></Link></li>
+            )}
+            {allowanceRisk > 0 && (
+              <li><Link to="/allowances"><span><Badge tone="warn">Allowances</Badge><strong>{fmt(allowanceRisk)} total overage</strong><small>Compare selections with allowance limits</small></span><span aria-hidden>›</span></Link></li>
+            )}
+            {overdueCount === 0 && overBudgetItems.length === 0 && nearLimitItems.length === 0 && pendingOrders.length === 0 && allowanceRisk === 0 && (
+              <li className="attention-clear"><span><Badge tone="success">On track</Badge><strong>No immediate financial risks</strong><small>{openExpenses.length} open expense{openExpenses.length === 1 ? '' : 's'} · {fmt(due14)} due in 14 days · {fmt(sumBy(expenses, retainageHeld))} retainage held</small></span></li>
+            )}
           </ul>
         </SectionCard>
         )}
 
         {prefs.recentExpenses && (
-        <SectionCard title="Recent expenses">
+        <SectionCard className="dash-span-6" title="Recent expenses" trailing={<Link to="/expenses" className="card-link inline-link">View all ›</Link>}>
           {recentExpenses.length === 0 && <p className="panel-lead">No expenses yet.</p>}
-          <ul className="plain-list">
+          <ul className="plain-list dashboard-expense-list">
             {recentExpenses.map((e: Expense) => (
-              <li key={e.id} className="kv-row">
-                <span>{e.vendorName || e.categoryName || 'Expense'}</span>
-                <strong className="tnum">{fmt(e.amount)}</strong>
-              </li>
+              <li key={e.id}><Link to="/expenses" className="kv-row"><span><strong>{e.vendorName || e.categoryName || 'Expense'}</strong><small>{fmtDate(e.date)} · {e.categoryName || 'Uncategorized'}</small></span><strong className="tnum">{fmt(e.amount)}</strong></Link></li>
             ))}
           </ul>
         </SectionCard>

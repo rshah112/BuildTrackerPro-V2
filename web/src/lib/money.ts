@@ -47,3 +47,12 @@ export function roundedToCents(v: number): number {
 
 const FMT = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 export const fmt = (v: number) => FMT.format(v)
+
+/** Exact transaction/detail formatting; headline KPIs intentionally continue to use `fmt`. */
+const FMT_EXACT = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+export const fmtExact = (v: number) => FMT_EXACT.format(roundedToCents(v))

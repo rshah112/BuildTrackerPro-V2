@@ -36,7 +36,7 @@ self.addEventListener('push', (event) => {
   } catch (e) {
     data = { body: event.data ? event.data.text() : '' }
   }
-  const title = data.title || 'BuildTracker Pro'
+  const title = data.title || 'HomeBuild Pro'
   event.waitUntil(
     self.registration.showNotification(title, {
       body: data.body || '',

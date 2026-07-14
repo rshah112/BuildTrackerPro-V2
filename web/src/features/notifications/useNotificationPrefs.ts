@@ -1,7 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useRows } from '../../data/hooks'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import type { NotificationPrefs } from '../../domain/types'
+import { toCamel } from '../../lib/casing'
 
 const TABLE = 'notification_prefs'
 
@@ -15,9 +15,18 @@ export const DEFAULT_PREFS: Omit<NotificationPrefs, 'owner' | 'updatedAt'> = {
 }
 
 /** The current owner's reminder prefs (0 or 1 row). RLS scopes it to the owner.
- *  `trashed: 'all'` because this table has no `deleted_at` column — the default soft-delete
- *  filter (`deleted_at IS NULL`) would error against a column that doesn't exist. */
-export const useNotificationPrefs = () => useRows<NotificationPrefs>(TABLE, undefined, { trashed: 'all' })
+ *  This table deliberately uses `owner` as its primary key and has neither `id` nor
+ *  `deleted_at`, so it must not go through the generic entity-list helper (which orders
+ *  by `id` and applies soft-delete conventions). */
+export const useNotificationPrefs = () =>
+  useQuery({
+    queryKey: [TABLE, 'current-owner'],
+    queryFn: async (): Promise<NotificationPrefs[]> => {
+      const { data, error } = await supabase.from(TABLE).select('*').maybeSingle()
+      if (error) throw error
+      return data ? [toCamel<NotificationPrefs>(data)] : []
+    },
+  })
 
 /** Upsert the owner's prefs. `owner` defaults to auth.uid() in the schema, so the conflict
  *  target resolves to the single owner row. */

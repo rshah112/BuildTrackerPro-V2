@@ -132,7 +132,8 @@
 .field input:focus-visible,
 .field textarea:focus-visible,
 .select:focus-visible {
-  outline: none;
+  outline: 2px solid var(--color-brand);
+  outline-offset: 1px;
   border-color: var(--color-brand);
   box-shadow: 0 0 0 3px var(--color-brand-tint);
 }
@@ -449,6 +450,23 @@
   font-weight: var(--font-weight-bold);
   cursor: pointer;
   white-space: nowrap;
+}
+.toast-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: -0.35rem -0.55rem -0.35rem 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.8;
+  cursor: pointer;
+}
+.toast-dismiss:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.14);
 }
 
 /* ---- Empty state ---- */
@@ -1288,6 +1306,16 @@
      with a hint makes the row taller and stretches the OTHER column's field — whose auto
      grid rows then stretch the (empty) input into a tall box that overlaps neighbors. */
   align-items: start;
+}
+
+@media (max-width: 620px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bid-line-row {
+    grid-template-columns: 1fr;
+  }
 }
 .upload-choices {
   display: flex;

@@ -128,6 +128,9 @@ textarea {
 
 /* App shell */
 .app-shell {
+  --shell-sidebar-width: 0px;
+  --tab-bar-height: 64px;
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
@@ -135,7 +138,7 @@ textarea {
 .app-main {
   flex: 1;
   width: 100%;
-  max-width: 1080px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 1.25rem;
   padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
@@ -173,7 +176,7 @@ textarea {
   /* Muted (not faint) so the small labels keep >=4.5:1 over the translucent bar. */
   color: var(--color-text-muted);
   text-decoration: none;
-  font-size: 0.66rem;
+  font-size: 0.72rem;
   font-weight: var(--font-weight-semibold);
   -webkit-tap-highlight-color: transparent;
   transition: color var(--dur-fast) var(--ease-out);
@@ -192,6 +195,136 @@ textarea {
 }
 .tab.active .tab-icon {
   transform: translateY(-1px) scale(1.04);
+}
+
+/* Tablet / desktop navigation. It shares the same route map as the mobile bar;
+   CSS turns it into a compact rail or a full grouped sidebar by viewport. */
+.app-sidebar {
+  display: none;
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: var(--z-tabbar);
+  width: var(--shell-sidebar-width);
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding-left: env(safe-area-inset-left);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  box-shadow: 8px 0 30px color-mix(in srgb, var(--neutral-950) 4%, transparent);
+  transition: width var(--dur) var(--ease-out);
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: calc(64px + env(safe-area-inset-top));
+  padding: calc(0.75rem + env(safe-area-inset-top)) 1rem 0.75rem;
+  color: var(--color-text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--color-border);
+}
+.sidebar-brand-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.01em;
+}
+.sidebar-nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3);
+  scrollbar-width: thin;
+}
+.sidebar-nav-rail {
+  display: none;
+}
+.sidebar-group + .sidebar-group {
+  margin-top: var(--space-5);
+}
+.sidebar-group-label {
+  margin: 0 0 var(--space-2);
+  padding: 0 0.65rem;
+  color: var(--color-text-faint);
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.07em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+.sidebar-group-items {
+  display: grid;
+  gap: 0.18rem;
+}
+.sidebar-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 44px;
+  min-width: 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  text-decoration: none;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.sidebar-link:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.sidebar-link.is-active {
+  background: var(--color-brand-tint);
+  color: var(--color-brand);
+  font-weight: var(--font-weight-semibold);
+}
+.sidebar-link.is-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 3px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+.sidebar-link-icon {
+  flex: 0 0 auto;
+}
+.sidebar-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-collapse {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 48px;
+  margin: 0 var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom));
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  text-align: left;
+  cursor: pointer;
+}
+.sidebar-collapse:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
 }
 
 /* Login */
@@ -324,9 +457,6 @@ textarea {
   top: 0;
   z-index: var(--z-header);
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.65rem;
   padding: calc(0.7rem + env(safe-area-inset-top)) max(1rem, calc((100vw - 1080px) / 2 + 1rem)) 0.7rem;
   background: var(--color-surface);
   background: color-mix(in srgb, var(--color-surface) 86%, transparent);
@@ -339,6 +469,10 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.app-header-brand {
+  order: 1;
 }
 .brand-lockup {
   display: inline-flex;
@@ -354,9 +488,9 @@ textarea {
   width: 2rem;
   height: 2rem;
   border-radius: 10px;
-  background: linear-gradient(145deg, var(--brand-400), var(--color-brand));
+  background: linear-gradient(145deg, var(--color-construction-bright), var(--color-construction));
   color: #fff;
-  box-shadow: 0 5px 14px color-mix(in srgb, var(--color-brand) 24%, transparent);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--color-construction) 24%, transparent);
   font: var(--font-weight-bold) 0.68rem/1 var(--font-display);
   letter-spacing: -0.02em;
 }
@@ -367,16 +501,20 @@ textarea {
   color: var(--color-text);
 }
 .app-header-actions {
+  order: 2;
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
   margin-left: auto;
 }
 .project-context {
+  order: 3;
+  flex: 1 1 100%;
   display: flex;
   align-items: center;
   align-self: flex-start;
-  min-width: min(100%, 18rem);
+  min-width: 0;
+  width: 100%;
   max-width: 100%;
   gap: 0.55rem;
   padding: 0.42rem 0.55rem;
@@ -697,41 +835,110 @@ textarea {
   }
 }
 
-/* Adaptive navigation rail on roomy screens keeps primary destinations visible
-   without stretching a phone-style tab bar across the desktop. */
-@media (min-width: 960px) {
+/* A compact rail replaces the mobile bar on tablets and small laptops. */
+@media (min-width: 768px) {
   .app-shell {
-    padding-left: 92px;
+    --shell-sidebar-width: 76px;
+    padding-left: var(--shell-sidebar-width);
+    transition: padding-left var(--dur) var(--ease-out);
+  }
+  .app-sidebar {
+    display: flex;
   }
   .tab-bar {
-    inset: 0 auto 0 0;
-    width: 92px;
-    max-width: none;
-    transform: none;
-    flex-direction: column;
-    justify-content: center;
-    gap: 0.35rem;
-    border-width: 0 1px 0 0;
-    border-radius: 0;
-    padding: 1rem 0.55rem;
-    box-shadow: var(--shadow-md);
+    display: none;
   }
-  .tab {
-    flex: 0 0 auto;
-    min-height: 70px;
-    padding: 0.7rem 0.25rem;
-    font-size: var(--text-xs);
+  .app-header {
+    padding: calc(0.7rem + env(safe-area-inset-top)) clamp(1.25rem, 3vw, 2.5rem) 0.7rem;
   }
-  .tab-icon {
-    width: 25px;
-    height: 25px;
+  .app-header-top {
+    flex-wrap: nowrap;
+  }
+  .app-header-brand {
+    display: none;
+  }
+  .project-context {
+    order: 1;
+    flex: 0 1 20rem;
+    width: auto;
+    max-width: 20rem;
+  }
+  .app-header-actions {
+    order: 2;
   }
   .app-main {
     padding: 1.75rem 2rem 3rem;
   }
-  .app-header {
-    padding-left: max(2rem, calc((100vw - 1172px) / 2 + 2rem));
-    padding-right: max(2rem, calc((100vw - 1172px) / 2 + 2rem));
+  .notify-banner {
+    left: calc(var(--shell-sidebar-width) + 1rem);
+    right: 1rem;
+    bottom: 1rem;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1439px) {
+  .sidebar-brand {
+    justify-content: center;
+    padding-inline: 0.6rem;
+  }
+  .sidebar-brand-name,
+  .sidebar-group-label,
+  .sidebar-label {
+    display: none;
+  }
+  .sidebar-nav-full {
+    display: none;
+  }
+  .sidebar-nav-rail {
+    display: grid;
+    align-content: start;
+    gap: 0.25rem;
+  }
+  .sidebar-group + .sidebar-group {
+    margin-top: var(--space-3);
+  }
+  .sidebar-link {
+    justify-content: center;
+    padding-inline: 0.5rem;
+  }
+  .sidebar-collapse {
+    display: none;
+  }
+}
+
+/* Full desktop sidebar. Its user preference is stored by AppShell; collapsing
+   returns it to the same compact 76px rail used by tablet. */
+@media (min-width: 1440px) {
+  .app-shell {
+    --shell-sidebar-width: 248px;
+  }
+  .app-shell.sidebar-is-collapsed {
+    --shell-sidebar-width: 76px;
+  }
+  .sidebar-is-collapsed .sidebar-brand {
+    justify-content: center;
+    padding-inline: 0.6rem;
+  }
+  .sidebar-is-collapsed .sidebar-brand-name,
+  .sidebar-is-collapsed .sidebar-group-label,
+  .sidebar-is-collapsed .sidebar-label {
+    display: none;
+  }
+  .sidebar-is-collapsed .sidebar-nav-full {
+    display: none;
+  }
+  .sidebar-is-collapsed .sidebar-nav-rail {
+    display: grid;
+    align-content: start;
+    gap: 0.25rem;
+  }
+  .sidebar-is-collapsed .sidebar-group + .sidebar-group {
+    margin-top: var(--space-3);
+  }
+  .sidebar-is-collapsed .sidebar-link,
+  .sidebar-is-collapsed .sidebar-collapse {
+    justify-content: center;
+    padding-inline: 0.5rem;
   }
 }
 

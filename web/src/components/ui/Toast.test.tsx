@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, act } from '@testing-library/react'
+import { render, screen, act, fireEvent } from '@testing-library/react'
 import { ToastProvider, useToast } from './Toast'
 
 function Trigger() {
@@ -39,5 +39,21 @@ describe('Toast', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(() => render(<Trigger />)).toThrow(/ToastProvider/)
     spy.mockRestore()
+  })
+
+  it('pauses dismissal while the toast is being inspected', () => {
+    render(
+      <ToastProvider>
+        <Trigger />
+      </ToastProvider>,
+    )
+    act(() => screen.getByRole('button', { name: 'go' }).click())
+    const toast = screen.getByRole('status')
+    fireEvent.mouseEnter(toast)
+    act(() => vi.advanceTimersByTime(5000))
+    expect(screen.getByRole('status')).toBeInTheDocument()
+    fireEvent.mouseLeave(toast)
+    act(() => vi.advanceTimersByTime(3500))
+    expect(screen.queryByRole('status')).toBeNull()
   })
 })

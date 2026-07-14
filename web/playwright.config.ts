@@ -5,7 +5,7 @@ export default defineConfig({
   timeout: 30_000,
   fullyParallel: false,
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://127.0.0.1:5173',
     trace: 'on-first-retry',
     // Pre-grant notifications so the one-time "enable reminders" banner (gated on
     // permission === 'default') never pops mid-test and intercepts clicks.
@@ -13,8 +13,8 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'npm run dev -- --port 5173 --strictPort',
-    url: 'http://localhost:5173',
+    command: 'npm run dev -- --host 127.0.0.1 --port 5173 --strictPort',
+    url: 'http://127.0.0.1:5173',
     reuseExistingServer: true,
     timeout: 60_000,
   },

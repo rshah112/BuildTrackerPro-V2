@@ -6,13 +6,17 @@ import { ExpenseList } from './ExpenseList'
 
 export function ExpensesScreen() {
   const { projectId } = useCurrentProject()
-  const { data: lineItems = [], isLoading } = useLineItems(projectId!)
+  const { data: lineItems = [], isLoading, error } = useLineItems(projectId!)
 
   if (!projectId) return null
   return (
     <section>
       <ScreenHeader title="Expenses" />
-      {isLoading ? (
+      {error ? (
+        <p role="alert" className="error-banner">
+          Couldn’t load expense categories: {(error as Error).message}
+        </p>
+      ) : isLoading ? (
         <ListSkeleton />
       ) : (
         <ExpenseList projectId={projectId} lineItems={lineItems} />

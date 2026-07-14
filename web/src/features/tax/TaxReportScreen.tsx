@@ -46,62 +46,66 @@ export function TaxReportScreen() {
     <section>
       <ScreenHeader title="Tax / 1099 prep" subtitle="Portfolio-wide payment candidates for review" />
 
-      <Field label="Tax year">
-        {(props) => (
-          <Select {...props} value={String(year)} onChange={(event) => setYear(Number(event.target.value))}>
-            {YEARS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </Select>
-        )}
-      </Field>
-
-      <div className="metric-grid compact">
-        <Stat label={`Candidates ≥ ${fmt(threshold)}`} value={String(candidates.length)} />
-        <Stat label="Candidate payments" value={fmt(candidateTotal)} />
-        <Stat label="Card / network excluded" value={fmt(excludedTotal)} />
-      </div>
-
       <ListState
         error={error}
         isLoading={isLoading}
-        isEmpty={rows.length === 0}
+        isEmpty={false}
         errorLabel="Couldn’t load portfolio payments"
-        empty={
-          <EmptyState
-            icon={Calculator}
-            title={`No vendor payments in ${year}`}
-            body="Paid expenses across your active projects show up here, grouped for tax review."
-          />
-        }
+        empty={null}
       >
-        <SectionCard
-          title={`Vendor payment review · ${year}`}
-          footnote={`Potential candidates only, not a filing determination. The ${year} review threshold shown is ${fmt(threshold)}. Card and recognized payment-network amounts are excluded; confirm vendor entity type, exemptions, payment purpose, W-9 details, and future-year inflation adjustments with your tax professional.`}
-        >
-          <ul className="plain-list">
-            {rows.map((row) => (
-              <li key={row.key} className="kv-row">
-                <span>
-                  {row.vendor}{' '}
-                  <span className="muted">
-                    · {row.paymentCount} eligible payment{row.paymentCount === 1 ? '' : 's'}
-                    {row.excludedNetworkCount > 0 ? ` · ${fmt(row.excludedNetworkPaid)} card/network excluded` : ''}
-                    {row.missingPaidDateCount > 0 ? ` · ${row.missingPaidDateCount} paid date${row.missingPaidDateCount === 1 ? '' : 's'} to verify` : ''}
-                    {row.partialPaymentCount > 0 ? ` · ${row.partialPaymentCount} partial payment allocation${row.partialPaymentCount === 1 ? '' : 's'} to verify` : ''}
-                    {row.candidate ? (row.hasTaxId ? ' · tax ID present' : ' · tax details to review') : ''}
-                  </span>
-                </span>
-                <span className="expense-row-amount">
-                  {row.candidate && <Badge tone={row.hasTaxId ? 'info' : 'warn'}>Review</Badge>}
-                  <strong className="tnum">{fmt(row.eligiblePaid)}</strong>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </SectionCard>
+        <>
+          <Field label="Tax year">
+            {(props) => (
+              <Select {...props} value={String(year)} onChange={(event) => setYear(Number(event.target.value))}>
+                {YEARS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+
+          <div className="metric-grid compact">
+            <Stat label={`Candidates ≥ ${fmt(threshold)}`} value={String(candidates.length)} />
+            <Stat label="Candidate payments" value={fmt(candidateTotal)} />
+            <Stat label="Card / network excluded" value={fmt(excludedTotal)} />
+          </div>
+
+          {rows.length === 0 ? (
+            <EmptyState
+              icon={Calculator}
+              title={`No vendor payments in ${year}`}
+              body="Paid expenses across your active projects show up here, grouped for tax review."
+            />
+          ) : (
+            <SectionCard
+              title={`Vendor payment review · ${year}`}
+              footnote={`Potential candidates only, not a filing determination. The ${year} review threshold shown is ${fmt(threshold)}. Card and recognized payment-network amounts are excluded; confirm vendor entity type, exemptions, payment purpose, W-9 details, and future-year inflation adjustments with your tax professional.`}
+            >
+              <ul className="plain-list">
+                {rows.map((row) => (
+                  <li key={row.key} className="kv-row">
+                    <span>
+                      {row.vendor}{' '}
+                      <span className="muted">
+                        · {row.paymentCount} eligible payment{row.paymentCount === 1 ? '' : 's'}
+                        {row.excludedNetworkCount > 0 ? ` · ${fmt(row.excludedNetworkPaid)} card/network excluded` : ''}
+                        {row.missingPaidDateCount > 0 ? ` · ${row.missingPaidDateCount} paid date${row.missingPaidDateCount === 1 ? '' : 's'} to verify` : ''}
+                        {row.partialPaymentCount > 0 ? ` · ${row.partialPaymentCount} partial payment allocation${row.partialPaymentCount === 1 ? '' : 's'} to verify` : ''}
+                        {row.candidate ? (row.hasTaxId ? ' · tax ID present' : ' · tax details to review') : ''}
+                      </span>
+                    </span>
+                    <span className="expense-row-amount">
+                      {row.candidate && <Badge tone={row.hasTaxId ? 'info' : 'warn'}>Review</Badge>}
+                      <strong className="tnum">{fmt(row.eligiblePaid)}</strong>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </SectionCard>
+          )}
+        </>
       </ListState>
     </section>
   )

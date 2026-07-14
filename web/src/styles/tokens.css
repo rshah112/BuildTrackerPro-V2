@@ -18,7 +18,7 @@
 }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   /* Brand — construction orange */
   --brand-50: #fff4ed;
@@ -59,11 +59,15 @@
   --color-border: #e6e4e0;
   --color-border-strong: var(--neutral-300);
 
-  --color-brand: var(--brand-500);
-  --color-brand-hover: var(--brand-600);
+  /* Blueprint teal carries interactive trust; construction copper is reserved for
+     the product mark so warnings no longer compete with every primary action. */
+  --color-brand: #214f5e;
+  --color-brand-hover: #173f4b;
   --color-brand-contrast: #ffffff;
-  --color-brand-tint: var(--brand-50);
-  --color-brand-bg: var(--brand-50);
+  --color-brand-tint: #e8f1f2;
+  --color-brand-bg: #e8f1f2;
+  --color-construction: #b94f1a;
+  --color-construction-bright: #f47a3c;
 
   --color-success: #1a7f37;
   --color-success-bg: #dcfce7;
@@ -167,11 +171,13 @@
   --color-border: #303036;
   --color-border-strong: #46464d;
 
-  --color-brand: #ff7a45;
-  --color-brand-hover: #ff9466;
-  --color-brand-contrast: #1c1c1e;
-  --color-brand-tint: rgba(255, 122, 69, 0.16);
-  --color-brand-bg: rgba(255, 122, 69, 0.16);
+  --color-brand: #79b9c4;
+  --color-brand-hover: #95ccd5;
+  --color-brand-contrast: #0c2227;
+  --color-brand-tint: rgba(121, 185, 196, 0.16);
+  --color-brand-bg: rgba(121, 185, 196, 0.16);
+  --color-construction: #ff7a45;
+  --color-construction-bright: #ff9466;
 
   --color-success: #4ade80;
   --color-success-bg: rgba(74, 222, 128, 0.16);

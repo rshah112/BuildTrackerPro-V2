@@ -8,14 +8,15 @@ import {
   payableBalance,
   retainageHeld,
 } from '../../lib/expenseMath'
-import { fmt, sumBy } from '../../lib/money'
+import { fmt, fmtExact, sumBy } from '../../lib/money'
 import { fmtDate } from '../../lib/date'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
-import { Stat } from '../../components/ui/Stat'
 import { EditorSheet } from '../../components/ui/EditorSheet'
 import { useEditor } from '../../components/ui/useEditor'
 import { SearchField } from '../../components/ui/SearchField'
+import { DataTable, type DataColumn, type SortState } from '../../components/ui/DataTable'
+import { SummaryStrip } from '../../components/ui/SummaryStrip'
 import { matchesQuery } from '../../lib/search'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
@@ -27,7 +28,7 @@ import { ExpenseForm } from './ExpenseForm'
 import { upsertExpense } from './recalculateLineItemActuals'
 import { useExpenses, useRemoveExpense } from './useExpenses'
 
-type Filter = 'all' | 'open' | 'paid'
+type Filter = 'all' | 'open' | 'paid' | 'unassigned'
 
 /** An expense is "open" if it still owes money, regardless of the isPaid flag — so a
  *  partial payment shows as Partial/open, not a misleading "Paid". */
@@ -64,24 +65,40 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
   const editor = useEditor<Expense>()
   const [filter, setFilter] = useState<Filter>('all')
   const [q, setQ] = useState('')
+  const [sort, setSort] = useState<SortState>({ key: 'date', direction: 'desc' })
 
-  const sorted = useMemo(() => [...expenses].sort((a, b) => b.date.localeCompare(a.date)), [expenses])
   const visible = useMemo(
     () =>
-      sorted.filter((e) => {
-        if (filter !== 'all') {
-          const open = balanceDue(e) > 0
-          if (filter === 'open' ? !open : open) return false
-        }
-        return matchesQuery(q, e.vendorName, e.invoiceNumber, e.notes, e.categoryName, e.budgetLineItemTitle)
-      }),
-    [sorted, filter, q],
+      expenses
+        .filter((e) => {
+          if (filter === 'unassigned') {
+            if (e.categoryName && (e.budgetLineItemId || e.budgetLineItemTitle)) return false
+          } else if (filter !== 'all') {
+            const open = balanceDue(e) > 0
+            if (filter === 'open' ? !open : open) return false
+          }
+          return matchesQuery(q, e.vendorName, e.invoiceNumber, e.notes, e.categoryName, e.budgetLineItemTitle)
+        })
+        .sort((a, b) => {
+          const direction = sort.direction === 'asc' ? 1 : -1
+          const numeric = (value: (expense: Expense) => number) => (value(a) - value(b)) * direction
+          if (sort.key === 'vendor') return a.vendorName.localeCompare(b.vendorName) * direction
+          if (sort.key === 'category') return (a.categoryName || '').localeCompare(b.categoryName || '') * direction
+          if (sort.key === 'amount') return numeric((expense) => expense.amount)
+          if (sort.key === 'paid') return numeric(effectiveAmountPaid)
+          if (sort.key === 'balance') return numeric(balanceDue)
+          if (sort.key === 'status') return expensePaymentState(a).localeCompare(expensePaymentState(b)) * direction
+          return a.date.localeCompare(b.date) * direction
+        }),
+    [expenses, filter, q, sort],
   )
-  const { total, paid, outstanding } = useMemo(
+  const { total, paid, outstanding, retainage, payable } = useMemo(
     () => ({
       total: sumBy(expenses, (e) => e.amount),
       paid: sumBy(expenses, effectiveAmountPaid),
       outstanding: sumBy(expenses, balanceDue),
+      retainage: sumBy(expenses, retainageHeld),
+      payable: sumBy(expenses, payableBalance),
     }),
     [expenses],
   )
@@ -104,16 +121,102 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
   if (isLoading) return <ListSkeleton />
   if (error) return <p role="alert" className="error-banner">Couldn’t load expenses: {(error as Error).message}</p>
 
+  const columns: DataColumn<Expense>[] = [
+    {
+      key: 'date',
+      header: 'Date',
+      mobileLabel: 'Date',
+      sortable: true,
+      cell: (expense) => <span className="tnum">{fmtDate(expense.date)}</span>,
+    },
+    {
+      key: 'vendor',
+      header: 'Vendor / invoice',
+      sortable: true,
+      className: 'expense-primary-cell',
+      cell: (expense) => (
+        <button type="button" className="table-row-link" onClick={() => editor.openEdit(expense)}>
+          <strong>{expense.vendorName || 'Unnamed vendor'}</strong>
+          <span>{expense.invoiceNumber ? `Invoice ${expense.invoiceNumber}` : 'No invoice number'}</span>
+        </button>
+      ),
+    },
+    {
+      key: 'category',
+      header: 'Budget assignment',
+      mobileLabel: 'Budget assignment',
+      sortable: true,
+      cell: (expense) => (
+        <span className={!expense.categoryName || (!expense.budgetLineItemId && !expense.budgetLineItemTitle) ? 'assignment-missing' : undefined}>
+          {expense.categoryName || 'Uncategorized'}
+          {expense.budgetLineItemTitle ? <small>{expense.budgetLineItemTitle}</small> : <small>No line item</small>}
+        </span>
+      ),
+    },
+    { key: 'amount', header: 'Invoiced', mobileLabel: 'Invoiced', sortable: true, align: 'end', cell: (expense) => <strong>{fmtExact(expense.amount)}</strong> },
+    { key: 'paid', header: 'Paid', mobileLabel: 'Paid', sortable: true, align: 'end', cell: (expense) => fmtExact(effectiveAmountPaid(expense)) },
+    {
+      key: 'balance',
+      header: 'Balance',
+      mobileLabel: 'Balance',
+      sortable: true,
+      align: 'end',
+      cell: (expense) => {
+        const balance = balanceDue(expense)
+        return <span className={balance > 0 ? 'balance-open' : undefined}>{fmtExact(balance)}</span>
+      },
+    },
+    {
+      key: 'status',
+      header: 'Status / due',
+      mobileLabel: 'Status',
+      sortable: true,
+      cell: (expense) => {
+        const status = payStatus(expense)
+        const due = dueInfo(expense)
+        return (
+          <span className="expense-status-cell">
+            <Badge tone={status.tone}>{status.label}</Badge>
+            {due && <span className={`expense-due${due.overdue ? ' overdue' : ''}`}>{due.label}</span>}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'document',
+      header: 'Receipt',
+      mobileLabel: 'Receipt',
+      align: 'center',
+      cell: (expense) => expense.receiptObjectKey ? <FileText size={17} className="muted" role="img" aria-label="Receipt attached" /> : <span className="muted" aria-label="No receipt">—</span>,
+    },
+    {
+      key: 'actions',
+      header: <span className="sr-only">Actions</span>,
+      align: 'center',
+      className: 'table-actions-cell',
+      cell: (expense) => (
+        <button type="button" className="table-icon-action danger-action" onClick={() => removeAndSync(expense)} aria-label={`Delete ${expense.vendorName || 'expense'}`}>
+          <Trash2 size={17} aria-hidden />
+        </button>
+      ),
+    },
+  ]
+
   return (
     <>
-      <div className="metric-grid compact">
-        <Stat label="Invoiced" value={fmt(total)} />
-        <Stat label="Paid" value={fmt(paid)} />
-        <Stat label="Open" value={fmt(outstanding)} />
-      </div>
+      <SummaryStrip
+        label="Expense summary"
+        metrics={[
+          { label: 'Invoiced', value: fmt(total), detail: `${expenses.length} transaction${expenses.length === 1 ? '' : 's'}` },
+          { label: 'Cash paid', value: fmt(paid), detail: total > 0 ? `${Math.round((paid / total) * 100)}% of invoiced` : 'No payments recorded', tone: 'success' },
+          { label: 'Open balance', value: fmt(outstanding), detail: `${fmt(payable)} payable now`, tone: outstanding > 0 ? 'warn' : 'default' },
+          { label: 'Retainage held', value: fmt(retainage), detail: 'Excluded from payable now' },
+        ]}
+      />
 
       {expenses.length > 0 && (
-        <div className="list-toolbar">
+        <div className="expense-workbench-toolbar">
+          <SearchField value={q} onChange={setQ} placeholder="Search vendor, invoice, notes, line item" />
           <SegmentedControl<Filter>
             ariaLabel="Filter expenses"
             value={filter}
@@ -122,14 +225,17 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
               { value: 'all', label: 'All' },
               { value: 'open', label: 'Open' },
               { value: 'paid', label: 'Paid' },
+              { value: 'unassigned', label: 'Unassigned' },
             ]}
           />
           <Button size="sm" leadingIcon={<Plus size={16} />} onClick={editor.openNew}>
             Add expense
           </Button>
+          <span className="result-count" aria-live="polite">
+            {visible.length} of {expenses.length} expenses
+          </span>
         </div>
       )}
-      {expenses.length > 2 && <SearchField value={q} onChange={setQ} placeholder="Search vendor, invoice, notes, line item" />}
 
       {visible.length === 0 ? (
         <EmptyState
@@ -138,7 +244,7 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
           body={
             expenses.length === 0
               ? 'Log invoices, receipts, and payments to track spend against your budget.'
-              : 'No expenses match this filter.'
+              : 'No expenses match the current search or filter.'
           }
           action={
             expenses.length === 0 ? (
@@ -149,38 +255,15 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
           }
         />
       ) : (
-        <ul className="card-list">
-          {visible.map((e) => {
-            const st = payStatus(e)
-            const due = dueInfo(e)
-            return (
-              <li key={e.id} className="expense-row">
-                <button className="expense-row-open" onClick={() => editor.openEdit(e)}>
-                  <div className="expense-row-main">
-                    <strong>{e.vendorName || 'Unnamed vendor'}</strong>
-                    <span className="muted">
-                      {fmtDate(e.date)} · {e.categoryName || 'Uncategorized'}
-                      {e.budgetLineItemTitle ? ` · ${e.budgetLineItemTitle}` : ''}
-                    </span>
-                  </div>
-                  <div className="expense-row-amount">
-                    <div className="expense-row-badges">
-                      <Badge tone={st.tone}>{st.label}</Badge>
-                      {due && <span className={`expense-due${due.overdue ? ' overdue' : ''}`}>{due.label}</span>}
-                      {e.receiptObjectKey && <FileText size={15} className="muted" role="img" aria-label="Has receipt" />}
-                    </div>
-                    <strong>{fmt(e.amount)}</strong>
-                    {st.label === 'Partial' && <span className="expense-left">{fmt(balanceDue(e))} left</span>}
-                    {st.label === 'Retainage' && <span className="expense-left">{fmt(retainageHeld(e))} held</span>}
-                  </div>
-                </button>
-                <button className="expense-row-del" onClick={() => removeAndSync(e)} aria-label="Delete expense">
-                  <Trash2 size={17} aria-hidden />
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+        <DataTable<Expense>
+          caption="Expenses and payment status"
+          rows={visible}
+          columns={columns}
+          getRowKey={(expense) => expense.id}
+          sort={sort}
+          onSort={setSort}
+          rowClassName={() => 'expense-row'}
+        />
       )}
 
       <EditorSheet editor={editor} newTitle="New expense" editTitle="Edit expense">

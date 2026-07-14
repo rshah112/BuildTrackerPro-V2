@@ -38,7 +38,7 @@ export function NotifyPrompt({ onChange }: { onChange: (s: NotifState) => void }
       void subscribeToPush() // register this device for background push (best-effort)
       toast.success('Reminders on — we’ll flag invoices coming due.')
       void showLocalNotification('Reminders are on', {
-        body: 'BuildTracker will flag invoices and change-order payments coming due.',
+        body: 'HomeBuild Pro will flag invoices and change-order payments coming due.',
         url: '/cashflow',
         tag: 'notify-welcome',
       })

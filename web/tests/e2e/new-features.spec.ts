@@ -61,6 +61,7 @@ test('templates, search, line-item detail/duplicate, funding source', async ({ p
   await page.getByLabel('Amount', { exact: true }).fill('5000')
   // Funding source select only appears because a loan exists
   await page.getByLabel('Funding source').selectOption('loan')
+  await page.getByRole('radio', { name: 'Paid', exact: true }).click()
   await page.getByRole('button', { name: 'Save expense' }).click()
   await expect(page.getByText('Loan Vendor')).toBeVisible()
 

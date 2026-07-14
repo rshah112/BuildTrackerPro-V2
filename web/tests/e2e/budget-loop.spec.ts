@@ -43,9 +43,13 @@ test('budget loop: project → category → line item → expense → dashboard'
   await expect(page.getByText('Framing')).toBeVisible()
 
   // --- Add a line item under it (budget $1,000) ---
-  await page.getByRole('button', { name: '+ Line item' }).click()
+  await page.getByRole('button', { name: /^Framing 0 line items/ }).click()
+  await page
+    .locator('.budget-line-panel')
+    .getByRole('button', { name: 'Add line item', exact: true })
+    .click()
   await page.getByLabel('Title', { exact: true }).fill('Lumber')
-  await page.getByLabel('Budget', { exact: true }).fill('1000')
+  await page.getByRole('textbox', { name: 'Budget', exact: true }).fill('1000')
   await page.getByRole('button', { name: 'Save' }).click()
 
   // --- Log an expense of $1,200 against the line item, fully paid ---
@@ -65,14 +69,19 @@ test('budget loop: project → category → line item → expense → dashboard'
   await expect(page.getByText('Acme Lumber')).toBeVisible()
 
   // --- Dashboard reflects the spend and the health roll-up ---
-  await page.getByRole('link', { name: 'Dashboard' }).click()
-  await expect(page.getByRole('heading', { name: projectName })).toBeVisible()
+  await page.getByRole('link', { name: 'Overview', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
+  await expect(page.getByRole('main').getByText(projectName, { exact: true })).toBeVisible()
 
-  const actualCard = page.locator('.metric-card', { hasText: 'Actual spend' })
-  await expect(actualCard).toContainText('$1,200')
+  const financialSummary = page.getByRole('region', { name: 'Project financial summary' })
+  await expect(
+    financialSummary.locator('.summary-metric').filter({ hasText: 'Incurred cost' }),
+  ).toContainText('$1,200')
 
   // Line item is $1,200 spent on a $1,000 budget → over budget.
-  await expect(page.locator('li', { hasText: 'over budget line items' })).toContainText('1')
+  await expect(page.locator('.attention-list li').filter({ hasText: 'Over budget' })).toContainText(
+    /1 line item.*exceed budget/,
+  )
 
   // Recent expenses surfaces the vendor we just logged.
   await expect(page.locator('.panel', { hasText: 'Recent expenses' })).toContainText('Acme Lumber')

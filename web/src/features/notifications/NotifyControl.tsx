@@ -39,7 +39,7 @@ export function NotifyControl() {
       void subscribeToPush() // register this device for background push (best-effort)
       toast.success('Reminders on')
       void showLocalNotification('Reminders are on', {
-        body: 'BuildTracker will flag invoices and change-order payments coming due.',
+        body: 'HomeBuild Pro will flag invoices and change-order payments coming due.',
         url: '/cashflow',
         tag: 'notify-welcome',
       })

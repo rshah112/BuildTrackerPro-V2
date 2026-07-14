@@ -24,6 +24,8 @@ interface Roll {
   tone: BadgeTone
 }
 
+const EMPTY_ROWS: never[] = []
+
 function tone(projected: number, limit: number): BadgeTone {
   if (limit > 0 && projected > limit) return 'danger'
   if (limit > 0 && projected / limit >= 0.9) return 'warn'
@@ -31,15 +33,24 @@ function tone(projected: number, limit: number): BadgeTone {
 }
 
 export function PortfolioScreen() {
-  const { data: projects = [], isLoading, error } = useProjects()
+  const projectsQuery = useProjects()
   // Unfiltered child queries — RLS still scopes every row to the owner, so this is the
   // whole portfolio. Aggregated per-project client-side below.
-  const { data: lineItems = [] } = useRows<BudgetLineItem>('budget_line_items')
-  const { data: expenses = [] } = useRows<Expense>('expenses')
-  const { data: changeOrders = [] } = useRows<ChangeOrder>('change_orders')
-  const { data: allowances = [] } = useRows<AllowanceSelection>('allowance_selections')
+  const lineItemsQuery = useRows<BudgetLineItem>('budget_line_items')
+  const expensesQuery = useRows<Expense>('expenses')
+  const changeOrdersQuery = useRows<ChangeOrder>('change_orders')
+  const allowancesQuery = useRows<AllowanceSelection>('allowance_selections')
   const { setProjectId } = useCurrentProject()
   const navigate = useNavigate()
+
+  const projects = projectsQuery.data ?? EMPTY_ROWS
+  const lineItems = lineItemsQuery.data ?? EMPTY_ROWS
+  const expenses = expensesQuery.data ?? EMPTY_ROWS
+  const changeOrders = changeOrdersQuery.data ?? EMPTY_ROWS
+  const allowances = allowancesQuery.data ?? EMPTY_ROWS
+  const queries = [projectsQuery, lineItemsQuery, expensesQuery, changeOrdersQuery, allowancesQuery]
+  const isLoading = queries.some((query) => query.isLoading)
+  const error = queries.find((query) => query.error)?.error
 
   const rolls = useMemo<Roll[]>(() => {
     return projects
@@ -79,7 +90,7 @@ export function PortfolioScreen() {
         error={error}
         isLoading={isLoading}
         isEmpty={projects.length === 0}
-        errorLabel="Couldn’t load your projects"
+        errorLabel="Couldn’t load portfolio totals"
         empty={
           <EmptyState
             icon={FolderKanban}

@@ -15,6 +15,14 @@ describe('Combobox (select mode)', () => {
     expect((screen.getByLabelText('Budget line') as HTMLInputElement).value).toBe('Framing lumber')
   })
 
+  it('distinguishes the selected value from the keyboard-highlighted option', () => {
+    render(<Combobox label="Budget line" value="2" options={OPTIONS} onChange={() => {}} />)
+    fireEvent.focus(screen.getByLabelText('Budget line'))
+    const options = screen.getAllByRole('option')
+    expect(options[0]).toHaveAttribute('aria-selected', 'false')
+    expect(options[1]).toHaveAttribute('aria-selected', 'true')
+  })
+
   it('filters options as you type', () => {
     render(<Combobox label="Budget line" value="" options={OPTIONS} onChange={() => {}} />)
     const input = screen.getByLabelText('Budget line')

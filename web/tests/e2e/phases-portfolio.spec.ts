@@ -49,10 +49,14 @@ test('phase pulse, portfolio, and export actions', async ({ page }) => {
   // --- Portfolio insights lists the project ---
   await page.goto('/portfolio')
   await expect(page.locator('.panel', { hasText: 'All projects' })).toBeVisible()
-  await expect(page.getByText(`E2E Phases ${suffix}`)).toBeVisible()
+  await expect(
+    page
+      .locator('main .card-list')
+      .getByRole('button', { name: new RegExp(`^E2E Phases ${suffix}\\b`) }),
+  ).toBeVisible()
 
   // --- Export screen exposes the new actions ---
   await page.goto('/export')
-  await expect(page.getByRole('button', { name: 'Download .zip bundle' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Download full recovery bundle' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Update budgets from workbook' })).toBeVisible()
 })

@@ -34,10 +34,9 @@ export default defineConfig({
         name: 'HomeBuild Pro',
         short_name: 'HomeBuild',
         description: 'Construction project budget, expenses, and photo tracker',
-        theme_color: '#c2410c',
-        background_color: '#ffffff',
+        theme_color: '#f6f4ef',
+        background_color: '#f6f4ef',
         display: 'standalone',
-        orientation: 'portrait',
         id: '/',
         scope: '/',
         start_url: '/',
@@ -63,12 +62,13 @@ export default defineConfig({
         // their on-demand (dynamic-import) chunks rather than the eager vendor bundle.
         manualChunks(id: string) {
           if (!id.includes('node_modules')) return
+          if (/[\\/]node_modules[\\/]@supabase[\\/]/.test(id)) return 'supabase-vendor'
+          if (/[\\/]node_modules[\\/]@tanstack[\\/]/.test(id)) return 'query-vendor'
+          if (/[\\/]node_modules[\\/]lucide-react[\\/]/.test(id)) return 'icons-vendor'
           if (
-            /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler|@tanstack|@supabase|lucide-react)[\\/]/.test(
-              id,
-            )
+            /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)
           )
-            return 'vendor'
+            return 'react-vendor'
         },
       },
     },

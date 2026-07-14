@@ -38,12 +38,17 @@ export function useCurrentProject(): CurrentProject {
  *  projects it bounces to the portfolio to choose. */
 export function RequireProject({ children }: { children: ReactNode }) {
   const { projectId, setProjectId } = useCurrentProject()
-  const { data: projects = [], isLoading } = useProjects()
+  const { data: projects = [], isLoading, isFetching } = useProjects()
   const active = projects.filter((p) => !p.deletedAt)
   const valid = projectId != null && active.some((p) => p.id === projectId)
+  // A successful create/update invalidates the projects query. During that background
+  // refetch, `data` can still be the previous list and therefore cannot prove that a
+  // freshly selected project is invalid. Wait for validation to settle before clearing
+  // the selection or redirecting to the picker.
+  const validating = isLoading || isFetching
 
   useEffect(() => {
-    if (isLoading) return
+    if (validating) return
     if (projectId && !active.some((p) => p.id === projectId)) {
       // Stored id points at a trashed/deleted/foreign project — drop it so we
       // re-resolve (auto-select the only project, or bounce to the picker).
@@ -51,10 +56,10 @@ export function RequireProject({ children }: { children: ReactNode }) {
     } else if (!projectId && active.length === 1) {
       setProjectId(active[0].id)
     }
-  }, [projectId, active, isLoading, setProjectId])
+  }, [projectId, active, validating, setProjectId])
 
   if (valid) return <>{children}</>
   // Still loading, or about to auto-select/clear — show a spinner instead of a flash.
-  if (isLoading || active.length === 1) return <div className="loading">Loading…</div>
+  if (validating || active.length === 1) return <div className="loading">Loading…</div>
   return <Navigate to="/projects" replace />
 }

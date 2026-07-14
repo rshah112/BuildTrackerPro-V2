@@ -25,7 +25,9 @@ test('vendors: create project → add vendor → edit vendor', async ({ page }) 
 
   // Navigate to Vendors via the More tab.
   await page.getByRole('link', { name: 'More' }).click()
-  await page.getByRole('link', { name: 'Vendors' }).click()
+  await expect(page).toHaveURL(/\/more$/)
+  await page.getByRole('link', { name: 'Vendors', exact: true }).click()
+  await expect(page).toHaveURL(/\/vendors$/)
   await expect(page.getByRole('heading', { name: 'Vendors', exact: true })).toBeVisible()
 
   // Empty state offers the add CTA.
@@ -38,7 +40,9 @@ test('vendors: create project → add vendor → edit vendor', async ({ page }) 
   // Row appears.
   await expect(page.getByText('Ace Plumbing')).toBeVisible()
 
-  // Re-open it for editing — the sheet title flips to "Edit vendor".
-  await page.getByRole('button', { name: /Ace Plumbing/ }).click()
+  // Open the operations profile, then move into the contact editor.
+  await page.getByRole('button', { name: 'Open Ace Plumbing details' }).click()
+  await expect(page.getByRole('dialog', { name: 'Ace Plumbing' })).toBeVisible()
+  await page.getByRole('button', { name: 'Edit contact details' }).click()
   await expect(page.getByRole('dialog', { name: 'Edit vendor' })).toBeVisible()
 })

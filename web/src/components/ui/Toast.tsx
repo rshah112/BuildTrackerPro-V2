@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { CheckCircle2, AlertCircle, Info } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react'
 
 type ToastTone = 'success' | 'error' | 'info'
 interface ToastAction {
@@ -25,6 +25,7 @@ interface ToastApi {
 const ToastCtx = createContext<ToastApi | null>(null)
 const ICONS = { success: CheckCircle2, error: AlertCircle, info: Info }
 const DURATION = 3200
+const ACTION_DURATION = 10_000
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([])
@@ -40,17 +41,31 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const pause = useCallback((id: number) => {
+    const handle = timers.current.get(id)
+    if (handle) clearTimeout(handle)
+    timers.current.delete(id)
+  }, [])
+
+  const schedule = useCallback(
+    (item: Pick<ToastItem, 'id' | 'action'>) => {
+      pause(item.id)
+      timers.current.set(
+        item.id,
+        setTimeout(() => dismiss(item.id), item.action ? ACTION_DURATION : DURATION),
+      )
+    },
+    [dismiss, pause],
+  )
+
   const show = useCallback(
     (message: string, tone: ToastTone = 'info', opts?: ToastOptions) => {
       const id = ++seq.current
-      setItems((prev) => [...prev, { id, message, tone, action: opts?.action }])
-      timers.current.set(
-        id,
-        // Actionable toasts (e.g. Undo) linger a bit longer so they're tappable.
-        setTimeout(() => dismiss(id), opts?.action ? DURATION + 2300 : DURATION),
-      )
+      const item = { id, message, tone, action: opts?.action }
+      setItems((prev) => [...prev, item])
+      schedule(item)
     },
-    [dismiss],
+    [schedule],
   )
 
   // Stable api object (reference never changes) — no ref-mutation-in-render.
@@ -81,6 +96,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   key={t.id}
                   className={`toast toast-${t.tone}`}
                   role={t.tone === 'error' ? 'alert' : 'status'}
+                  onMouseEnter={() => pause(t.id)}
+                  onMouseLeave={() => schedule(t)}
+                  onFocusCapture={() => pause(t.id)}
+                  onBlurCapture={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) schedule(t)
+                  }}
                 >
                   <Glyph size={18} aria-hidden />
                   <span>{t.message}</span>
@@ -96,6 +117,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                       {t.action.label}
                     </button>
                   )}
+                  <button
+                    type="button"
+                    className="toast-dismiss"
+                    onClick={() => dismiss(t.id)}
+                    aria-label="Dismiss notification"
+                  >
+                    <X size={15} aria-hidden />
+                  </button>
                 </div>
               )
             })}

@@ -22,7 +22,15 @@ export function BarRow({
         <span className="barrow-label">{label}</span>
         <span className="barrow-value">{valueText}</span>
       </div>
-      <div className="progress thin">
+      <div
+        className="progress thin"
+        role="progressbar"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={Math.max(max, value, 0)}
+        aria-valuenow={Math.max(0, value)}
+        aria-valuetext={valueText}
+      >
         <span className={`fill-${tone}`} style={{ width: `${barWidthPct(value, max)}%` }} />
       </div>
     </div>

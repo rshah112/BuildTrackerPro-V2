@@ -1,29 +1,28 @@
-import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Wallet, Receipt, Image, MoreHorizontal, type LucideIcon } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { getMobileNavigation, mobileNavigationItemIsActive } from './navigation'
 
-const tabs: { to: string; label: string; icon: LucideIcon; end: boolean }[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/budget', label: 'Budget', icon: Wallet, end: false },
-  { to: '/expenses', label: 'Expenses', icon: Receipt, end: false },
-  { to: '/photos', label: 'Photos', icon: Image, end: false },
-  { to: '/more', label: 'More', icon: MoreHorizontal, end: false },
-]
+export function TabBar({ hasProject }: { hasProject: boolean }) {
+  const { pathname } = useLocation()
+  const tabs = getMobileNavigation(hasProject)
 
-export function TabBar() {
   return (
     <nav className="tab-bar" aria-label="Primary">
-      {tabs.map(({ to, label, icon: Glyph, end }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={end}
-          viewTransition
-          className={({ isActive }) => (isActive ? 'tab active' : 'tab')}
-        >
-          <Glyph className="tab-icon" size={23} aria-hidden />
-          <span className="tab-label">{label}</span>
-        </NavLink>
-      ))}
+      {tabs.map((item) => {
+        const Glyph = item.icon
+        const active = mobileNavigationItemIsActive(item, pathname, tabs)
+        return (
+          <Link
+            key={item.id}
+            to={item.to}
+            viewTransition
+            className={active ? 'tab active' : 'tab'}
+            aria-current={active ? 'page' : undefined}
+          >
+            <Glyph className="tab-icon" size={22} aria-hidden />
+            <span className="tab-label">{item.mobileLabel ?? item.label}</span>
+          </Link>
+        )
+      })}
     </nav>
   )
 }

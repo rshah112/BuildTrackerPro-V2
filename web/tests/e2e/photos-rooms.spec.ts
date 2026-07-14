@@ -53,7 +53,7 @@ test('photo tiles are square; tapping previews (not edits)', async ({ page }) =>
 test('tapping a room opens its detail', async ({ page }) => {
   await setup(page)
   await page.getByRole('link', { name: 'More' }).click()
-  await page.getByRole('link', { name: 'By room' }).click()
+  await page.getByRole('link', { name: 'Spaces & rooms', exact: true }).click()
   await page.locator('.room-open').first().click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()

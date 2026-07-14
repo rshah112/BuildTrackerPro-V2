@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { cents, dollars, sum, sumBy, diff, roundedToCents } from './money'
+import { cents, dollars, sum, sumBy, diff, fmtExact, roundedToCents } from './money'
 
 // Golden values verified against IEEE-754 f64 semantics. Native Swift's MoneyMath
 // uses the same doubles, so these results are bit-identical across both apps.
 describe("money: banker's rounding", () => {
+  it('formats transaction values to exact cents', () => {
+    expect(fmtExact(48_725.5)).toBe('$48,725.50')
+  })
+
   it('rounds exact halves to even', () => {
     expect(cents(0.005)).toBe(0) // 0.5 -> 0 (even)
     expect(cents(0.015)).toBe(2) // 1.5 -> 2 (even)

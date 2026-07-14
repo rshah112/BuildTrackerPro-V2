@@ -5,10 +5,12 @@ export function Sparkline({
   values,
   width = 320,
   height = 72,
+  ariaLabel,
 }: {
   values: number[]
   width?: number
   height?: number
+  ariaLabel?: string
 }) {
   const pad = 3
   const pts = sparklinePoints(values, width, height, pad)
@@ -18,7 +20,13 @@ export function Sparkline({
   const area = `${pad},${height - pad} ${line} ${width - pad},${height - pad}`
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="sparkline" preserveAspectRatio="none" aria-hidden>
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="sparkline"
+      preserveAspectRatio="none"
+      role="img"
+      aria-label={ariaLabel ?? `Trend across ${values.length} recorded values`}
+    >
       <polygon className="sparkline-area" points={area} />
       <polyline className="sparkline-line" points={line} fill="none" />
     </svg>

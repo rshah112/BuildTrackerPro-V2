@@ -22,11 +22,19 @@ import { DrawForm } from './DrawForm'
 import { availableCredit, drawnTotal, interestAccruedToDate, monthlyInterest, utilization } from './loanMath'
 import { effectiveAmountPaid } from '../../lib/expenseMath'
 
+const EMPTY_ROWS: never[] = []
+
 export function LoanScreen() {
   const { projectId } = useCurrentProject()
-  const { data: loans = [], isLoading, error } = useLoan(projectId!)
-  const { data: allDraws = [] } = useLoanDraws(projectId!)
-  const { data: expenses = [] } = useExpenses(projectId!)
+  const loansQuery = useLoan(projectId!)
+  const drawsQuery = useLoanDraws(projectId!)
+  const expensesQuery = useExpenses(projectId!)
+  const loans = loansQuery.data ?? EMPTY_ROWS
+  const allDraws = drawsQuery.data ?? EMPTY_ROWS
+  const expenses = expensesQuery.data ?? EMPTY_ROWS
+  const queries = [loansQuery, drawsQuery, expensesQuery]
+  const isLoading = queries.some((query) => query.isLoading)
+  const error = queries.find((query) => query.error)?.error
   const removeDraw = useRemoveDraw()
   const restoreDraw = useRestoreRow('loan_draws')
   const toast = useToast()

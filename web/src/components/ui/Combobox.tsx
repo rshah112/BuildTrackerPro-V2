@@ -238,7 +238,7 @@ export function Combobox({
                       <li
                         id={`${listId}-opt-${i}`}
                         role="option"
-                        aria-selected={isActive}
+                        aria-selected={o.value === value}
                         className={`combobox-option${isActive ? ' is-active' : ''}`}
                         ref={(el) => {
                           optionRefs.current[i] = el

@@ -10,6 +10,7 @@ import { usePhotos } from '../photos/usePhotos'
 import { RoomDetailSheet } from './RoomDetailSheet'
 
 const roomOf = (tag: string | null | undefined) => tag?.trim() || 'Unassigned'
+const EMPTY_ROWS: never[] = []
 
 function pct(actual: number, budget: number): number {
   if (budget <= 0) return 0
@@ -18,8 +19,12 @@ function pct(actual: number, budget: number): number {
 
 export function RoomSummaryScreen() {
   const { projectId } = useCurrentProject()
-  const { data: lineItems = [], isLoading, error } = useLineItems(projectId!)
-  const { data: photos = [] } = usePhotos(projectId!)
+  const lineItemsQuery = useLineItems(projectId!)
+  const photosQuery = usePhotos(projectId!)
+  const lineItems = lineItemsQuery.data ?? EMPTY_ROWS
+  const photos = photosQuery.data ?? EMPTY_ROWS
+  const isLoading = lineItemsQuery.isLoading || photosQuery.isLoading
+  const error = lineItemsQuery.error ?? photosQuery.error
   const [active, setActive] = useState<string | null>(null)
 
   const rooms = useMemo(() => {
