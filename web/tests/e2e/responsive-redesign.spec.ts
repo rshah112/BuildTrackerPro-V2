@@ -67,3 +67,83 @@ test('mobile finance workbenches reflow without horizontal page scrolling', asyn
   const collapsedSidebar = await page.locator('.app-sidebar').boundingBox()
   expect(collapsedSidebar?.width).toBeLessThanOrEqual(80)
 })
+
+test('dashboard expense tiles stay contained and keep vendor names readable', async ({ page }) => {
+  await createResponsiveProject(page)
+
+  const vendor = 'N. O. T. S. L.'
+  const category = 'General Requirements & Soft Costs'
+
+  await page.getByRole('link', { name: 'Expenses', exact: true }).click()
+  await page.getByRole('button', { name: 'Add expense' }).click()
+  await page.getByLabel('Vendor', { exact: true }).fill(vendor)
+  await page.getByLabel('Amount', { exact: true }).fill('5000')
+  await page.getByText('More details', { exact: true }).click()
+  await page.getByLabel('Category', { exact: true }).fill(category)
+  await page.getByRole('button', { name: 'Save expense' }).click()
+  await expect(page.getByText(vendor, { exact: true })).toBeVisible()
+
+  await page.getByRole('link', { name: 'Overview', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible()
+
+  const card = page.locator('.panel').filter({
+    has: page.getByRole('heading', { name: 'Recent expenses', exact: true }),
+  })
+  const row = card.locator('.dashboard-expense-list a').filter({ hasText: vendor })
+  await expect(row).toBeVisible()
+
+  const metrics = await row.evaluate((link, expectedVendor) => {
+    const cardNode = link.closest('.panel')
+    const vendorNode = Array.from(link.querySelectorAll('strong')).find(
+      (node) => node.textContent?.trim() === expectedVendor,
+    )
+    const metaNode = link.querySelector('.dashboard-expense-meta')
+    const amountNode = link.querySelector(':scope > strong')
+
+    if (
+      !(cardNode instanceof HTMLElement) ||
+      !(vendorNode instanceof HTMLElement) ||
+      !(metaNode instanceof HTMLElement) ||
+      !(amountNode instanceof HTMLElement)
+    ) {
+      throw new Error('Expected dashboard expense layout nodes')
+    }
+
+    const cardRect = cardNode.getBoundingClientRect()
+    const rowRect = link.getBoundingClientRect()
+    const vendorRect = vendorNode.getBoundingClientRect()
+    const metaRect = metaNode.getBoundingClientRect()
+    const amountRect = amountNode.getBoundingClientRect()
+    const range = document.createRange()
+    range.selectNodeContents(vendorNode)
+
+    return {
+      viewportWidth: window.innerWidth,
+      documentWidth: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth),
+      cardLeft: cardRect.left,
+      cardRight: cardRect.right,
+      rowRight: rowRect.right,
+      amountRight: amountRect.right,
+      vendorLeft: vendorRect.left,
+      vendorWidth: vendorRect.width,
+      vendorHeight: vendorRect.height,
+      vendorBottom: vendorRect.bottom,
+      vendorLines: new Set(
+        Array.from(range.getClientRects()).map((rect) => Math.round(rect.top)),
+      ).size,
+      metaLeft: metaRect.left,
+      metaTop: metaRect.top,
+    }
+  }, vendor)
+
+  expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth)
+  expect(metrics.cardLeft).toBeGreaterThanOrEqual(-1)
+  expect(metrics.cardRight).toBeLessThanOrEqual(metrics.viewportWidth + 1)
+  expect(metrics.rowRight).toBeLessThanOrEqual(metrics.cardRight + 1)
+  expect(metrics.amountRight).toBeLessThanOrEqual(metrics.cardRight + 1)
+  expect(Math.abs(metrics.vendorLeft - metrics.metaLeft)).toBeLessThanOrEqual(1)
+  expect(metrics.metaTop).toBeGreaterThanOrEqual(metrics.vendorBottom - 1)
+  expect(metrics.vendorLines).toBeLessThanOrEqual(2)
+  expect(metrics.vendorWidth).toBeGreaterThanOrEqual(64)
+  expect(metrics.vendorWidth / metrics.vendorHeight).toBeGreaterThan(1.5)
+})

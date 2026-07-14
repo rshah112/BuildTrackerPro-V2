@@ -489,7 +489,19 @@ export function DashboardScreen() {
           {recentExpenses.length === 0 && <p className="panel-lead">No expenses yet.</p>}
           <ul className="plain-list dashboard-expense-list">
             {recentExpenses.map((e: Expense) => (
-              <li key={e.id}><Link to="/expenses" className="kv-row"><span><strong>{e.vendorName || e.categoryName || 'Expense'}</strong><small>{fmtDate(e.date)} · {e.categoryName || 'Uncategorized'}</small></span><strong className="tnum">{fmt(e.amount)}</strong></Link></li>
+              <li key={e.id}>
+                <Link to="/expenses" className="dashboard-expense-row">
+                  <span className="dashboard-expense-copy">
+                    <strong className="dashboard-expense-vendor">
+                      {e.vendorName || e.categoryName || 'Expense'}
+                    </strong>
+                    <small className="dashboard-expense-meta">
+                      {fmtDate(e.date)} · {e.categoryName || 'Uncategorized'}
+                    </small>
+                  </span>
+                  <strong className="dashboard-expense-amount tnum">{fmt(e.amount)}</strong>
+                </Link>
+              </li>
             ))}
           </ul>
         </SectionCard>
