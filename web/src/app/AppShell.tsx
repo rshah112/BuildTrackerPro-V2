@@ -1,6 +1,6 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { Outlet, Link, useLocation } from 'react-router-dom'
-import { FolderKanban } from 'lucide-react'
+import { Building2, ChevronsUpDown } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { TabBar } from './TabBar'
 import { PageTransition } from '../components/ui/PageTransition'
@@ -14,14 +14,17 @@ import { DueReminders } from '../features/notifications/DueReminders'
 import { notifState, type NotifState } from '../lib/notifications'
 import { ErrorBoundary } from './ErrorBoundary'
 import { SyncIndicator } from './SyncIndicator'
+import { useProjects } from '../features/projects/useProjects'
+import { UnsavedNavigationGuard } from './UnsavedNavigationGuard'
 
 export function AppShell() {
   const queryClient = useQueryClient()
   const toast = useToast()
   const { projectId } = useCurrentProject()
+  const { data: projects = [] } = useProjects()
+  const currentProject = projects.find((project) => project.id === projectId)
   const { pathname } = useLocation()
   const [perm, setPerm] = useState<NotifState>(notifState())
-
   // Daily off-site safety snapshot to R2 (best-effort, non-blocking).
   useEffect(() => {
     if (projectId) void maybeAutoBackup(projectId)
@@ -36,21 +39,30 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
+      <UnsavedNavigationGuard />
       <a href="#main" className="skip-link">
         Skip to content
       </a>
       <header className="app-header">
-        <span className="brand">HomeBuild&nbsp;Pro</span>
-        <span
-          className="app-header-actions"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}
-        >
-          <SyncIndicator />
-          <Link to="/projects" className="header-link">
-            <FolderKanban size={16} aria-hidden />
-            Projects
+        <div className="app-header-top">
+          <Link to="/" className="brand-lockup" aria-label="HomeBuild Pro dashboard">
+            <span className="brand-mark" aria-hidden>HB</span>
+            <span className="brand">HomeBuild&nbsp;Pro</span>
           </Link>
-        </span>
+          <span className="app-header-actions">
+            <SyncIndicator />
+          </span>
+        </div>
+        {currentProject && (
+          <Link to="/projects" className="project-context" aria-label={`Switch project. Current project: ${currentProject.name}`}>
+            <span className="project-context-icon"><Building2 size={17} aria-hidden /></span>
+            <span className="project-context-copy">
+              <small>Current project</small>
+              <strong>{currentProject.name}</strong>
+            </span>
+            <ChevronsUpDown size={16} aria-hidden />
+          </Link>
+        )}
       </header>
       <main className="app-main" id="main">
         <PageTransition>

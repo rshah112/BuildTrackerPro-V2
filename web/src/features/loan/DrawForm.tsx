@@ -4,17 +4,17 @@ import { CurrencyField } from '../../components/ui/CurrencyField'
 import { Form } from '../../components/ui/Form'
 import { useEntityForm } from '../../lib/useEntityForm'
 import { useCreateDraw, useUpdateDraw } from './useLoan'
+import { localDateISO } from '../../lib/date'
 
 type Draft = Partial<Omit<LoanDraw, 'id' | 'owner' | 'createdAt'>>
 
-const today = () => new Date().toISOString().slice(0, 10)
 const dateValue = (v?: string | null) => (v ? v.slice(0, 10) : '')
 
 const blank = (projectId: string, loanId: string): Draft => ({
   projectId,
   loanId,
   amount: 0,
-  drawDate: today(),
+  drawDate: localDateISO(),
   description: '',
   notes: '',
 })
@@ -49,7 +49,7 @@ export function DrawForm({
                 type="date"
                 {...p}
                 value={dateValue(d.drawDate)}
-                onChange={(e) => set('drawDate', e.target.value || today())}
+                onChange={(e) => set('drawDate', e.target.value || localDateISO())}
               />
             )}
           </Field>

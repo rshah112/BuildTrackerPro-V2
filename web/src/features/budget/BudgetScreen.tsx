@@ -25,6 +25,8 @@ import { LineItemForm } from './LineItemForm'
 import { LineItemDetailSheet } from './LineItemDetailSheet'
 import { HealthPill } from './HealthPill'
 import { ExpenseList } from '../expenses/ExpenseList'
+import { useSyncActuals } from './useSyncActuals'
+import { compareCategories, nextCategorySortOrder } from './categoryOrder'
 
 type Tab = 'budget' | 'expenses'
 type Editing =
@@ -55,6 +57,12 @@ export function BudgetScreen() {
   const restoreLineItem = useRestoreRow('budget_line_items')
   const confirm = useConfirm()
   const toast = useToast()
+  const syncActuals = useSyncActuals(projectId!)
+
+  const orderedCategories = useMemo(
+    () => [...categories].sort(compareCategories),
+    [categories],
+  )
 
   // Group line items by category once (with cent-exact budget/actual totals) instead of
   // re-filtering + re-summing the full list for every category on every render/toggle.
@@ -67,7 +75,13 @@ export function BudgetScreen() {
     }
     const out = new Map<string, { items: BudgetLineItem[]; budget: number; actual: number }>()
     for (const [name, arr] of grouped) {
-      out.set(name, { items: arr, budget: sumBy(arr, (i) => i.budget), actual: sumBy(arr, (i) => i.actual) })
+      const items = [...arr].sort(
+        (a, b) =>
+          Number(b.isPinned) - Number(a.isPinned) ||
+          a.costCode.localeCompare(b.costCode, undefined, { numeric: true }) ||
+          a.title.localeCompare(b.title, undefined, { numeric: true }),
+      )
+      out.set(name, { items, budget: sumBy(items, (i) => i.budget), actual: sumBy(items, (i) => i.actual) })
     }
     return out
   }, [lineItems])
@@ -98,12 +112,22 @@ export function BudgetScreen() {
       allowanceAmount: li.allowanceAmount,
     }
     await createLineItem.mutateAsync(copy)
+    await syncActuals()
     toast.success('Line item duplicated')
   }
   const deleteLineItem = async (li: BudgetLineItem) => {
     if (await confirm({ title: 'Delete line item?', message: `“${li.title}” will be moved to Trash.`, destructive: true })) {
       await removeLineItem.mutateAsync(li.id)
-      toast.success('Line item moved to Trash', { action: { label: 'Undo', onClick: () => restoreLineItem.mutate(li.id) } })
+      await syncActuals()
+      toast.success('Line item moved to Trash', {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            await restoreLineItem.mutateAsync(li.id)
+            await syncActuals()
+          },
+        },
+      })
     }
   }
 
@@ -130,10 +154,10 @@ export function BudgetScreen() {
   const searching = q.trim() !== ''
   const itemMatches = (li: BudgetLineItem) => matchesQuery(q, li.title, li.costCode, li.notes, li.roomTag)
   const shownCats = searching
-    ? categories.filter(
+    ? orderedCategories.filter(
         (cat) => matchesQuery(q, cat.name) || (categoryStats.get(cat.name)?.items ?? []).some(itemMatches),
       )
-    : categories
+    : orderedCategories
 
   return (
     <section>
@@ -313,6 +337,7 @@ export function BudgetScreen() {
           <CategoryForm
             projectId={projectId}
             initial={editing.kind === 'editCategory' ? editing.cat : undefined}
+            nextSortOrder={nextCategorySortOrder(categories)}
             onDone={close}
           />
         )}

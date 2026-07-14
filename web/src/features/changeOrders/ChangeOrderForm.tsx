@@ -29,12 +29,14 @@ export function ChangeOrderForm({
   lineItems,
   initial,
   onSaved,
+  onPostSaveError,
   onDone,
 }: {
   projectId: string
   lineItems: BudgetLineItem[]
   initial?: ChangeOrder
   onSaved: (saved: ChangeOrder) => Promise<void>
+  onPostSaveError?: (error: unknown, saved: ChangeOrder) => void | Promise<void>
   onDone: () => void
 }) {
   const { d, setD, set, text, date, busy, submit } = useEntityForm<ChangeOrder, Draft>({
@@ -43,6 +45,7 @@ export function ChangeOrderForm({
     create: useCreateChangeOrder(),
     update: useUpdateChangeOrder(),
     onSaved,
+    onPostSaveError,
     onDone,
   })
 

@@ -3,7 +3,7 @@ import { notifState } from './notifications'
 
 // Web Push subscription (Phase 2). The VAPID PUBLIC key is safe to ship (it only lets the
 // browser target our push server); the PRIVATE key lives only in Vercel env, used by the
-// reminder cron. Baked prod fallback mirrors how the Supabase anon key is handled.
+// reminder cron. A baked public fallback keeps existing subscribed installs compatible.
 const PROD_VAPID_PUBLIC = 'BDk300BdpTcg4CxGWlYuY3aHy0p78M5kPVQXNFPTRPIXbnbnEVz3kacNa4xGQ2l9ncTE2aJvZIgYZSxAoSr4HUQ'
 const VAPID_PUBLIC =
   import.meta.env.VITE_VAPID_PUBLIC_KEY || (import.meta.env.PROD ? PROD_VAPID_PUBLIC : '')
@@ -46,6 +46,31 @@ export async function subscribeToPush(): Promise<boolean> {
       { onConflict: 'endpoint' },
     )
     return !error
+  } catch {
+    return false
+  }
+}
+
+/** Remove this browser's push endpoint while the current auth session can still
+ * satisfy RLS, then unsubscribe locally so a signed-out device cannot receive reminders. */
+export async function unsubscribeFromPush(): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return true
+  try {
+    const registration = await navigator.serviceWorker.getRegistration()
+    const subscription = await registration?.pushManager.getSubscription()
+    if (!subscription) return true
+
+    const endpoint = subscription.endpoint
+    let serverDeleted = false
+    try {
+      const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint)
+      serverDeleted = !error
+    } catch {
+      // Still unsubscribe the browser below; the push service will subsequently report
+      // the stale server endpoint as gone and the reminder job removes dead endpoints.
+    }
+    const unsubscribed = await subscription.unsubscribe()
+    return serverDeleted && unsubscribed
   } catch {
     return false
   }

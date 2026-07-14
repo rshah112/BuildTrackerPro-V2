@@ -28,9 +28,11 @@ const exp = (over: Partial<AggExpense> = {}): AggExpense => ({
   budgetLineItemId: null,
   budgetLineItemTitle: '',
   categoryName: '',
+  changeOrderId: null,
   ...over,
 })
 const co = (over: Partial<AggChangeOrder> = {}): AggChangeOrder => ({
+  id: 'co',
   amount: 0,
   status: 'pending',
   budgetLineItemId: null,
@@ -64,6 +66,32 @@ describe('recalculateActuals', () => {
       [],
     )
     expect(result.get('a')).toBe(250)
+  })
+
+  it('resolves ambiguous legacy title links to the lowest id regardless of input order', () => {
+    const items = [
+      item({ id: 'b', title: 'Framing', categoryName: 'Structure' }),
+      item({ id: 'a', title: 'Framing', categoryName: 'Structure' }),
+    ]
+    const result = recalculateActuals(
+      items,
+      [exp({ amount: 250, budgetLineItemTitle: 'framing', categoryName: 'structure' })],
+      [],
+      [],
+    )
+    expect(result.get('a')).toBe(250)
+    expect(result.get('b')).toBe(0)
+  })
+
+  it('does not add a paid change order again when an expense represents it', () => {
+    const items = [item({ id: 'a', title: 'Framing' })]
+    const result = recalculateActuals(
+      items,
+      [exp({ amount: 300, budgetLineItemId: 'a', changeOrderId: 'co1' })],
+      [{ ...co({ amount: 300, status: 'paid', budgetLineItemId: 'a' }), id: 'co1' }],
+      [],
+    )
+    expect(result.get('a')).toBe(300)
   })
 })
 
@@ -102,12 +130,36 @@ describe('actualSpend de-dups allowance expenses against selections', () => {
     // double-counted before the fix.
     expect(total).toBe(900)
   })
+
+
+  it('de-duplicates a linked change order from actual spend', () => {
+    const items = [item({ id: 'a' })]
+    expect(
+      actualSpend(
+        items,
+        [exp({ amount: 500, budgetLineItemId: 'a', changeOrderId: 'co1' })],
+        [],
+        [{ ...co({ amount: 500, status: 'paid' }), id: 'co1' }],
+      ),
+    ).toBe(500)
+  })
 })
 
 describe('committedSpend', () => {
   it('open commitments + approved COs', () => {
     const items = [item({ id: 'a', budget: 1000, actual: 100, committed: 400 })] // open = 300
     expect(committedSpend(items, [co({ amount: 200, status: 'approved' })])).toBe(500)
+  })
+
+
+  it('excludes approved change orders already represented by linked expenses', () => {
+    expect(
+      committedSpend(
+        [],
+        [{ ...co({ amount: 200, status: 'approved' }), id: 'co1' }],
+        [exp({ amount: 200, changeOrderId: 'co1' })],
+      ),
+    ).toBe(0)
   })
 })
 
@@ -117,11 +169,31 @@ describe('cashPaidTotal', () => {
       cashPaidTotal([exp({ amount: 100, amountPaid: 60, isPaid: true })], [co({ amount: 100, status: 'paid' })]),
     ).toBe(160)
   })
+
+
+  it('does not count cash twice for a linked paid change order', () => {
+    expect(
+      cashPaidTotal(
+        [exp({ amount: 100, amountPaid: 60, isPaid: true, changeOrderId: 'co1' })],
+        [{ ...co({ amount: 100, status: 'paid' }), id: 'co1' }],
+      ),
+    ).toBe(60)
+  })
 })
 
 describe('pendingExposure', () => {
   it('sums pending COs only', () => {
     expect(pendingExposure([co({ amount: 30, status: 'pending' }), co({ amount: 99, status: 'paid' })])).toBe(30)
+  })
+
+
+  it('excludes a pending order represented by a linked expense', () => {
+    expect(
+      pendingExposure(
+        [{ ...co({ amount: 30, status: 'pending' }), id: 'co1' }],
+        [exp({ amount: 30, changeOrderId: 'co1' })],
+      ),
+    ).toBe(0)
   })
 })
 

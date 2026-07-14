@@ -6,6 +6,8 @@ import { Form } from '../../components/ui/Form'
 import { useEntityForm } from '../../lib/useEntityForm'
 import { useCreateLineItem, useUpdateLineItem } from './useBudget'
 import { cascadeLineItemTitle } from './cascadeLineItemTitle'
+import { useSyncActuals } from './useSyncActuals'
+import { useToast } from '../../components/ui/Toast'
 
 type Draft = Partial<Omit<BudgetLineItem, 'id' | 'owner' | 'createdAt'>>
 
@@ -36,11 +38,21 @@ export function LineItemForm({
   onDone: () => void
 }) {
   const qc = useQueryClient()
+  const toast = useToast()
+  const syncActuals = useSyncActuals(projectId)
   const { d, setD, text, busy, submit } = useEntityForm<BudgetLineItem, Draft>({
     initial,
     blank: blank(projectId, categoryName),
     create: useCreateLineItem(),
     update: useUpdateLineItem(),
+    // `actual` is derived from expenses, paid change orders, and allowance selections.
+    // Omit the cached value so an editor opened before a background reconciliation can
+    // never overwrite the newer database total (or have an otherwise valid edit rejected).
+    transform: (draft) => {
+      const payload = { ...draft } as Record<string, unknown>
+      for (const key of ['actual', 'id', 'owner', 'createdAt', 'deletedAt']) delete payload[key]
+      return payload as Draft
+    },
     // A title change must propagate to the denormalized budgetLineItemTitle on expenses/COs/docs
     // (otherwise list rows and the Excel export show the old name). The id link is unaffected, so
     // money is never wrong — this is display consistency.
@@ -53,7 +65,9 @@ export function LineItemForm({
           qc.invalidateQueries({ queryKey: ['project_documents'] }),
         ])
       }
+      await syncActuals()
     },
+    onPostSaveError: () => toast.error('Line item saved, but linked totals or labels need a refresh.'),
     onDone,
   })
   const money = (k: keyof Draft) => (v: number) => setD((p) => ({ ...p, [k]: v }))

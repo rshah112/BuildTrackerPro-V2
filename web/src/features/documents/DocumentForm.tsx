@@ -7,6 +7,7 @@ import { Select } from '../../components/ui/Select'
 import { FileUploadField } from '../../components/ui/FileUploadField'
 import { Form } from '../../components/ui/Form'
 import { useCreateDocument, useUpdateDocument, DOCUMENT_KIND_LABEL } from './useDocuments'
+import { useDirtyState } from '../../lib/useDirtyState'
 
 type Draft = Partial<Omit<ProjectDocument, 'id' | 'owner'>>
 
@@ -40,7 +41,9 @@ export function DocumentForm({
   initial?: ProjectDocument
   onDone: () => void
 }) {
-  const [d, setD] = useState<Draft>(initial ?? blank(projectId, initialKind))
+  const { value: d, setValue: setD, markClean, markDirty } = useDirtyState<Draft>(
+    initial ?? blank(projectId, initialKind),
+  )
   const [file, setFile] = useState<File | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const create = useCreateDocument()
@@ -72,6 +75,7 @@ export function DocumentForm({
       const payload: Draft = { ...d, projectId, fileObjectKey, fileName: fileName.trim() || 'Document' }
       if (initial) await update.mutateAsync({ id: initial.id, patch: payload })
       else await create.mutateAsync(payload)
+      markClean()
       onDone()
     } catch (e2) {
       setErr((e2 as Error).message || 'Upload failed — document storage may not be configured yet.')
@@ -88,7 +92,10 @@ export function DocumentForm({
           cameraLabel="Take photo"
           fileAccept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
           fileLabel="Choose file"
-          onPick={setFile}
+          onPick={(picked) => {
+            setFile(picked)
+            markDirty()
+          }}
         />
         {(file || d.fileObjectKey) && <p className="muted">{file ? file.name : d.fileName || 'File attached'}</p>}
         <Field label="Display name" hint="Optional — defaults to the uploaded file name.">

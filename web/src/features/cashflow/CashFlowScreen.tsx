@@ -1,6 +1,6 @@
 import { CalendarClock } from 'lucide-react'
 import { fmt, sumBy } from '../../lib/money'
-import { balanceDue } from '../../lib/expenseMath'
+import { payableBalance } from '../../lib/expenseMath'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Badge } from '../../components/ui/Badge'
 import { EmptyState, ListSkeleton } from '../../components/ui/Feedback'
@@ -42,13 +42,18 @@ export function CashFlowScreen() {
   // Overdue: still-owing items whose date is already in the past (outside the forward window).
   const overdueExpenses = expenses.filter((e) => {
     const due = e.expectedPaymentDate ?? e.dueDate
-    return balanceDue(e) > 0 && due != null && due.slice(0, 10) < today
+    return payableBalance(e) > 0 && due != null && due.slice(0, 10) < today
   })
+  const invoicedOrderIds = new Set(expenses.flatMap((expense) => (expense.changeOrderId ? [expense.changeOrderId] : [])))
   const overdueOrders = changeOrders.filter(
-    (c) => c.status !== 'paid' && c.expectedPaymentDate != null && c.expectedPaymentDate.slice(0, 10) < today,
+    (c) =>
+      c.status !== 'paid' &&
+      !invoicedOrderIds.has(c.id) &&
+      c.expectedPaymentDate != null &&
+      c.expectedPaymentDate.slice(0, 10) < today,
   )
   const overdueTotal =
-    sumBy(overdueExpenses, (e) => balanceDue(e)) + sumBy(overdueOrders, (c) => c.amount)
+    sumBy(overdueExpenses, payableBalance) + sumBy(overdueOrders, (c) => c.amount)
   const hasOverdue = overdueExpenses.length + overdueOrders.length > 0
 
   return (
@@ -72,7 +77,7 @@ export function CashFlowScreen() {
                     {e.categoryName ? ` · ${e.categoryName}` : ''}
                   </span>
                 </div>
-                <strong>{fmt(balanceDue(e))}</strong>
+                <strong>{fmt(payableBalance(e))}</strong>
               </li>
             ))}
             {overdueOrders.map((c) => (

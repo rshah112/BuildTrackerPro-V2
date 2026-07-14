@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { objectKeyFor, keyBelongsToUser } from './objectKey'
-import { uploadBlob } from './r2'
+import { deleteBlob, uploadBlob } from './r2'
 
 vi.mock('./supabase', () => ({
   supabase: {
@@ -37,6 +37,11 @@ describe('uploadBlob', () => {
     expect(res).toEqual({ key: 'u1/photo/xyz' })
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(fetchMock.mock.calls[0][0]).toBe('/api/r2-sign')
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      op: 'put',
+      entity: 'photo',
+      contentLength: 1,
+    })
     expect(fetchMock.mock.calls[1][0]).toBe('https://r2/put')
     expect(fetchMock.mock.calls[1][1].method).toBe('PUT')
   })
@@ -50,5 +55,23 @@ describe('uploadBlob', () => {
 
     expect(res.key.startsWith('local/photo/')).toBe(true)
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects empty and oversized files before requesting a signed URL', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(uploadBlob(new Blob([]), 'photo')).rejects.toThrow(/empty/)
+    await expect(
+      uploadBlob({ size: 50 * 1024 * 1024 + 1, type: 'application/octet-stream' } as Blob, 'photo'),
+    ).rejects.toThrow(/50 MB/)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('requests an authenticated permanent object deletion', async () => {
+    vi.stubEnv('VITE_R2_LOCAL', '')
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal('fetch', fetchMock)
+    await deleteBlob('u1/backup/abc')
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ op: 'delete', key: 'u1/backup/abc' })
   })
 })

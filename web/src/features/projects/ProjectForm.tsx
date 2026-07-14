@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react'
+import { type ChangeEvent, type FormEvent } from 'react'
 import type { Project } from '../../domain/types'
 import { PROJECT_STATUSES, PROJECT_PRIORITIES, PROJECT_TEMPLATE_TYPES } from '../../domain/enums'
 import { Field } from '../../components/ui/Field'
@@ -8,6 +8,7 @@ import { Form } from '../../components/ui/Form'
 import { useToast } from '../../components/ui/Toast'
 import { useCreateProject, useUpdateProject } from './useProjects'
 import { seedProjectBudget } from './seedBudget'
+import { useDirtyState } from '../../lib/useDirtyState'
 
 type Draft = Partial<Project>
 
@@ -36,7 +37,7 @@ const blank: Draft = {
 const dateValue = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : '')
 
 export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: (createdId?: string) => void }) {
-  const [d, setD] = useState<Draft>(initial ?? blank)
+  const { value: d, setValue: setD, markClean } = useDirtyState<Draft>(initial ?? blank)
   const create = useCreateProject()
   const update = useUpdateProject()
   const toast = useToast()
@@ -57,6 +58,7 @@ export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: (c
     e.preventDefault()
     if (initial) {
       await update.mutateAsync({ id: initial.id, patch: d })
+      markClean()
       onDone()
     } else {
       const created = await create.mutateAsync(d)
@@ -72,6 +74,7 @@ export function ProjectForm({ initial, onDone }: { initial?: Project; onDone: (c
           toast.show('Project created — set up the budget categories manually')
         }
       }
+      markClean()
       onDone(newId)
     }
   }

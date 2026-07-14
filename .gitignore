@@ -26,6 +26,8 @@ Package.resolved
 # Project local
 .idea/
 *.swp
+.private-backups/
+**/supabase/.temp/
 
 # QA artifacts (local screen-walk screenshots, etc.)
 QA/

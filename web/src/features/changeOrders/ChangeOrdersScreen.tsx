@@ -156,6 +156,9 @@ export function ChangeOrdersScreen() {
               await syncActuals({ changeOrders: upsert(orders, saved) })
               toast.success('Change order saved')
             }}
+            onPostSaveError={() =>
+              toast.error('Change order saved, but budget totals could not refresh. Reopen Budget to reconcile them.')
+            }
             onDone={editor.close}
           />
         )}

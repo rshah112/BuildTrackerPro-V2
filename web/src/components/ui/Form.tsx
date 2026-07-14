@@ -1,5 +1,6 @@
 import type { FormEvent, ReactNode } from 'react'
 import { Button } from './Button'
+import { hasUnsavedChanges } from '../../lib/unsavedChanges'
 
 /** Compound form scaffold shared by every entity form. Renders the established `.form`
  *  markup so existing styling/tests are unaffected:
@@ -39,12 +40,16 @@ function Actions({
   saveLabel?: string
   cancelLabel?: string
 }) {
+  const cancel = () => {
+    if (hasUnsavedChanges() && !window.confirm('Discard your unsaved changes?')) return
+    onCancel()
+  }
   return (
     <div className="form-actions form-actions-sticky">
       <Button type="submit" loading={busy} fullWidth>
         {saveLabel}
       </Button>
-      <Button type="button" variant="secondary" onClick={onCancel}>
+      <Button type="button" variant="secondary" onClick={cancel}>
         {cancelLabel}
       </Button>
     </div>

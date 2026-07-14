@@ -14,3 +14,13 @@ export function fmtDate(iso: string | null | undefined, opts?: Intl.DateTimeForm
   if (!y || !m || !d) return ''
   return new Date(y, m - 1, d).toLocaleDateString(undefined, opts)
 }
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** Return yyyy-mm-dd for the device-local calendar day.
+ *
+ * Do not replace this with `date.toISOString().slice(0, 10)`: ISO serialization first
+ * converts to UTC, which can select tomorrow or yesterday near local midnight. */
+export function localDateISO(date: Date = new Date()): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
+}

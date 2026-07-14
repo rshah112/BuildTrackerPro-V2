@@ -4,25 +4,31 @@
 //
 // Run:
 //   SUPABASE_URL=.. SUPABASE_ANON_KEY=.. SUPABASE_SERVICE_ROLE=.. \
-//   FRIEND=kyle node web/scripts/seed-friend.mjs
-//   FRIEND=mihir node web/scripts/seed-friend.mjs
+//   FRIEND=kyle FRIEND_EMAIL=.. FRIEND_PASSWORD=.. node web/scripts/seed-friend.mjs
 
 import { createClient } from '@supabase/supabase-js'
 
 const url = process.env.SUPABASE_URL
 const anon = process.env.SUPABASE_ANON_KEY
+const serviceRole = process.env.SUPABASE_SERVICE_ROLE
 const which = (process.env.FRIEND || '').toLowerCase()
+const email = (process.env.FRIEND_EMAIL || '').trim()
+const password = process.env.FRIEND_PASSWORD || ''
 
-if (!url || !anon || !which) {
-  console.error('Need SUPABASE_URL, SUPABASE_ANON_KEY, FRIEND=kyle|mihir')
+if (!url || !anon || !serviceRole || !which || !email || !password) {
+  console.error(
+    'Need SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE, FRIEND=kyle|mihir, FRIEND_EMAIL, and FRIEND_PASSWORD',
+  )
+  process.exit(1)
+}
+if (password.length < 12 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+  console.error('FRIEND_PASSWORD must be at least 12 characters and contain letters and digits')
   process.exit(1)
 }
 
 // share = relative weight; line-item budget = round(total * share / sumShares), cents-safe-ish.
 const FRIENDS = {
   kyle: {
-    email: 'kyle@buildtracker.app',
-    password: 'password',
     total: 120000,
     project: {
       name: 'Backyard Pool',
@@ -46,8 +52,6 @@ const FRIENDS = {
     ],
   },
   mihir: {
-    email: 'mihir@buildtracker.app',
-    password: 'password',
     total: 45000,
     project: {
       name: 'Backyard Deck',
@@ -76,22 +80,23 @@ if (!cfg) {
   process.exit(1)
 }
 
-// 1) Create the user via the public signup endpoint (this project auto-confirms email).
-//    Idempotent: an existing user just fails signup, then we sign in below.
+// 1) Public signups are disabled. Create the requested account through the admin API;
+//    an already-existing account is left untouched so this remains idempotent.
+const admin = createClient(url, serviceRole, { auth: { persistSession: false } })
 const supa = createClient(url, anon, { db: { schema: 'buildtracker' }, auth: { persistSession: false } })
-const { error: signUpErr } = await supa.auth.signUp({ email: cfg.email, password: cfg.password })
-if (signUpErr && !/already|registered|exists/i.test(signUpErr.message)) {
-  console.error('signup failed:', signUpErr.message)
+const { error: createUserErr } = await admin.auth.admin.createUser({ email, password, email_confirm: true })
+if (createUserErr && !/already|registered|exists/i.test(createUserErr.message)) {
+  console.error('user creation failed:', createUserErr.message)
   process.exit(1)
 }
 
 // 2) Sign in as the user so RLS owns the rows.
-const { error: signInErr } = await supa.auth.signInWithPassword({ email: cfg.email, password: cfg.password })
+const { error: signInErr } = await supa.auth.signInWithPassword({ email, password })
 if (signInErr) {
-  console.error('sign-in failed:', signInErr.message)
+  console.error('sign-in failed (for an existing account, supply its current password):', signInErr.message)
   process.exit(1)
 }
-console.log('user ready:', cfg.email)
+console.log('user ready:', email)
 
 const { data: existing } = await supa.from('projects').select('id').eq('name', cfg.project.name).limit(1)
 if (existing && existing.length) {
@@ -122,6 +127,8 @@ const categoryRows = cfg.categories.map((c, i) => ({
   target_budget: round100(c.items.reduce((s, [, sh]) => s + sh * perShare, 0)),
   system_image: c.icon,
 }))
+const roundedCategoryTotal = categoryRows.reduce((sum, row) => sum + row.target_budget, 0)
+if (categoryRows.length) categoryRows[categoryRows.length - 1].target_budget += cfg.total - roundedCategoryTotal
 const { error: cErr } = await supa.from('budget_categories').insert(categoryRows)
 if (cErr) {
   console.error('categories insert failed:', cErr.message)
@@ -141,6 +148,13 @@ const lineRows = cfg.categories.flatMap((c, ci) =>
     allowance_amount: 0,
   })),
 )
+// Keep the friendly rounded figures while making each category add up to its target.
+// (Independent $100 rounding can otherwise drift by several hundred dollars.)
+for (const category of categoryRows) {
+  const rows = lineRows.filter((row) => row.category_name === category.name)
+  const roundedTotal = rows.reduce((sum, row) => sum + row.budget, 0)
+  if (rows.length) rows[rows.length - 1].budget += category.target_budget - roundedTotal
+}
 const { error: lErr } = await supa.from('budget_line_items').insert(lineRows)
 if (lErr) {
   console.error('line items insert failed:', lErr.message)
@@ -148,4 +162,4 @@ if (lErr) {
 }
 
 const sum = lineRows.reduce((s, r) => s + r.budget, 0)
-console.log(`seeded "${cfg.project.name}" for ${cfg.email}: ${categoryRows.length} categories, ${lineRows.length} line items, $${sum.toLocaleString()} allocated`)
+console.log(`seeded "${cfg.project.name}" for ${email}: ${categoryRows.length} categories, ${lineRows.length} line items, $${sum.toLocaleString()} allocated`)

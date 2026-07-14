@@ -134,6 +134,9 @@ export function AllowancesScreen() {
               await syncActuals({ allowanceSelections: upsert(selections, saved) })
               toast.success('Allowance selection saved')
             }}
+            onPostSaveError={() =>
+              toast.error('Selection saved, but budget totals could not refresh. Reopen Budget to reconcile them.')
+            }
             onDone={editor.close}
           />
         )}

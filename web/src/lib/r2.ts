@@ -14,6 +14,7 @@ function isLocal(): boolean {
 }
 
 const localBlobs = new Map<string, Blob>()
+const MAX_BLOB_BYTES = 50 * 1024 * 1024
 
 async function authHeader(): Promise<string> {
   const { data } = await supabase.auth.getSession()
@@ -21,6 +22,8 @@ async function authHeader(): Promise<string> {
 }
 
 export async function uploadBlob(file: Blob, entity: string): Promise<UploadResult> {
+  if (file.size < 1) throw new Error('The selected file is empty')
+  if (file.size > MAX_BLOB_BYTES) throw new Error('Files must be 50 MB or smaller')
   if (isLocal()) {
     const key = objectKeyFor('local', entity, crypto.randomUUID())
     localBlobs.set(key, file)
@@ -30,7 +33,7 @@ export async function uploadBlob(file: Blob, entity: string): Promise<UploadResu
   const signRes = await fetch('/api/r2-sign', {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: await authHeader() },
-    body: JSON.stringify({ op: 'put', entity, contentType }),
+    body: JSON.stringify({ op: 'put', entity, contentType, contentLength: file.size }),
   })
   if (!signRes.ok) throw new Error(`r2 sign failed: ${signRes.status}`)
   const { url, key } = (await signRes.json()) as { url: string; key: string }
@@ -53,4 +56,18 @@ export async function signedDownloadUrl(key: string): Promise<string> {
   if (!res.ok) throw new Error(`r2 sign(get) failed: ${res.status}`)
   const { url } = (await res.json()) as { url: string }
   return url
+}
+
+/** Permanently remove an object owned by the signed-in user. */
+export async function deleteBlob(key: string): Promise<void> {
+  if (isLocal()) {
+    localBlobs.delete(key)
+    return
+  }
+  const res = await fetch('/api/r2-sign', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: await authHeader() },
+    body: JSON.stringify({ op: 'delete', key }),
+  })
+  if (!res.ok) throw new Error(`r2 delete failed: ${res.status}`)
 }

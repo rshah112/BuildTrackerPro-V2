@@ -1,5 +1,6 @@
 import type { ChangeOrder, Expense } from '../../domain/types'
-import { balanceDue } from '../../lib/expenseMath'
+import { payableBalance } from '../../lib/expenseMath'
+import { localDateISO } from '../../lib/date'
 import { cents, dollars, sumBy } from '../../lib/money'
 
 // Port of ParamusBuild/Data/CashFlowService.swift — 14-day cash outflow forecast.
@@ -28,14 +29,11 @@ export interface CashFlowDay {
 
 const day = (iso: string) => iso.slice(0, 10)
 const max = (a: string, b: string) => (a < b ? b : a)
-const pad2 = (n: number) => String(n).padStart(2, '0')
 
 /** Today as yyyy-mm-dd in the DEVICE-LOCAL calendar (not UTC), so the 14-day horizon
  *  lines up with the user's actual day rather than shifting near midnight in non-UTC
  *  timezones. Pass this to the forecast functions. */
-export function localToday(d: Date = new Date()): string {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
-}
+export const localToday = localDateISO
 
 export function addDays(iso: string, days: number): string {
   const [y, m, d] = day(iso).split('-').map(Number)
@@ -61,9 +59,7 @@ export function cashFlowPayments(
   const end = addDays(start, FORECAST_DAYS)
 
   const expensePayments: CashFlowPayment[] = expenses.flatMap((e) => {
-    // Retainage is held until completion — not a near-term obligation — so exclude it from the
-    // upcoming "due" amount (cent-exact).
-    const due = dollars(Math.max(0, cents(balanceDue(e)) - cents(e.retainageAmount ?? 0)))
+    const due = payableBalance(e)
     if (due <= 0) return []
     const expected = e.expectedPaymentDate ?? e.dueDate
     if (!expected) return []
@@ -84,8 +80,9 @@ export function cashFlowPayments(
     ]
   })
 
+  const invoicedOrderIds = new Set(expenses.flatMap((expense) => (expense.changeOrderId ? [expense.changeOrderId] : [])))
   const orderPayments: CashFlowPayment[] = changeOrders.flatMap((o) => {
-    if (o.status === 'paid' || !o.expectedPaymentDate) return []
+    if (o.status === 'paid' || invoicedOrderIds.has(o.id) || !o.expectedPaymentDate) return []
     const expDay = day(o.expectedPaymentDate)
     if (!includeOverdue && expDay < start) return []
     const forecastDay = max(expDay, start)

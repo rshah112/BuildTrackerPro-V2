@@ -1,11 +1,15 @@
-import { useMemo, useRef, useState, type ChangeEvent } from 'react'
-import { ScanLine, Upload, ChevronDown } from 'lucide-react'
+import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { ScanLine, Upload, ChevronDown, CircleCheck, TriangleAlert, Sparkles } from 'lucide-react'
 import type { BudgetLineItem, Expense } from '../../domain/types'
 import { PAYMENT_METHODS } from '../../domain/enums'
 import { balanceDue } from '../../lib/expenseMath'
 import { fmt } from '../../lib/money'
 import { uploadBlob, signedDownloadUrl } from '../../lib/r2'
-import { scanReceipt, looksLikeInvoice } from '../../lib/receiptOcr'
+import {
+  scanReceipt,
+  type ReceiptFieldName,
+  type ReceiptScan,
+} from '../../lib/receiptOcr'
 import { getLastUsed, setLastUsed } from '../../lib/lastUsed'
 import { Field } from '../../components/ui/Field'
 import { Select } from '../../components/ui/Select'
@@ -24,11 +28,129 @@ import { VendorPicker } from '../vendors/VendorPicker'
 import { useLoan } from '../loan/useLoan'
 import { useCreateLineItem } from '../budget/useBudget'
 import { RoomTagPicker } from '../rooms/RoomTagPicker'
+import { localDateISO } from '../../lib/date'
+import { useChangeOrders } from '../changeOrders/useChangeOrders'
 
 type Draft = Partial<Omit<Expense, 'id' | 'owner'>>
 
-const today = () => new Date().toISOString().slice(0, 10)
 const dateValue = (v?: string | null) => (v ? v.slice(0, 10) : '')
+
+const SCAN_FIELD_LABEL: Record<ReceiptFieldName, string> = {
+  vendor: 'Vendor',
+  amount: 'Amount',
+  date: 'Date',
+  invoiceNumber: 'Invoice #',
+  dueDate: 'Due date',
+}
+
+function scanFieldValue(name: ReceiptFieldName, value: string | number): string {
+  return name === 'amount' && typeof value === 'number'
+    ? new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(value)
+    : String(value)
+}
+
+function ScanReview({
+  scan,
+  onUse,
+}: {
+  scan: ReceiptScan
+  onUse: (name: ReceiptFieldName, value: string | number) => void
+}) {
+  const found = (Object.keys(SCAN_FIELD_LABEL) as ReceiptFieldName[]).filter(
+    (name) => scan.fields[name].value != null,
+  )
+  const review = new Set(scan.needsReview)
+  const typeConflict = scan.warnings.includes('document_type_conflict')
+  const needsPaymentReview =
+    typeConflict || scan.documentType === 'unknown' || scan.documentTypeConfidence < 0.7
+  const clean =
+    found.length > 0 &&
+    review.size === 0 &&
+    !scan.extraction.manualFallback &&
+    !needsPaymentReview
+  const method = scan.extraction.usedAi && scan.extraction.usedLocalOcr
+    ? 'AI + on-device verification'
+    : scan.extraction.usedAi
+      ? 'Document AI'
+      : scan.extraction.usedLocalOcr
+        ? 'On-device text recognition'
+        : 'Manual entry'
+
+  return (
+    <aside className={`scan-review ${clean ? 'scan-review-clean' : 'scan-review-warn'}`} aria-live="polite">
+      <div className="scan-review-head">
+        <span className="scan-review-icon">
+          {clean ? <CircleCheck size={18} aria-hidden /> : <TriangleAlert size={18} aria-hidden />}
+        </span>
+        <span className="scan-review-title">
+          <strong>{clean ? 'Scan looks reliable' : 'Review the highlighted scan results'}</strong>
+          <small>
+            {scan.documentType === 'unknown' ? 'Document' : scan.documentType[0].toUpperCase() + scan.documentType.slice(1)}
+            {' · '}{method}
+          </small>
+        </span>
+      </div>
+      {found.length > 0 ? (
+        <div className="scan-field-chips" aria-label="Detected fields">
+          {found.filter((name) => !review.has(name)).map((name) => {
+            const field = scan.fields[name]
+            return (
+              <span
+                className={`scan-field-chip ${review.has(name) ? 'needs-review' : 'is-confident'}`}
+                key={name}
+              >
+                {SCAN_FIELD_LABEL[name]} · {Math.round(field.confidence * 100)}%
+              </span>
+            )
+          })}
+        </div>
+      ) : (
+        <p>Nothing reliable was detected. The file is attached; enter the details manually.</p>
+      )}
+      {review.size > 0 && (
+        <>
+          <p>
+            Check {Array.from(review, (name) => SCAN_FIELD_LABEL[name]).join(', ')} against the original before saving.
+          </p>
+          <div className="scan-candidate-list" aria-label="Scan suggestions needing review">
+            {found.filter((name) => review.has(name)).map((name) => {
+              const field = scan.fields[name]
+              if (field.value == null) return null
+              return (
+                <div className="scan-candidate" key={name}>
+                  <span className="scan-candidate-copy">
+                    <small>{SCAN_FIELD_LABEL[name]} suggestion · {Math.round(field.confidence * 100)}%</small>
+                    <strong>{scanFieldValue(name, field.value)}</strong>
+                    {field.evidence && <span>Detected near “{field.evidence}”</span>}
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    aria-label={`Use ${SCAN_FIELD_LABEL[name]} suggestion: ${scanFieldValue(name, field.value)}`}
+                    onClick={() => onUse(name, field.value!)}
+                  >
+                    Use
+                  </Button>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
+      {needsPaymentReview && (
+        <p>
+          The scan could not confidently tell whether this is a paid receipt or an unpaid invoice. Confirm Paid or Unpaid before saving.
+        </p>
+      )}
+    </aside>
+  )
+}
 
 function blank(projectId: string): Draft {
   return {
@@ -37,10 +159,10 @@ function blank(projectId: string): Draft {
     amountPaid: 0,
     vendorName: '',
     invoiceNumber: '',
-    date: today(),
+    date: localDateISO(),
     dueDate: null,
     expectedPaymentDate: null,
-    paidDate: today(),
+    paidDate: localDateISO(),
     paymentMethod: '',
     paymentReference: '',
     categoryName: '',
@@ -49,9 +171,11 @@ function blank(projectId: string): Draft {
     budgetLineItemTitle: '',
     notes: '',
     // Smart default: a fresh expense is Unpaid (a bill to track). Scanning a receipt flips it
-    // to Paid; scanning an invoice keeps it Unpaid — see runExtraction.
+    // to Paid only when the classifier is confident; uncertain scans stay Unpaid for review.
     isPaid: false,
     receiptObjectKey: null,
+    vendorId: null,
+    changeOrderId: null,
     fundingSource: '',
     retainageAmount: 0,
   }
@@ -62,27 +186,35 @@ export function ExpenseForm({
   lineItems,
   initial,
   onSaved,
+  onPostSaveError,
   onDone,
 }: {
   projectId: string
   lineItems: BudgetLineItem[]
   initial?: Expense
   onSaved: (expense: Expense) => Promise<void>
+  onPostSaveError?: (error: unknown, expense: Expense) => void | Promise<void>
   onDone: () => void
 }) {
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
   // Once the user edits "Amount paid", honor their literal value (incl. $0) instead of
   // re-deriving the full-amount default on every render.
   const [paidTouched, setPaidTouched] = useState(false)
+  // OCR may replace untouched defaults, but it must never undo an explicit date/status
+  // choice—or silently rewrite those fields while editing an existing expense.
+  const dateTouched = useRef(!!initial)
+  const paidStatusTouched = useRef(!!initial)
   // Editing an existing expense reveals the exact paid amount/date; new entries assume
   // "paid in full today" until the user taps Adjust.
   const [adjustPaid, setAdjustPaid] = useState(!!initial)
   // Auto-opened when OCR fills a tucked-away field (invoice # / due date) so it's visible.
   const [moreOpen, setMoreOpen] = useState(false)
   const hasLoan = (useLoan(projectId).data ?? []).length > 0
+  const { data: changeOrders = [] } = useChangeOrders(projectId)
   const scanRef = useRef<HTMLInputElement>(null)
   const uploadRef = useRef<HTMLInputElement>(null)
   const [scanning, setScanning] = useState(false)
+  const [scanResult, setScanResult] = useState<ReceiptScan | null>(null)
   const toast = useToast()
 
   // Vendor suggestions: every distinct name from the vendor list + past expenses.
@@ -136,6 +268,7 @@ export function ExpenseForm({
     create: useCreateExpense(),
     update: useUpdateExpense(),
     onSaved,
+    onPostSaveError,
     onDone,
     transform: async (draft) => {
       const amount = draft.amount ?? 0
@@ -149,18 +282,37 @@ export function ExpenseForm({
       if (isPaid && draft.paymentMethod) setLastUsed('expense.paymentMethod', draft.paymentMethod)
       if (hasLoan && draft.fundingSource) setLastUsed('expense.fundingSource', draft.fundingSource)
       // Auto-create a vendor profile for a typed name (best-effort; never blocks the save).
+      // Persist its id when available so tax rollups survive a later vendor rename.
+      const sameVendorAsBefore =
+        !!initial &&
+        (initial.vendorName ?? '').trim().toLocaleLowerCase() ===
+          (draft.vendorName ?? '').trim().toLocaleLowerCase()
+      let vendorId = sameVendorAsBefore ? draft.vendorId ?? null : null
       try {
-        await ensureVendor(draft.vendorName)
+        const vendor = await ensureVendor(draft.vendorName)
+        vendorId = vendor?.id ?? null
       } catch {
         /* vendor auto-create is best-effort */
+      }
+      const amountPaid = isPaid
+        ? paidTouched
+          ? draft.amountPaid ?? 0
+          : resolvePaidAmount(true, draft.amountPaid ?? 0, amount)
+        : 0
+      const remaining = balanceDue({ amount, amountPaid, isPaid })
+      const retainageAmount = draft.retainageAmount ?? 0
+      if (retainageAmount < 0 || retainageAmount > remaining) {
+        throw new Error(`Retainage must be between $0 and the ${fmt(remaining)} remaining balance.`)
       }
       return {
         ...draft,
         projectId,
         amount,
         // If they explicitly set the paid amount (incl. $0), keep it; else default to full.
-        amountPaid: isPaid ? (paidTouched ? draft.amountPaid ?? 0 : resolvePaidAmount(true, draft.amountPaid ?? 0, amount)) : 0,
-        paidDate: isPaid ? draft.paidDate || today() : null,
+        amountPaid,
+        paidDate: isPaid ? draft.paidDate || localDateISO() : null,
+        vendorId,
+        changeOrderId: draft.changeOrderId || null,
         budgetLineItemId: draft.budgetLineItemId || null,
         budgetLineItemTitle: selected?.title ?? draft.budgetLineItemTitle ?? '',
         categoryName: selected?.categoryName ?? draft.categoryName ?? '',
@@ -223,40 +375,77 @@ export function ExpenseForm({
     }))
     toast.success(`Added “${li.title}” to your budget — set its amount in Budget anytime.`)
   }
-  const setPaid = (paid: boolean) =>
-    setD((p) => ({ ...p, isPaid: paid, paidDate: paid ? p.paidDate || today() : null }))
+  const setPaid = (paid: boolean) => {
+    paidStatusTouched.current = true
+    setD((p) => ({ ...p, isPaid: paid, paidDate: paid ? p.paidDate || localDateISO() : null }))
+  }
+
+  const useScanSuggestion = (name: ReceiptFieldName, value: string | number) => {
+    switch (name) {
+      case 'vendor':
+        setD((p) => ({ ...p, vendorName: String(value) }))
+        break
+      case 'amount':
+        setD((p) => ({ ...p, amount: Number(value) }))
+        break
+      case 'date':
+        dateTouched.current = true
+        setD((p) => ({ ...p, date: String(value) }))
+        break
+      case 'invoiceNumber':
+        setMoreOpen(true)
+        setD((p) => ({ ...p, invoiceNumber: String(value) }))
+        break
+      case 'dueDate':
+        setMoreOpen(true)
+        setD((p) => ({ ...p, dueDate: String(value) }))
+        break
+    }
+  }
 
   // OCR a scanned/uploaded receipt or invoice (image or PDF) and pre-fill empty fields. Also
-  // attaches the file as the receipt and sets Paid via the receipt-vs-invoice heuristic.
+  // attaches the file and changes paid status only when document classification is confident.
   const runExtraction = async (file: File | null | undefined) => {
     if (!file) return
     setReceiptFile(file) // attach immediately so a failed/unsupported read still keeps the file
+    setD((current) => current) // the attachment itself is an unsaved change, even if OCR fails
+    setScanResult(null)
     setScanning(true)
     try {
       const r = await scanReceipt(file)
-      const invoice = looksLikeInvoice(r)
+      setScanResult(r)
+      const reliableType =
+        r.documentTypeConfidence >= 0.7 &&
+        r.documentType !== 'unknown' &&
+        !r.warnings.includes('document_type_conflict')
+      const invoice = r.documentType === 'invoice'
+      const autoClassifyPayment = reliableType && !paidStatusTouched.current
+      const accepted = <K extends ReceiptFieldName>(name: K) =>
+        r.fields[name].needsReview ? null : r.fields[name].value
+      const vendor = accepted('vendor') as string | null
+      const amount = accepted('amount') as number | null
+      const receiptDate = accepted('date') as string | null
+      const invoiceNumber = accepted('invoiceNumber') as string | null
+      const dueDate = accepted('dueDate') as string | null
       setD((p) => ({
         ...p,
-        vendorName: p.vendorName?.trim() ? p.vendorName : r.vendor ?? p.vendorName,
-        amount: (p.amount ?? 0) > 0 ? p.amount : r.amount ?? p.amount,
-        date: r.date ?? p.date,
-        invoiceNumber: p.invoiceNumber?.trim() ? p.invoiceNumber : r.invoiceNumber ?? p.invoiceNumber ?? '',
-        dueDate: p.dueDate ?? r.dueDate ?? null,
-        isPaid: !invoice,
-        paidDate: invoice ? null : p.paidDate || today(),
+        vendorName: p.vendorName?.trim() ? p.vendorName : vendor ?? p.vendorName,
+        amount: (p.amount ?? 0) > 0 ? p.amount : amount ?? p.amount,
+        date: dateTouched.current ? p.date : receiptDate ?? p.date,
+        invoiceNumber: p.invoiceNumber?.trim() ? p.invoiceNumber : invoiceNumber ?? p.invoiceNumber ?? '',
+        dueDate: p.dueDate ?? dueDate ?? null,
+        isPaid: autoClassifyPayment ? !invoice : p.isPaid,
+        paidDate: autoClassifyPayment ? (invoice ? null : p.paidDate || localDateISO()) : p.paidDate,
       }))
-      if (r.invoiceNumber || r.dueDate) setMoreOpen(true)
+      if (invoiceNumber || dueDate) setMoreOpen(true)
       const found = [
-        r.vendor && 'vendor',
-        r.amount != null && 'amount',
-        r.date && 'date',
-        r.invoiceNumber && 'invoice #',
+        vendor && 'vendor',
+        amount != null && 'amount',
+        receiptDate && 'date',
+        invoiceNumber && 'invoice #',
       ].filter(Boolean)
-      toast.success(
-        found.length
-          ? `${invoice ? 'Invoice' : 'Receipt'} read — filled ${found.join(', ')}. Double-check the values.`
-          : 'Attached — couldn’t read it automatically. Enter the details below.',
-      )
+      if (found.length) toast.success(`Scan filled ${found.join(', ')}. Review any amber fields before saving.`)
+      else toast.show('File attached — the scan needs manual review.')
     } catch (err) {
       console.error('Receipt/invoice extraction failed', err)
       toast.error('Attached the file, but couldn’t read it automatically — enter the details below.')
@@ -269,9 +458,17 @@ export function ExpenseForm({
     e.target.value = ''
     runExtraction(file)
   }
+  const submitExpense = (event: FormEvent) => {
+    if (scanning) {
+      event.preventDefault()
+      toast.show('Wait for the document scan to finish before saving.')
+      return
+    }
+    void submit(event)
+  }
 
   return (
-    <Form onSubmit={submit}>
+    <Form onSubmit={submitExpense}>
       <Form.Section>
         <input ref={scanRef} type="file" accept="image/*" capture="environment" hidden onChange={onPick} />
         <input ref={uploadRef} type="file" accept="image/*,application/pdf" hidden onChange={onPick} />
@@ -283,6 +480,16 @@ export function ExpenseForm({
             Upload receipt / invoice
           </Button>
         </div>
+        <p className="scan-privacy">
+          For automatic extraction, document content is securely processed by Cloudflare Workers AI. Images may also be checked on this device; the original remains attached to this project.
+        </p>
+        {scanning && (
+          <div className="scan-progress" role="status">
+            <Sparkles size={17} aria-hidden />
+            <span><strong>Reading document…</strong><small>Checking layout, totals, dates, and invoice signals</small></span>
+          </div>
+        )}
+        {scanResult && <ScanReview scan={scanResult} onUse={useScanSuggestion} />}
         {(receiptFile || d.receiptObjectKey) && (
           <div className="row-between">
             <p className="muted" style={{ margin: 0 }}>{receiptFile ? receiptFile.name : 'Receipt attached'}</p>
@@ -317,7 +524,18 @@ export function ExpenseForm({
         />
         <div className="form-grid">
           <Field label="Date">
-            {(p) => <input type="date" {...p} value={dateValue(d.date)} onChange={date('date')} required />}
+            {(p) => (
+              <input
+                type="date"
+                {...p}
+                value={dateValue(d.date)}
+                onChange={(event) => {
+                  dateTouched.current = true
+                  date('date')(event)
+                }}
+                required
+              />
+            )}
           </Field>
           <div className="field">
             <span className="field-label">Status</span>
@@ -414,6 +632,20 @@ export function ExpenseForm({
           <Field label="Reference">
             {(p) => <input {...p} value={d.paymentReference ?? ''} onChange={text('paymentReference')} />}
           </Field>
+          {changeOrders.length > 0 && (
+            <Field label="Related change order" hint="Link the invoice so the same cost is not counted twice.">
+              {(p) => (
+                <Select {...p} value={d.changeOrderId ?? ''} onChange={text('changeOrderId')}>
+                  <option value="">None</option>
+                  {changeOrders.map((order) => (
+                    <option key={order.id} value={order.id}>
+                      {order.title} · {fmt(order.amount)}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          )}
           <CurrencyField
             label="Retainage held"
             value={d.retainageAmount ?? 0}
@@ -428,7 +660,7 @@ export function ExpenseForm({
           {submitError}
         </p>
       )}
-      <Form.Actions busy={busy} onCancel={onDone} saveLabel="Save expense" />
+      <Form.Actions busy={busy || scanning} onCancel={onDone} saveLabel="Save expense" />
     </Form>
   )
 }

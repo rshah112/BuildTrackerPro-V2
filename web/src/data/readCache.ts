@@ -8,9 +8,17 @@
 //    empty, which is the normal online case, so the hot path is unchanged.
 
 import { idbGet, idbSet } from '../lib/idbKv'
-import { pendingCount, pendingForTable, type OutboxOp } from '../lib/outbox'
+import { pendingForTable, unresolvedCount, type OutboxOp } from '../lib/outbox'
 
 type TrashMode = 'exclude' | 'only' | 'all'
+
+let boundUserId: string | null = null
+
+/** Read caches are account-scoped. Switching users never falls back to another
+ * account's rows, even while offline. */
+export function bindReadCacheUser(userId: string | null): void {
+  boundUserId = userId
+}
 
 function stableStringify(o: Record<string, unknown>): string {
   return JSON.stringify(
@@ -24,7 +32,8 @@ function stableStringify(o: Record<string, unknown>): string {
 }
 
 function cacheKey(name: string, filter: Record<string, unknown> | undefined, trashed: TrashMode): string {
-  return `cache/v1/${name}/${trashed}/${stableStringify(filter ?? {})}`
+  if (!boundUserId) throw new Error('No authenticated cache owner.')
+  return `cache/v2/${encodeURIComponent(boundUserId)}/${name}/${trashed}/${stableStringify(filter ?? {})}`
 }
 
 export async function cacheList<T>(
@@ -33,6 +42,7 @@ export async function cacheList<T>(
   trashed: TrashMode,
   rows: T[],
 ): Promise<void> {
+  if (!boundUserId) return
   try {
     await idbSet(cacheKey(name, filter, trashed), rows)
   } catch {
@@ -45,6 +55,7 @@ export async function readCachedList<T>(
   filter: Record<string, unknown> | undefined,
   trashed: TrashMode,
 ): Promise<T[] | null> {
+  if (!boundUserId) return null
   try {
     return await idbGet<T[]>(cacheKey(name, filter, trashed))
   } catch {
@@ -90,7 +101,7 @@ export function overlayPending<T>(
   trashed: TrashMode,
   base: T[],
 ): T[] {
-  if (pendingCount() === 0) return base
+  if (unresolvedCount() === 0) return base
   const pend = pendingForTable(name)
   if (pend.length === 0) return base
   const byId = new Map<string, Record<string, unknown>>()

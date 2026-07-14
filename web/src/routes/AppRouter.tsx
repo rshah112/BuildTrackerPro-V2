@@ -1,5 +1,5 @@
 import { lazy } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { createBrowserRouter, createRoutesFromElements, Route, Navigate, RouterProvider } from 'react-router-dom'
 import { LoginScreen } from '../features/auth/LoginScreen'
 import { RequireAuth } from '../features/auth/RequireAuth'
 import { AppShell } from '../app/AppShell'
@@ -34,10 +34,9 @@ const NotificationSettingsScreen = lazy(() => import('../features/notifications/
 const TaxReportScreen = lazy(() => import('../features/tax/TaxReportScreen').then((m) => ({ default: m.TaxReportScreen })))
 const LienWaiversScreen = lazy(() => import('../features/lienWaivers/LienWaiversScreen').then((m) => ({ default: m.LienWaiversScreen })))
 
-export function AppRouter() {
-  return (
-    <BrowserRouter>
-      <Routes>
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <>
         <Route path="/login" element={<LoginScreen />} />
         <Route
           element={
@@ -66,7 +65,8 @@ export function AppRouter() {
           <Route path="/trash" element={<RequireProject><TrashScreen /></RequireProject>} />
           <Route path="/loan" element={<RequireProject><LoanScreen /></RequireProject>} />
           <Route path="/phases" element={<RequireProject><PhasesScreen /></RequireProject>} />
-          <Route path="/export" element={<RequireProject><ExportScreen /></RequireProject>} />
+          {/* Recovery must remain reachable even after the final source project is deleted. */}
+          <Route path="/export" element={<ExportScreen />} />
           <Route path="/tax-1099" element={<RequireProject><TaxReportScreen /></RequireProject>} />
           <Route path="/lien-waivers" element={<RequireProject><LienWaiversScreen /></RequireProject>} />
           <Route path="/portfolio" element={<PortfolioScreen />} />
@@ -74,7 +74,10 @@ export function AppRouter() {
           <Route path="/more" element={<MoreScreen />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
-  )
+    </>,
+  ),
+)
+
+export function AppRouter() {
+  return <RouterProvider router={router} />
 }

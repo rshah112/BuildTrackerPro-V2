@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fmtDate } from './date'
+import { fmtDate, localDateISO } from './date'
 
 describe('fmtDate', () => {
   it('formats the stored calendar day without timezone shift', () => {
@@ -22,5 +22,15 @@ describe('fmtDate', () => {
     expect(fmtDate(undefined)).toBe('')
     expect(fmtDate('')).toBe('')
     expect(fmtDate('not-a-date')).toBe('')
+  })
+})
+
+describe('localDateISO', () => {
+  it('uses the device-local calendar fields', () => {
+    expect(localDateISO(new Date(2026, 6, 13, 23, 45))).toBe('2026-07-13')
+  })
+
+  it('pads single-digit months and days', () => {
+    expect(localDateISO(new Date(2026, 0, 2, 8))).toBe('2026-01-02')
   })
 })

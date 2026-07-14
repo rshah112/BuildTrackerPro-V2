@@ -1,6 +1,7 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
+import { hasUnsavedChanges } from '../../lib/unsavedChanges'
 
 interface SheetProps {
   open: boolean
@@ -36,6 +37,10 @@ function unlockScroll() {
 export function Sheet({ open, onClose, title, children, footer, centered = false }: SheetProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const restoreRef = useRef<HTMLElement | null>(null)
+  const requestClose = useCallback(() => {
+    if (hasUnsavedChanges() && !window.confirm('Discard your unsaved changes?')) return
+    onClose()
+  }, [onClose])
 
   useEffect(() => {
     if (!open) return
@@ -50,7 +55,7 @@ export function Sheet({ open, onClose, title, children, footer, centered = false
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        onClose()
+        requestClose()
         return
       }
       if (e.key !== 'Tab' || !panel) return
@@ -80,13 +85,13 @@ export function Sheet({ open, onClose, title, children, footer, centered = false
       // Best effort — no-ops if the trigger has since unmounted.
       if (restoreRef.current?.isConnected) restoreRef.current.focus?.()
     }
-  }, [open, onClose])
+  }, [open, requestClose])
 
   if (!open) return null
 
   return createPortal(
     <div className={`overlay${centered ? ' overlay-centered' : ''}`}>
-      <div className="overlay-backdrop" onClick={onClose} aria-hidden />
+      <div className="overlay-backdrop" onClick={requestClose} aria-hidden />
       <div
         ref={panelRef}
         className={centered ? 'modal-panel' : 'sheet-panel'}
@@ -99,7 +104,7 @@ export function Sheet({ open, onClose, title, children, footer, centered = false
         {title && (
           <header className="sheet-header">
             <h2 className="sheet-title">{title}</h2>
-            <button type="button" className="sheet-close" onClick={onClose} aria-label="Close">
+            <button type="button" className="sheet-close" onClick={requestClose} aria-label="Close">
               <X size={20} aria-hidden />
             </button>
           </header>

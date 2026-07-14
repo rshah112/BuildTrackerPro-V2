@@ -5,6 +5,7 @@ import { Form } from '../../components/ui/Form'
 import { useEntityForm } from '../../lib/useEntityForm'
 import { useCreateVendor, useUpdateVendor } from './useVendors'
 import { cascadeVendorRename } from './cascadeVendorRename'
+import { useToast } from '../../components/ui/Toast'
 
 type Draft = Partial<Omit<Vendor, 'id' | 'owner'>>
 
@@ -30,6 +31,7 @@ export function VendorForm({
   onDone: () => void
 }) {
   const qc = useQueryClient()
+  const toast = useToast()
   const { d, text, date, busy, submit } = useEntityForm<Vendor, Draft>({
     initial,
     blank: blank(projectId),
@@ -45,6 +47,7 @@ export function VendorForm({
         ])
       }
     },
+    onPostSaveError: () => toast.error('Vendor saved, but some linked names could not be refreshed.'),
     onDone,
   })
 

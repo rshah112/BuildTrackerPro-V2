@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ToastProvider } from '../../components/ui/Toast'
 import { VendorForm } from './VendorForm'
 
 vi.mock('./useVendors', () => ({
@@ -13,7 +14,9 @@ function renderForm() {
   const qc = new QueryClient()
   return render(
     <QueryClientProvider client={qc}>
-      <VendorForm projectId="p1" onDone={() => {}} />
+      <ToastProvider>
+        <VendorForm projectId="p1" onDone={() => {}} />
+      </ToastProvider>
     </QueryClientProvider>,
   )
 }

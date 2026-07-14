@@ -3,21 +3,16 @@
 // what's overdue or coming due, so the reminder reaches a FULLY CLOSED app. Node runtime
 // (NOT edge) — web-push needs Node crypto/zlib.
 //
-// Activation requires two server-only env vars in Vercel: SUPABASE_SERVICE_ROLE (so the
-// cron can read across RLS) and VAPID_PRIVATE_KEY. Until both are set this returns a
-// no-op 200 so the scheduled job never errors.
+// Activation requires explicit Supabase and VAPID server configuration in Vercel.
+// Until it is complete this returns a no-op 200 so the scheduled job never errors.
 
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? 'https://wzbtxwnvplpnwmavfdwx.supabase.co'
+const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? ''
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE ?? ''
-const VAPID_PUBLIC =
-  process.env.VAPID_PUBLIC_KEY ??
-  process.env.VITE_VAPID_PUBLIC_KEY ??
-  'BDk300BdpTcg4CxGWlYuY3aHy0p78M5kPVQXNFPTRPIXbnbnEVz3kacNa4xGQ2l9ncTE2aJvZIgYZSxAoSr4HUQ'
+const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY ?? process.env.VITE_VAPID_PUBLIC_KEY ?? ''
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY ?? ''
 const LEAD_DAYS = 3
 const TZ = 'America/New_York'
@@ -27,13 +22,16 @@ const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD',
 interface ExpenseRow {
   amount: number
   amount_paid: number
+  retainage_amount: number
   is_paid: boolean
   vendor_name: string
   due_date: string | null
   expected_payment_date: string | null
+  change_order_id: string | null
   project_id: string
 }
 interface CoRow {
+  id: string
   title: string
   amount: number
   status: string
@@ -98,10 +96,13 @@ function addDays(iso: string, n: number): string {
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10)
 }
 
-/** An unpaid expense's outstanding balance (mirrors lib/expenseMath.balanceDue). */
+/** An expense's currently payable balance (mirrors lib/expenseMath.payableBalance). */
 function expenseBalance(e: ExpenseRow): number {
-  const effectivePaid = e.is_paid ? (e.amount_paid > 0 ? e.amount_paid : e.amount) : 0
-  return Math.max(0, e.amount - effectivePaid)
+  const amount = Math.max(0, Math.round(e.amount * 100))
+  const paid = e.is_paid ? Math.min(amount, Math.max(0, Math.round(e.amount_paid * 100))) : 0
+  const balance = Math.max(0, amount - paid)
+  const retainage = Math.min(balance, Math.max(0, Math.round((e.retainage_amount ?? 0) * 100)))
+  return (balance - retainage) / 100
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -112,8 +113,11 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   if (!secret || req.headers['authorization'] !== `Bearer ${secret}`) {
     return send(res, 401, { ok: false, error: 'unauthorized' })
   }
-  if (!SERVICE_ROLE || !VAPID_PRIVATE) {
-    return send(res, 200, { ok: false, reason: 'push not configured (set SUPABASE_SERVICE_ROLE + VAPID_PRIVATE_KEY)' })
+  if (!SUPABASE_URL || !SERVICE_ROLE || !VAPID_PUBLIC || !VAPID_PRIVATE) {
+    return send(res, 200, {
+      ok: false,
+      reason: 'push not configured (set SUPABASE_URL, SUPABASE_SERVICE_ROLE, VAPID_PUBLIC_KEY, and VAPID_PRIVATE_KEY)',
+    })
   }
 
   webpush.setVapidDetails('mailto:rajrulz@aol.com', VAPID_PUBLIC, VAPID_PRIVATE)
@@ -150,12 +154,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const [{ data: exp }, { data: cos }, { data: trashedProjects }] = await Promise.all([
       supa
         .from('expenses')
-        .select('amount,amount_paid,is_paid,vendor_name,due_date,expected_payment_date,project_id')
+        .select('amount,amount_paid,retainage_amount,is_paid,vendor_name,due_date,expected_payment_date,change_order_id,project_id')
         .eq('owner', owner)
         .is('deleted_at', null),
       supa
         .from('change_orders')
-        .select('title,amount,status,expected_payment_date,project_id')
+        .select('id,title,amount,status,expected_payment_date,project_id')
         .eq('owner', owner)
         .is('deleted_at', null),
       // Don't nag about items that live inside a TRASHED project.
@@ -166,8 +170,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     let overdue = 0
     let dueSoon = 0
     let total = 0
+    const invoicedOrderIds = new Set<string>()
     for (const e of (exp ?? []) as ExpenseRow[]) {
       if (trashed.has(e.project_id)) continue
+      if (e.change_order_id) invoicedOrderIds.add(e.change_order_id)
       const bal = expenseBalance(e)
       if (bal <= 0) continue
       // Compare date-only: expected_payment_date is a timestamptz, and a same-day time component
@@ -186,7 +192,13 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     }
     if (pref.remind_change_orders) {
       for (const o of (cos ?? []) as CoRow[]) {
-        if (o.status === 'paid' || !o.expected_payment_date || trashed.has(o.project_id)) continue
+        if (
+          o.status === 'paid' ||
+          invoicedOrderIds.has(o.id) ||
+          !o.expected_payment_date ||
+          trashed.has(o.project_id)
+        )
+          continue
         const expected = o.expected_payment_date.slice(0, 10)
         if (expected < today) {
           overdue++

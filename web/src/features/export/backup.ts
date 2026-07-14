@@ -1,22 +1,108 @@
-import { table } from '../../data/table'
+import { toSnake } from '../../lib/casing'
+import { isNetworkError, isRetryablePostgrestError } from '../../lib/netStatus'
+import { supabase } from '../../lib/supabase'
 import { loadProjectExport, downloadBlob, safeFileName, type ProjectExport } from './exportData'
 
-const BACKUP_VERSION = 1
+export const BACKUP_VERSION = 2
+const MAX_BACKUP_CHARS = 50 * 1024 * 1024
+const MAX_BACKUP_ROWS = 100_000
 
-interface BackupFile extends ProjectExport {
+export interface BackupFile extends ProjectExport {
   backupVersion: number
+}
+
+const COLLECTIONS = [
+  'categories',
+  'lineItems',
+  'expenses',
+  'changeOrders',
+  'allowanceSelections',
+  'vendors',
+  'tasks',
+  'bidPackages',
+  'bids',
+  'photos',
+  'documents',
+  'loans',
+  'loanDraws',
+  'phases',
+  'lienWaivers',
+] as const
+
+type CollectionName = (typeof COLLECTIONS)[number]
+type Row = Record<string, unknown>
+
+export interface PreparedRestore {
+  backupVersion: number
+  project: Row
+  categories: Row[]
+  lineItems: Row[]
+  expenses: Row[]
+  changeOrders: Row[]
+  allowanceSelections: Row[]
+  vendors: Row[]
+  tasks: Row[]
+  bidPackages: Row[]
+  bids: Row[]
+  photos: Row[]
+  documents: Row[]
+  loans: Row[]
+  loanDraws: Row[]
+  phases: Row[]
+  lienWaivers: Row[]
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+/** Validate and normalize a backup before any database write happens. Version 1
+ *  files remain supported; they predate lien-waiver export, so that list is empty. */
+export function parseBackup(json: string): BackupFile {
+  if (json.length > MAX_BACKUP_CHARS) throw new Error('Backup is larger than the 50 MB restore limit')
+
+  let raw: unknown
+  try {
+    raw = JSON.parse(json)
+  } catch {
+    throw new Error('This file is not valid JSON')
+  }
+  if (!isRecord(raw) || !isRecord(raw.project)) throw new Error('Not a valid project backup')
+  const version = Number(raw.backupVersion)
+  if (version !== 1 && version !== BACKUP_VERSION) {
+    throw new Error(`Backup version ${String(raw.backupVersion)} is not supported`)
+  }
+  if (typeof raw.project.id !== 'string' || typeof raw.project.name !== 'string') {
+    throw new Error('Backup project metadata is incomplete')
+  }
+  if (typeof raw.exportedAt !== 'string') throw new Error('Backup export date is missing')
+
+  let rowCount = 0
+  for (const name of COLLECTIONS) {
+    if (name === 'lienWaivers' && version === 1 && raw[name] === undefined) raw[name] = []
+    if (!Array.isArray(raw[name])) throw new Error(`Backup section “${name}” is missing or invalid`)
+    if (!(raw[name] as unknown[]).every(isRecord)) throw new Error(`Backup section “${name}” contains invalid rows`)
+    rowCount += (raw[name] as unknown[]).length
+  }
+  if (rowCount > MAX_BACKUP_ROWS) throw new Error('Backup contains too many records to restore safely')
+  return raw as unknown as BackupFile
+}
+
+export function makeBackupFile(data: ProjectExport): BackupFile {
+  return { backupVersion: BACKUP_VERSION, ...data }
+}
+
+export function backupItemCount(file: Pick<BackupFile, CollectionName>): number {
+  return COLLECTIONS.reduce((total, name) => total + file[name].length, 0)
 }
 
 /** Download a full JSON snapshot of the project (all entities). */
 export async function downloadBackup(projectId: string): Promise<void> {
   // 'all' → a full backup includes trashed (soft-deleted) rows, not just active ones.
   const data = await loadProjectExport(projectId, { trashed: 'all' })
-  const file: BackupFile = { backupVersion: BACKUP_VERSION, ...data }
+  const file = makeBackupFile(data)
   const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' })
   downloadBlob(blob, `${safeFileName(data.project.name)}-backup-${data.exportedAt.slice(0, 10)}.json`)
 }
-
-type Row = Record<string, unknown>
 
 function omitMeta(row: Row): Row {
   const copy = { ...row }
@@ -25,94 +111,176 @@ function omitMeta(row: Row): Row {
   return copy
 }
 
-/** Restore a backup as a NEW project (owned by the current user via RLS). Child rows
- *  are re-pointed at the new project AND their cross-entity id references (line item,
- *  vendor, package, awarded bid, task photos) are remapped to the newly-created ids so
- *  the restored project's internal linkage stays intact instead of dangling at the
- *  source project's UUIDs. */
-export async function restoreBackup(json: string): Promise<string> {
-  const file = JSON.parse(json) as BackupFile
-  if (!file.project) throw new Error('Not a valid project backup')
+function mapIds(rows: unknown[], section: string): Map<string, string> {
+  const ids = new Map<string, string>()
+  for (const row of rows as Row[]) {
+    if (typeof row.id !== 'string' || !row.id) throw new Error(`Backup section “${section}” has a row without an id`)
+    if (ids.has(row.id)) throw new Error(`Backup section “${section}” contains duplicate ids`)
+    ids.set(row.id, crypto.randomUUID())
+  }
+  return ids
+}
 
-  const projectFields = omitMeta(file.project as unknown as Row)
-  const newProject = await table<{ id: string }>('projects').create({
-    ...projectFields,
+function remapOptional(ids: Map<string, string>, value: unknown): string | null {
+  return typeof value === 'string' ? ids.get(value) ?? null : null
+}
+
+function remapRequired(ids: Map<string, string>, value: unknown, label: string): string {
+  const mapped = remapOptional(ids, value)
+  if (!mapped) throw new Error(`Backup contains a ${label} that does not exist in the backup`)
+  return mapped
+}
+
+function preparedRows(
+  rows: unknown[],
+  ids: Map<string, string>,
+  projectId: string,
+  defaults: Row,
+  patch?: (row: Row) => Row,
+): Row[] {
+  return (rows as Row[]).map((row) => ({
+    ...defaults,
+    ...omitMeta(row),
+    ...(patch?.(row) ?? {}),
+    id: ids.get(row.id as string),
+    projectId,
+  }))
+}
+
+/** Build a complete, allow-listed restore payload and remap every internal id before
+ *  the transactional RPC starts. Missing required references fail before any write. */
+export function prepareRestore(file: BackupFile): PreparedRestore {
+  const now = new Date().toISOString()
+  const projectId = crypto.randomUUID()
+  const categoryIds = mapIds(file.categories, 'categories')
+  const lineIds = mapIds(file.lineItems, 'lineItems')
+  const expenseIds = mapIds(file.expenses, 'expenses')
+  const changeOrderIds = mapIds(file.changeOrders, 'changeOrders')
+  const allowanceIds = mapIds(file.allowanceSelections, 'allowanceSelections')
+  const vendorIds = mapIds(file.vendors, 'vendors')
+  const taskIds = mapIds(file.tasks, 'tasks')
+  const packageIds = mapIds(file.bidPackages, 'bidPackages')
+  const bidIds = mapIds(file.bids, 'bids')
+  const photoIds = mapIds(file.photos, 'photos')
+  const documentIds = mapIds(file.documents, 'documents')
+  const loanIds = mapIds(file.loans, 'loans')
+  const drawIds = mapIds(file.loanDraws, 'loanDraws')
+  const phaseIds = mapIds(file.phases, 'phases')
+  const waiverIds = mapIds(file.lienWaivers, 'lienWaivers')
+
+  const project: Row = {
+    address: '', status: 'planning', priority: 'normal', templateType: 'custom', purchasePrice: 0,
+    closingCosts: 0, squareFootage: null, lotDimensions: '', proposedBuildDimensions: '', footprint: '',
+    stories: 0, basement: '', scopeSummary: '', warrantyNotes: '', startDate: null, targetFinishDate: null,
+    constructionBudget: 0, contingencyBudget: 0, createdAt: now,
+    ...omitMeta(file.project as unknown as Row),
+    id: projectId,
     name: `${file.project.name} (restored)`,
-  } as never)
-  const pid = newProject.id
+    deletedAt: null,
+  }
 
-  // Insert a table's rows, capturing oldId -> newId. `patch` rewrites foreign refs
-  // using maps built from earlier inserts.
-  const insertMapped = async (
-    name: string,
-    rows: unknown[] = [],
-    patch?: (clean: Row) => Row,
-  ): Promise<Map<string, string>> => {
-    const map = new Map<string, string>()
-    for (const raw of rows as Row[]) {
-      const oldId = raw.id as string | undefined
-      const clean = omitMeta(raw)
-      const created = await table<{ id: string }>(name).create({
-        ...clean,
-        ...(patch ? patch(clean) : {}),
-        projectId: pid,
-      } as never)
-      if (oldId) map.set(oldId, created.id)
+  return {
+    backupVersion: BACKUP_VERSION,
+    project,
+    categories: preparedRows(file.categories, categoryIds, projectId, {
+      name: '', sortOrder: 0, targetBudget: 0, systemImage: '', deletedAt: null,
+    }),
+    lineItems: preparedRows(file.lineItems, lineIds, projectId, {
+      costCode: '', title: '', categoryName: '', roomTag: '', budget: 0, actual: 0, committed: 0,
+      notes: '', isPinned: false, isAllowance: false, allowanceAmount: 0, createdAt: now, deletedAt: null,
+    }, () => ({ actual: 0 })),
+    expenses: preparedRows(file.expenses, expenseIds, projectId, {
+      amount: 0, amountPaid: 0, vendorName: '', vendorId: null, invoiceNumber: '', date: now,
+      dueDate: null, expectedPaymentDate: null, paidDate: null, paymentMethod: '', paymentReference: '',
+      categoryName: '', roomTag: '', budgetLineItemId: null, budgetLineItemTitle: '', changeOrderId: null,
+      notes: '', isPaid: true, receiptObjectKey: null, fundingSource: '', retainageAmount: 0, deletedAt: null,
+    }, (row) => ({
+      budgetLineItemId: remapOptional(lineIds, row.budgetLineItemId),
+      vendorId: remapOptional(vendorIds, row.vendorId),
+      changeOrderId: remapOptional(changeOrderIds, row.changeOrderId),
+    })),
+    changeOrders: preparedRows(file.changeOrders, changeOrderIds, projectId, {
+      title: '', amount: 0, status: 'pending', notes: '', categoryName: '', budgetLineItemId: null,
+      budgetLineItemTitle: '', createdAt: now, expectedPaymentDate: null, deletedAt: null,
+    }, (row) => ({ budgetLineItemId: remapOptional(lineIds, row.budgetLineItemId) })),
+    allowanceSelections: preparedRows(file.allowanceSelections, allowanceIds, projectId, {
+      lineItemId: null, selectionDate: now, vendor: '', amount: 0, notes: '', photoObjectKey: null,
+      deletedAt: null,
+    }, (row) => ({ lineItemId: remapRequired(lineIds, row.lineItemId, 'selection line item') })),
+    vendors: preparedRows(file.vendors, vendorIds, projectId, {
+      name: '', trade: '', phone: '', email: '', notes: '', taxId: '', licenseNumber: '',
+      insuranceExpiry: null, deletedAt: null,
+    }),
+    tasks: preparedRows(file.tasks, taskIds, projectId, {
+      title: '', status: 'todo', dueDate: null, vendorId: null, budgetLineItemId: null, photoIds: [],
+      notes: '', createdAt: now, completedAt: null, deletedAt: null,
+    }, (row) => ({
+      vendorId: remapOptional(vendorIds, row.vendorId),
+      budgetLineItemId: remapOptional(lineIds, row.budgetLineItemId),
+      photoIds: Array.isArray(row.photoIds)
+        ? row.photoIds.flatMap((id) => remapOptional(photoIds, id) ?? [])
+        : [],
+    })),
+    bidPackages: preparedRows(file.bidPackages, packageIds, projectId, {
+      scopeTitle: '', dueDate: null, status: 'open', awardedBidId: null, createdAt: now, notes: '',
+      deletedAt: null,
+    }, (row) => ({ awardedBidId: remapOptional(bidIds, row.awardedBidId) })),
+    bids: preparedRows(file.bids, bidIds, projectId, {
+      packageId: null, vendorId: null, vendorName: '', amount: 0, fileObjectKey: null, fileName: '',
+      notes: '', lineItems: [], createdAt: now, awardedAt: null, deletedAt: null,
+    }, (row) => ({
+      packageId: remapRequired(packageIds, row.packageId, 'bid package'),
+      vendorId: remapOptional(vendorIds, row.vendorId),
+    })),
+    photos: preparedRows(file.photos, photoIds, projectId, {
+      imageObjectKey: null, createdAt: now, roomTag: '', phaseTag: '', categoryName: '',
+      budgetLineItemId: null, notes: '', deletedAt: null,
+    }, (row) => ({ budgetLineItemId: remapOptional(lineIds, row.budgetLineItemId) })),
+    documents: preparedRows(file.documents, documentIds, projectId, {
+      fileName: '', kind: 'other', status: 'received', notes: '', budgetLineItemId: null,
+      budgetLineItemTitle: '', uploadedAt: now, fileObjectKey: null, deletedAt: null,
+    }, (row) => ({ budgetLineItemId: remapOptional(lineIds, row.budgetLineItemId) })),
+    loans: preparedRows(file.loans, loanIds, projectId, {
+      lender: '', totalAmount: 0, interestRate: 0, notes: '', createdAt: now, deletedAt: null,
+    }),
+    loanDraws: preparedRows(file.loanDraws, drawIds, projectId, {
+      loanId: null, amount: 0, drawDate: now, description: '', notes: '', createdAt: now, deletedAt: null,
+    }, (row) => ({ loanId: remapRequired(loanIds, row.loanId, 'construction loan') })),
+    phases: preparedRows(file.phases, phaseIds, projectId, {
+      name: '', pctComplete: 0, sortOrder: 0, targetDate: null, notes: '', createdAt: now, deletedAt: null,
+    }),
+    lienWaivers: preparedRows(file.lienWaivers, waiverIds, projectId, {
+      vendorName: '', expenseId: null, amount: 0, waiverType: 'conditional_progress', throughDate: null,
+      received: false, notes: '', createdAt: now, deletedAt: null,
+    }, (row) => ({ expenseId: remapOptional(expenseIds, row.expenseId) })),
+  }
+}
+
+/** Restore as a NEW project in one authenticated PostgreSQL transaction. This deliberately
+ *  bypasses the normal offline table wrapper: a restore is never queued or reported as
+ *  successful unless the complete server transaction returns successfully. */
+export async function restoreBackup(json: string): Promise<string> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error('Reconnect before restoring a backup so the transaction can be verified')
+  }
+
+  const payload = prepareRestore(parseBackup(json))
+  try {
+    const { data, error, status } = await supabase.rpc('restore_project_backup', {
+      payload: toSnake(payload),
+    })
+    if (error) {
+      if (isRetryablePostgrestError(error, status)) {
+        throw new Error('Restore could not be confirmed. Reconnect and check Projects before retrying.', { cause: error })
+      }
+      throw new Error(`Restore was rolled back: ${error.message || 'the server rejected the backup'}`, { cause: error })
     }
-    return map
+    if (typeof data !== 'string' || !data) throw new Error('Restore completed without a project id')
+    return data
+  } catch (error) {
+    if (isNetworkError(error)) {
+      throw new Error('Restore could not be confirmed. Reconnect and check Projects before retrying.', { cause: error })
+    }
+    throw error
   }
-
-  const remap = (m: Map<string, string>, v: unknown): string | null =>
-    typeof v === 'string' && m.has(v) ? (m.get(v) as string) : null
-
-  await insertMapped('budget_categories', file.categories)
-  const lineMap = await insertMapped('budget_line_items', file.lineItems)
-  const vendorMap = await insertMapped('vendors', file.vendors)
-  const photoMap = await insertMapped('photo_attachments', file.photos, (r) => ({
-    budgetLineItemId: remap(lineMap, r.budgetLineItemId),
-  }))
-
-  // Packages first (awardedBidId cleared — bids don't exist yet), patched after bids.
-  const pkgMap = await insertMapped('bid_packages', file.bidPackages, () => ({ awardedBidId: null }))
-  const bidMap = await insertMapped('bids', file.bids, (r) => ({
-    packageId: remap(pkgMap, r.packageId) ?? (r.packageId as string),
-    vendorId: remap(vendorMap, r.vendorId),
-  }))
-  for (const pkg of (file.bidPackages ?? []) as unknown as Row[]) {
-    const newPkg = remap(pkgMap, pkg.id)
-    const newBid = remap(bidMap, pkg.awardedBidId)
-    if (newPkg && newBid) await table('bid_packages').update(newPkg, { awardedBidId: newBid } as never)
-  }
-
-  await insertMapped('expenses', file.expenses, (r) => ({ budgetLineItemId: remap(lineMap, r.budgetLineItemId) }))
-  await insertMapped('change_orders', file.changeOrders, (r) => ({
-    budgetLineItemId: remap(lineMap, r.budgetLineItemId),
-  }))
-  await insertMapped('allowance_selections', file.allowanceSelections, (r) => ({
-    lineItemId: remap(lineMap, r.lineItemId) ?? (r.lineItemId as string),
-  }))
-  await insertMapped('project_tasks', file.tasks, (r) => ({
-    vendorId: remap(vendorMap, r.vendorId),
-    budgetLineItemId: remap(lineMap, r.budgetLineItemId),
-    photoIds: Array.isArray(r.photoIds)
-      ? r.photoIds.flatMap((id) => {
-          const n = photoMap.get(id as string)
-          return n ? [n] : []
-        })
-      : [],
-  }))
-  await insertMapped('project_documents', file.documents, (r) => ({
-    budgetLineItemId: remap(lineMap, r.budgetLineItemId),
-  }))
-
-  // Construction loan (+ its draws, re-pointed at the new loan id).
-  const loanMap = await insertMapped('construction_loans', file.loans)
-  await insertMapped('loan_draws', file.loanDraws, (r) => ({
-    loanId: remap(loanMap, r.loanId) ?? (r.loanId as string),
-  }))
-
-  // Build phases (project-scoped only — no cross-entity refs to remap).
-  await insertMapped('phases', file.phases)
-
-  return pid
 }

@@ -9,6 +9,12 @@ import { EmptyState, ListState } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { useConfirm } from '../../components/ui/Confirm'
 import { useCurrentProject } from '../projects/currentProject'
+import type { AllowanceSelection, BudgetLineItem, ChangeOrder, Expense } from '../../domain/types'
+import { useExpenses } from '../expenses/useExpenses'
+import { useChangeOrders } from '../changeOrders/useChangeOrders'
+import { useAllowances } from '../allowances/useAllowances'
+import { useSyncActuals } from '../budget/useSyncActuals'
+import { useLineItems } from '../budget/useBudget'
 
 type TrashRow = { id: string; deletedAt?: string | null } & Record<string, unknown>
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -33,10 +39,23 @@ export function TrashScreen() {
   const loans = useRows<TrashRow>('construction_loans', f, only)
   const draws = useRows<TrashRow>('loan_draws', f, only)
   const phases = useRows<TrashRow>('phases', f, only)
+  const waivers = useRows<TrashRow>('lien_waivers', f, only)
+
+  // These active lists share the same React Query cache used elsewhere. They let a restored
+  // financial row be reconciled immediately instead of leaving stored line-item actuals stale.
+  const activeExpensesQuery = useExpenses(projectId!)
+  const activeChangeOrdersQuery = useChangeOrders(projectId!)
+  const activeAllowancesQuery = useAllowances(projectId!)
+  const activeLineItemsQuery = useLineItems(projectId!)
+  const activeExpenses = activeExpensesQuery.data ?? []
+  const activeChangeOrders = activeChangeOrdersQuery.data ?? []
+  const activeAllowances = activeAllowancesQuery.data ?? []
+  const activeLineItems = activeLineItemsQuery.data ?? []
+  const syncActuals = useSyncActuals(projectId!)
 
   const qc = useQueryClient()
   const restore = useMutation({
-    mutationFn: ({ name, id }: { name: string; id: string }) => table(name).restore(id),
+    mutationFn: ({ name, id }: { name: string; id: string }) => table<TrashRow>(name).restore(id),
     onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: [v.name] }),
   })
   const purge = useMutation({
@@ -61,16 +80,69 @@ export function TrashScreen() {
     { name: 'construction_loans', label: 'Loans', rows: loans.data ?? [], title: (r) => str(r.lender) || 'Construction loan' },
     { name: 'loan_draws', label: 'Loan draws', rows: draws.data ?? [], title: (r) => str(r.description) || 'Draw' },
     { name: 'phases', label: 'Build phases', rows: phases.data ?? [], title: (r) => str(r.name) || 'Phase' },
+    { name: 'lien_waivers', label: 'Lien waivers', rows: waivers.data ?? [], title: (r) => str(r.vendorName) || 'Lien waiver' },
   ]
 
-  const queries = [cats, items, expenses, vendors, cos, allowances, photos, docs, tasks, pkgs, bids, loans, draws, phases]
+  const queries = [
+    cats,
+    items,
+    expenses,
+    vendors,
+    cos,
+    allowances,
+    photos,
+    docs,
+    tasks,
+    pkgs,
+    bids,
+    loans,
+    draws,
+    phases,
+    waivers,
+    activeExpensesQuery,
+    activeChangeOrdersQuery,
+    activeAllowancesQuery,
+    activeLineItemsQuery,
+  ]
   const isLoading = queries.some((q) => q.isLoading)
   const error = queries.find((q) => q.error)?.error
   const total = groups.reduce((n, g) => n + g.rows.length, 0)
 
-  const onRestore = (name: string, id: string) => {
-    restore.mutate({ name, id })
-    toast.success('Restored')
+  const onRestore = async (name: string, row: TrashRow) => {
+    try {
+      await restore.mutateAsync({ name, id: row.id })
+    } catch (error) {
+      toast.error(`Couldn’t restore: ${(error as Error).message}`)
+      return
+    }
+
+    const restored: TrashRow = { ...row, deletedAt: null }
+    try {
+      if (name === 'expenses') {
+        const expense = restored as unknown as Expense
+        await syncActuals({ expenses: [...activeExpenses.filter((item) => item.id !== expense.id), expense] })
+      } else if (name === 'change_orders') {
+        const order = restored as unknown as ChangeOrder
+        await syncActuals({
+          changeOrders: [...activeChangeOrders.filter((item) => item.id !== order.id), order],
+        })
+      } else if (name === 'allowance_selections') {
+        const selection = restored as unknown as AllowanceSelection
+        await syncActuals({
+          allowanceSelections: [...activeAllowances.filter((item) => item.id !== selection.id), selection],
+        })
+      } else if (name === 'budget_line_items') {
+        const lineItem = restored as unknown as BudgetLineItem
+        await syncActuals({
+          lineItems: [...activeLineItems.filter((item) => item.id !== lineItem.id), lineItem],
+        })
+      }
+      toast.success('Restored')
+    } catch {
+      // The authoritative restore succeeded. Be explicit that only the derived totals failed,
+      // and never invite a second restore attempt for an already-active row.
+      toast.error('Restored, but budget totals could not refresh. Reopen Budget to reconcile them.')
+    }
   }
   const onPurge = async (name: string, id: string, label: string) => {
     if (!(await confirm({ title: 'Delete forever?', message: `This permanently removes “${label}”. This cannot be undone.`, destructive: true }))) return
@@ -104,7 +176,7 @@ export function TrashScreen() {
                         {r.deletedAt && <span className="muted">Deleted {fmtDate(r.deletedAt)}</span>}
                       </div>
                     </div>
-                    <Button size="sm" variant="ghost" leadingIcon={<RotateCcw size={14} />} onClick={() => onRestore(g.name, r.id)}>
+                    <Button size="sm" variant="ghost" leadingIcon={<RotateCcw size={14} />} onClick={() => onRestore(g.name, r)}>
                       Restore
                     </Button>
                     <button className="expense-row-del" onClick={() => onPurge(g.name, r.id, g.title(r))} aria-label="Delete forever">

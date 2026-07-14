@@ -1,4 +1,13 @@
-import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+} from 'react'
+import { setFormDirty } from './unsavedChanges'
 
 const DEFAULT_ERROR = 'Save failed — please try again.'
 
@@ -29,11 +38,16 @@ export function useEntityForm<TEntity extends { id: string }, TDraft extends obj
    *  and update payloads. */
   transform?: (draft: TDraft) => TDraft | Promise<TDraft>
   onSaved?: (saved: TEntity) => void | Promise<void>
+  /** The primary row has already committed when this fires. Use it to surface a
+   *  reconciliation warning; the editor still closes so retry cannot duplicate it. */
+  onPostSaveError?: (error: unknown, saved: TEntity) => void | Promise<void>
   onDone: () => void
 }) {
-  const { initial, blank, create, update, transform, onSaved, onDone } = opts
-  const [d, setD] = useState<TDraft>((initial as unknown as TDraft) ?? blank)
+  const { initial, blank, create, update, transform, onSaved, onPostSaveError, onDone } = opts
+  const [d, setDraft] = useState<TDraft>((initial as unknown as TDraft) ?? blank)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const dirtyId = useRef(Symbol('entity-form'))
+  const [dirty, setDirty] = useState(false)
   // Hard re-entry guard: submit() runs an async transform (receipt upload, vendor auto-create)
   // BEFORE the mutation flips isPending, so without this a rapid double-tap fires two creates
   // (duplicate rows). The ref blocks re-entry synchronously; the state drives the disabled UI.
@@ -41,6 +55,16 @@ export function useEntityForm<TEntity extends { id: string }, TDraft extends obj
   const [submitting, setSubmitting] = useState(false)
   const busy = submitting || create.isPending || update.isPending
 
+  useEffect(() => () => setFormDirty(dirtyId.current, false), [])
+
+  const markDirty = () => {
+    setDirty(true)
+    setFormDirty(dirtyId.current, true)
+  }
+  const setD: Dispatch<SetStateAction<TDraft>> = (value) => {
+    markDirty()
+    setDraft(value)
+  }
   const set = <K extends keyof TDraft>(k: K, v: TDraft[K]) => setD((p) => ({ ...p, [k]: v }))
   /** Bind a text/select control: `<input value={d.x} onChange={text('x')} />`. */
   const text = (k: keyof TDraft) => (e: AnyChange) => set(k, e.target.value as TDraft[keyof TDraft])
@@ -62,7 +86,21 @@ export function useEntityForm<TEntity extends { id: string }, TDraft extends obj
       const saved = initial
         ? await update.mutateAsync({ id: initial.id, patch: payload })
         : await create.mutateAsync(payload)
-      await onSaved?.(saved)
+      // The authoritative write is complete. Clear the guard before any reconciliation
+      // side effect and never leave a successful create open for a duplicate retry.
+      setDirty(false)
+      setFormDirty(dirtyId.current, false)
+      if (onSaved) {
+        try {
+          await onSaved(saved)
+        } catch (error) {
+          try {
+            await onPostSaveError?.(error, saved)
+          } catch {
+            // Reporting a post-save warning must never make the committed create retryable.
+          }
+        }
+      }
       onDone()
     } catch (err) {
       setSubmitError((err as Error)?.message || DEFAULT_ERROR)
@@ -72,5 +110,5 @@ export function useEntityForm<TEntity extends { id: string }, TDraft extends obj
     }
   }
 
-  return { d, setD, set, busy, text, date, submit, submitError }
+  return { d, setD, set, dirty, busy, text, date, submit, submitError }
 }

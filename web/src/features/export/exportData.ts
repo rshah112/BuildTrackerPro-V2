@@ -8,6 +8,7 @@ import type {
   ChangeOrder,
   ConstructionLoan,
   Expense,
+  LienWaiver,
   LoanDraw,
   Phase,
   PhotoAttachment,
@@ -33,6 +34,7 @@ export interface ProjectExport {
   loans: ConstructionLoan[]
   loanDraws: LoanDraw[]
   phases: Phase[]
+  lienWaivers: LienWaiver[]
   exportedAt: string
 }
 
@@ -60,6 +62,7 @@ export async function loadProjectExport(
     loans,
     loanDraws,
     phases,
+    lienWaivers,
   ] = await Promise.all([
     table<Project>('projects').get(projectId),
     table<BudgetCategory>('budget_categories').list(f, opts),
@@ -76,6 +79,7 @@ export async function loadProjectExport(
     table<ConstructionLoan>('construction_loans').list(f, opts),
     table<LoanDraw>('loan_draws').list(f, opts),
     table<Phase>('phases').list(f, opts),
+    table<LienWaiver>('lien_waivers').list(f, opts),
   ])
 
   if (!project) throw new Error('Project not found')
@@ -96,6 +100,7 @@ export async function loadProjectExport(
     loans,
     loanDraws,
     phases,
+    lienWaivers,
     exportedAt: new Date().toISOString(),
   }
 }

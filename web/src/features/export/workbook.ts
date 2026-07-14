@@ -2,12 +2,19 @@ import * as XLSX from 'xlsx'
 import { lineItemHealth, variance } from '../../lib/budgetMath'
 import { diff, sumBy } from '../../lib/money'
 import { actualSpend, committedSpend } from '../../lib/budgetAggregates'
-import { effectiveAmountPaid } from '../../lib/expenseMath'
+import {
+  balanceDue,
+  effectiveAmountPaid,
+  expensePaymentState,
+  payableBalance,
+  retainageHeld,
+} from '../../lib/expenseMath'
 import { cashFlowPayments, localToday } from '../cashflow/cashFlow'
 import { landAcquisitionCost, allInProjectCost } from '../projects/projectCost'
 import { loadProjectExport, downloadBlob, safeFileName, type ProjectExport } from './exportData'
 
 const dateOnly = (v?: string | null) => (v ? v.slice(0, 10) : '')
+const paymentStateLabel = { open: 'Open', partial: 'Partial', retainage: 'Retainage held', paid: 'Paid' } as const
 
 function buildWorkbook(d: ProjectExport): XLSX.WorkBook {
   const wb = XLSX.utils.book_new()
@@ -21,7 +28,7 @@ function buildWorkbook(d: ProjectExport): XLSX.WorkBook {
   // adds open commitments + approved (unpaid) change orders. The per-row Line Items sheet below
   // still shows the stored li.actual / li.committed for line-by-line detail.
   const actualTotal = actualSpend(d.lineItems, d.expenses, d.allowanceSelections, d.changeOrders)
-  const committedTotal = committedSpend(d.lineItems, d.changeOrders)
+  const committedTotal = committedSpend(d.lineItems, d.changeOrders, d.expenses)
 
   const summary = XLSX.utils.aoa_to_sheet([
     ['Project', d.project.name],
@@ -78,12 +85,15 @@ function buildWorkbook(d: ProjectExport): XLSX.WorkBook {
     Vendor: e.vendorName,
     Amount: e.amount,
     Paid: effectiveAmountPaid(e),
+    'Balance due': balanceDue(e),
+    'Payable now': payableBalance(e),
+    'Retainage held': retainageHeld(e),
     'Invoice #': e.invoiceNumber,
     Date: dateOnly(e.date),
     'Due date': dateOnly(e.dueDate),
     Category: e.categoryName,
     'Budget line': e.budgetLineItemTitle,
-    Status: e.isPaid ? 'Paid' : 'Open',
+    Status: paymentStateLabel[expensePaymentState(e)],
   })))
 
   append('Change Orders', d.changeOrders.map((o) => ({

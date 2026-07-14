@@ -10,10 +10,10 @@ import { useCreateLienWaiver, useUpdateLienWaiver } from './useLienWaivers'
 import { useVendors } from '../vendors/useVendors'
 import { useEnsureVendor } from '../vendors/useEnsureVendor'
 import { VendorPicker } from '../vendors/VendorPicker'
+import { localDateISO } from '../../lib/date'
 
 type Draft = Partial<Omit<LienWaiver, 'id' | 'owner' | 'createdAt'>>
 
-const today = () => new Date().toISOString().slice(0, 10)
 const dateValue = (v?: string | null) => (v ? v.slice(0, 10) : '')
 
 const blank = (projectId: string): Draft => ({
@@ -22,7 +22,7 @@ const blank = (projectId: string): Draft => ({
   expenseId: null,
   amount: 0,
   waiverType: 'conditional_progress',
-  throughDate: today(),
+  throughDate: localDateISO(),
   received: false,
   notes: '',
 })

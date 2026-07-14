@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { ScreenHeader } from '../../app/ScreenHeader'
 import { Button } from '../../components/ui/Button'
 import { Field } from '../../components/ui/Field'
@@ -8,6 +8,7 @@ import { ListSkeleton } from '../../components/ui/Feedback'
 import { useToast } from '../../components/ui/Toast'
 import { NotifyControl } from './NotifyControl'
 import { useNotificationPrefs, useSaveNotificationPrefs, DEFAULT_PREFS } from './useNotificationPrefs'
+import { useDirtyState } from '../../lib/useDirtyState'
 
 const hourLabel = (h: number) => {
   const am = h < 12
@@ -24,13 +25,13 @@ export function NotificationSettingsScreen() {
   const { data = [], isLoading } = useNotificationPrefs()
   const save = useSaveNotificationPrefs()
   const toast = useToast()
-  const [form, setForm] = useState<Form>(DEFAULT_PREFS)
+  const { value: form, setValue: setForm, markClean, resetClean } = useDirtyState<Form>(DEFAULT_PREFS)
   const seeded = useRef(false)
 
   useEffect(() => {
     if (seeded.current || data.length === 0) return
     const p = data[0]
-    setForm({
+    resetClean({
       leadDays: p.leadDays,
       quietStart: p.quietStart,
       quietEnd: p.quietEnd,
@@ -39,13 +40,14 @@ export function NotificationSettingsScreen() {
       remindChangeOrders: p.remindChangeOrders,
     })
     seeded.current = true
-  }, [data])
+  }, [data, resetClean])
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }))
 
   const onSave = async () => {
     try {
       await save.mutateAsync(form)
+      markClean()
       toast.success('Reminder settings saved')
     } catch (e) {
       toast.error((e as Error).message || 'Couldn’t save settings')

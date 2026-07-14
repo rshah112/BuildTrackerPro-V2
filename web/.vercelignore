@@ -1,6 +1,6 @@
-# Never upload local env to Vercel — the production build uses the baked-in
-# fallback in src/lib/supabase.ts (public URL + anon key). Uploading .env would
-# override it with the local stack URL.
+# Never upload local env files. Configure VITE_SUPABASE_URL and
+# VITE_SUPABASE_ANON_KEY explicitly in each Vercel environment; production builds
+# fail closed when either is missing.
 .env
 .env.*
 !.env.example

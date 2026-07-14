@@ -50,8 +50,8 @@ export function PortfolioScreen() {
         const sels = allowances.filter((a) => a.projectId === project.id)
         const budget = project.constructionBudget + project.contingencyBudget
         const actual = actualSpend(items, exp, sels, cos)
-        const committed = committedSpend(items, cos)
-        const pending = pendingExposure(cos)
+        const committed = committedSpend(items, cos, exp)
+        const pending = pendingExposure(cos, exp)
         const projected = actual + committed + pending
         const remaining = budget - projected
         const usedPct = budget > 0 ? Math.round((projected / budget) * 100) : 0

@@ -20,6 +20,7 @@ import { useLoan, useLoanDraws, useRemoveDraw } from './useLoan'
 import { LoanForm } from './LoanForm'
 import { DrawForm } from './DrawForm'
 import { availableCredit, drawnTotal, interestAccruedToDate, monthlyInterest, utilization } from './loanMath'
+import { effectiveAmountPaid } from '../../lib/expenseMath'
 
 export function LoanScreen() {
   const { projectId } = useCurrentProject()
@@ -54,8 +55,8 @@ export function LoanScreen() {
 
   // Personal vs loan-funded spend, from each expense's funding source tag.
   const funding = useMemo(() => {
-    const loanSpend = sumBy(expenses.filter((e) => e.fundingSource === 'loan'), (e) => e.amount)
-    const personalSpend = sumBy(expenses.filter((e) => e.fundingSource !== 'loan'), (e) => e.amount)
+    const loanSpend = sumBy(expenses.filter((e) => e.fundingSource === 'loan'), effectiveAmountPaid)
+    const personalSpend = sumBy(expenses.filter((e) => e.fundingSource !== 'loan'), effectiveAmountPaid)
     return { loanSpend, personalSpend }
   }, [expenses])
 

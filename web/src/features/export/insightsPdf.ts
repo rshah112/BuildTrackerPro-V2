@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable'
 import { diff, fmt, sumBy } from '../../lib/money'
 import { actualSpend, committedSpend } from '../../lib/budgetAggregates'
 import { lineItemHealth } from '../../lib/budgetMath'
+import { balanceDue } from '../../lib/expenseMath'
 import { nextFourteenDaysDue, localToday } from '../cashflow/cashFlow'
 import { loadProjectExport, downloadBlob, safeFileName } from './exportData'
 
@@ -30,7 +31,7 @@ export async function downloadInsightsPdf(projectId: string): Promise<void> {
   const budgetTotal = sumBy(d.lineItems, (li) => li.budget)
   // Same basis as the Dashboard so the report reconciles (see workbook.ts).
   const actualTotal = actualSpend(d.lineItems, d.expenses, d.allowanceSelections, d.changeOrders)
-  const committedTotal = committedSpend(d.lineItems, d.changeOrders)
+  const committedTotal = committedSpend(d.lineItems, d.changeOrders, d.expenses)
   const limit = d.project.constructionBudget + d.project.contingencyBudget
   const usedPct = limit > 0 ? Math.round((actualTotal / limit) * 100) : 0
 
@@ -86,7 +87,7 @@ export async function downloadInsightsPdf(projectId: string): Promise<void> {
   doc.text(
     [
       `${overBudget.length} line item(s) over budget`,
-      `${d.expenses.filter((e) => !e.isPaid).length} open expense(s)`,
+      `${d.expenses.filter((e) => balanceDue(e) > 0).length} open expense(s)`,
       `${d.changeOrders.filter((c) => c.status === 'pending').length} pending change order(s)`,
     ].join('\n'),
     margin,

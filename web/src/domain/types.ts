@@ -81,6 +81,8 @@ export interface Expense {
   amount: number
   amountPaid: number
   vendorName: string
+  /** Stable vendor profile link when one is available; vendorName remains the display snapshot. */
+  vendorId?: UUID | null
   invoiceNumber: string
   date: ISODateString
   dueDate: ISODateString | null
@@ -92,6 +94,8 @@ export interface Expense {
   roomTag: string
   budgetLineItemId: UUID | null
   budgetLineItemTitle: string
+  /** Optional source change order represented by this invoice/receipt (prevents double-counting). */
+  changeOrderId?: UUID | null
   notes: string
   isPaid: boolean
   receiptObjectKey: string | null
@@ -272,6 +276,21 @@ export interface LienWaiver {
   throughDate: ISODateString | null
   received: boolean
   notes: string
+  createdAt: ISODateString
+  deletedAt?: ISODateString | null
+}
+
+/** Searchable metadata for an encrypted-in-transit project snapshot stored in R2. */
+export interface CloudBackupRecord {
+  id: UUID
+  owner: UUID
+  projectId: UUID
+  projectName: string
+  objectKey: string
+  backupVersion: number
+  sizeBytes: number
+  checksum: string
+  itemCount: number
   createdAt: ISODateString
   deletedAt?: ISODateString | null
 }

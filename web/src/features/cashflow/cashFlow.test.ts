@@ -52,6 +52,12 @@ describe('cashFlowPayments', () => {
     expect(ps[0].exposure).toBe('committed')
     expect(ps[1].exposure).toBe('pending')
   })
+
+  it('does not forecast a change order again once a linked expense represents it', () => {
+    const exps = [expense({ amount: 500, changeOrderId: 'co1', dueDate: '2026-06-04' })]
+    const orders = [order({ id: 'co1', amount: 500, status: 'approved', expectedPaymentDate: '2026-06-04' })]
+    expect(cashFlowPayments(exps, orders, TODAY).map((payment) => payment.id)).toEqual(['expense-e1'])
+  })
 })
 
 describe('cashFlowForecast + nextFourteenDaysDue', () => {
@@ -77,6 +83,20 @@ describe('retainage', () => {
     const exps = [expense({ id: 'e1', amount: 1000, retainageAmount: 100, dueDate: '2026-06-05' })]
     const ps = cashFlowPayments(exps, [], TODAY)
     expect(ps[0].amount).toBe(900) // 1000 balance − 100 retainage held
+  })
+
+  it('does not forecast a retainage-only balance as currently payable', () => {
+    const exps = [
+      expense({
+        id: 'e1',
+        amount: 1000,
+        amountPaid: 900,
+        isPaid: true,
+        retainageAmount: 100,
+        dueDate: '2026-06-05',
+      }),
+    ]
+    expect(cashFlowPayments(exps, [], TODAY)).toEqual([])
   })
 })
 

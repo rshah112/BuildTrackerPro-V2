@@ -8,16 +8,16 @@ import { useCreateAllowance, useUpdateAllowance } from './useAllowances'
 import { useVendors } from '../vendors/useVendors'
 import { useEnsureVendor } from '../vendors/useEnsureVendor'
 import { VendorPicker } from '../vendors/VendorPicker'
+import { localDateISO } from '../../lib/date'
 
 type Draft = Partial<Omit<AllowanceSelection, 'id' | 'owner'>>
 
-const today = () => new Date().toISOString().slice(0, 10)
 const dateValue = (v?: string | null) => (v ? v.slice(0, 10) : '')
 
 const blank = (projectId: string, lineItemId: string): Draft => ({
   projectId,
   lineItemId,
-  selectionDate: today(),
+  selectionDate: localDateISO(),
   vendor: '',
   amount: 0,
   notes: '',
@@ -29,12 +29,14 @@ export function AllowanceForm({
   lineItems,
   initial,
   onSaved,
+  onPostSaveError,
   onDone,
 }: {
   projectId: string
   lineItems: BudgetLineItem[]
   initial?: AllowanceSelection
   onSaved: (saved: AllowanceSelection) => Promise<void>
+  onPostSaveError?: (error: unknown, saved: AllowanceSelection) => void | Promise<void>
   onDone: () => void
 }) {
   const { data: vendors = [] } = useVendors(projectId)
@@ -54,6 +56,7 @@ export function AllowanceForm({
       return draft
     },
     onSaved,
+    onPostSaveError,
     onDone,
   })
 
@@ -83,7 +86,7 @@ export function AllowanceForm({
               type="date"
               {...p}
               value={dateValue(d.selectionDate)}
-              onChange={(e) => set('selectionDate', e.target.value || today())}
+              onChange={(e) => set('selectionDate', e.target.value || localDateISO())}
             />
           )}
         </Field>

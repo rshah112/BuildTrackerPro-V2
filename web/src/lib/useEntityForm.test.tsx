@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { FormEvent } from 'react'
 import { renderHook, act } from '@testing-library/react'
 import { useEntityForm } from './useEntityForm'
+import { hasUnsavedChanges } from './unsavedChanges'
 
 type Entity = { id: string; name: string }
 type Draft = { name: string }
@@ -101,5 +102,46 @@ describe('useEntityForm', () => {
     })
     expect(create.mutateAsync).toHaveBeenCalledTimes(1)
     expect(onDone).toHaveBeenCalledTimes(1)
+  })
+
+  it('tracks unsaved edits and clears the navigation guard after a successful write', async () => {
+    const create = { mutateAsync: vi.fn(async (x: Draft) => ({ id: 'n1', ...x })), isPending: false }
+    const { result, unmount } = renderHook(() =>
+      useEntityForm<Entity, Draft>({
+        blank: { name: '' },
+        create,
+        update: { mutateAsync: vi.fn(), isPending: false },
+        onDone: vi.fn(),
+      }),
+    )
+    act(() => result.current.set('name', 'Edited'))
+    expect(result.current.dirty).toBe(true)
+    expect(hasUnsavedChanges()).toBe(true)
+    await act(async () => result.current.submit(noEvt))
+    expect(hasUnsavedChanges()).toBe(false)
+    unmount()
+  })
+
+  it('closes after a committed write even when post-save reconciliation fails', async () => {
+    const create = { mutateAsync: vi.fn(async (x: Draft) => ({ id: 'n1', ...x })), isPending: false }
+    const onDone = vi.fn()
+    const onPostSaveError = vi.fn()
+    const { result } = renderHook(() =>
+      useEntityForm<Entity, Draft>({
+        blank: { name: 'Saved once' },
+        create,
+        update: { mutateAsync: vi.fn(), isPending: false },
+        onSaved: vi.fn(async () => {
+          throw new Error('reconciliation failed')
+        }),
+        onPostSaveError,
+        onDone,
+      }),
+    )
+    await act(async () => result.current.submit(noEvt))
+    expect(create.mutateAsync).toHaveBeenCalledTimes(1)
+    expect(onPostSaveError).toHaveBeenCalledWith(expect.any(Error), { id: 'n1', name: 'Saved once' })
+    expect(onDone).toHaveBeenCalledTimes(1)
+    expect(result.current.submitError).toBeNull()
   })
 })

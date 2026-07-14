@@ -3,12 +3,14 @@ import { Sheet } from '../../components/ui/Sheet'
 import { Button } from '../../components/ui/Button'
 import { Field } from '../../components/ui/Field'
 import { useCreateTask } from './useTasks'
+import { useDirtyState } from '../../lib/useDirtyState'
+import { hasUnsavedChanges } from '../../lib/unsavedChanges'
 
 /** Rapid punch-list capture: add to-do after to-do without the form closing, so you can walk
  *  the site logging items quickly. Mirrors the native "Punch Walk". */
 export function PunchWalkSheet({ projectId, onClose }: { projectId: string; onClose: () => void }) {
   const create = useCreateTask()
-  const [title, setTitle] = useState('')
+  const { value: title, setValue: setTitle, markClean, resetClean } = useDirtyState('')
   const [count, setCount] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -18,8 +20,14 @@ export function PunchWalkSheet({ projectId, onClose }: { projectId: string; onCl
     if (!t) return
     await create.mutateAsync({ projectId, title: t, status: 'todo' } as never)
     setCount((c) => c + 1)
-    setTitle('')
+    resetClean('')
     inputRef.current?.focus()
+  }
+
+  const done = () => {
+    if (hasUnsavedChanges() && !window.confirm('Discard the unfinished punch-list item?')) return
+    markClean()
+    onClose()
   }
 
   return (
@@ -42,7 +50,7 @@ export function PunchWalkSheet({ projectId, onClose }: { projectId: string; onCl
           <Button type="submit" loading={create.isPending} fullWidth>
             Add item
           </Button>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={done}>
             Done{count > 0 ? ` (${count})` : ''}
           </Button>
         </div>

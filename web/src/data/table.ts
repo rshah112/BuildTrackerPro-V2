@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { toCamel, toSnake } from '../lib/casing'
-import { isNetworkError } from '../lib/netStatus'
+import { isNetworkError, isRetryablePostgrestError } from '../lib/netStatus'
 import { enqueue } from '../lib/outbox'
 import { cacheList, readCachedList, overlayPending } from './readCache'
 
@@ -19,6 +19,7 @@ import { cacheList, readCachedList, overlayPending } from './readCache'
 // machinery only engages on a network failure, so it can't regress the live path.
 
 export type TrashMode = 'exclude' | 'only' | 'all'
+const PAGE_SIZE = 1000
 
 export interface TableApi<T> {
   list(filter?: Record<string, unknown>, opts?: { trashed?: TrashMode }): Promise<T[]>
@@ -33,25 +34,52 @@ export interface TableApi<T> {
   purge(id: string): Promise<void>
 }
 
+function throwPostgrestError(error: unknown, status?: unknown): void {
+  const message = (error as { message?: string } | null)?.message || 'The server rejected this request.'
+  if (isRetryablePostgrestError(error, status)) {
+    const retryable = new Error(message)
+    retryable.name = 'NetworkError'
+    Object.assign(retryable, { status, cause: error })
+    throw retryable
+  }
+  if (error) {
+    const permanent = new Error(message)
+    Object.assign(permanent, error, { status, cause: error })
+    throw permanent
+  }
+}
+
 export function table<T>(name: string): TableApi<T> {
   return {
     async list(filter, opts) {
       const mode = opts?.trashed ?? 'exclude'
       try {
-        let q = supabase.from(name).select('*')
-        if (filter) {
-          const snake = toSnake<Record<string, unknown>>(filter)
-          for (const [col, val] of Object.entries(snake)) {
-            q = val === null ? q.is(col, null) : q.eq(col, val as never)
+        const rows: unknown[] = []
+        let from = 0
+        // PostgREST projects commonly cap one response at 1,000 rows. Fetch stable,
+        // deterministic UUID-ordered pages so exports, totals, and backups are complete.
+        while (true) {
+          let q = supabase.from(name).select('*')
+          if (filter) {
+            const snake = toSnake<Record<string, unknown>>(filter)
+            for (const [col, val] of Object.entries(snake)) {
+              q = val === null ? q.is(col, null) : q.eq(col, val as never)
+            }
           }
+          if (mode === 'exclude') q = q.is('deleted_at', null)
+          else if (mode === 'only') q = q.not('deleted_at', 'is', null)
+          const { data, error, status } = await q
+            .order('id', { ascending: true })
+            .range(from, from + PAGE_SIZE - 1)
+          throwPostgrestError(error, status)
+          const page = data ?? []
+          rows.push(...page)
+          if (page.length < PAGE_SIZE) break
+          from += PAGE_SIZE
         }
-        if (mode === 'exclude') q = q.is('deleted_at', null)
-        else if (mode === 'only') q = q.not('deleted_at', 'is', null)
-        const { data, error } = await q
-        if (error) throw error
-        const rows = (data ?? []).map((row) => toCamel<T>(row))
-        void cacheList(name, filter, mode, rows)
-        return overlayPending(name, filter, mode, rows)
+        const mapped = rows.map((row) => toCamel<T>(row))
+        void cacheList(name, filter, mode, mapped)
+        return overlayPending(name, filter, mode, mapped)
       } catch (err) {
         if (!isNetworkError(err)) throw err
         // Offline: serve the last-synced copy with any pending local changes overlaid.
@@ -60,8 +88,8 @@ export function table<T>(name: string): TableApi<T> {
       }
     },
     async get(id) {
-      const { data, error } = await supabase.from(name).select('*').eq('id', id).maybeSingle()
-      if (error) throw error
+      const { data, error, status } = await supabase.from(name).select('*').eq('id', id).maybeSingle()
+      throwPostgrestError(error, status)
       return data ? toCamel<T>(data) : null
     },
     async create(input) {
@@ -74,53 +102,61 @@ export function table<T>(name: string): TableApi<T> {
         id: (input as { id?: string }).id ?? crypto.randomUUID(),
       } as Record<string, unknown>
       try {
-        const { data, error } = await supabase.from(name).insert(toSnake(row) as never).select().single()
-        if (error) throw error
+        const { data, error, status } = await supabase.from(name).insert(toSnake(row) as never).select().single()
+        throwPostgrestError(error, status)
         return toCamel<T>(data)
       } catch (err) {
         if (!isNetworkError(err)) throw err
         // Offline: queue the insert and optimistically return the entry so the form closes and the
         // row shows in lists immediately (the stable id keeps it deduped through replay).
-        enqueue({ kind: 'create', table: name, id: row.id as string, payload: row })
+        await enqueue({ kind: 'create', table: name, id: row.id as string, payload: row })
         return row as T
       }
     },
     async update(id, patch) {
       try {
-        const { data, error } = await supabase.from(name).update(toSnake(patch) as never).eq('id', id).select().single()
-        if (error) throw error
+        const { data, error, status } = await supabase
+          .from(name)
+          .update(toSnake(patch) as never)
+          .eq('id', id)
+          .select()
+          .single()
+        throwPostgrestError(error, status)
         return toCamel<T>(data)
       } catch (err) {
         if (!isNetworkError(err)) throw err
-        enqueue({ kind: 'update', table: name, id, payload: patch as Record<string, unknown> })
+        await enqueue({ kind: 'update', table: name, id, payload: patch as Record<string, unknown> })
         return { ...(patch as object), id } as T
       }
     },
     async remove(id) {
       try {
-        const { error } = await supabase.from(name).update({ deleted_at: new Date().toISOString() } as never).eq('id', id)
-        if (error) throw error
+        const { error, status } = await supabase
+          .from(name)
+          .update({ deleted_at: new Date().toISOString() } as never)
+          .eq('id', id)
+        throwPostgrestError(error, status)
       } catch (err) {
         if (!isNetworkError(err)) throw err
-        enqueue({ kind: 'remove', table: name, id })
+        await enqueue({ kind: 'remove', table: name, id })
       }
     },
     async restore(id) {
       try {
-        const { error } = await supabase.from(name).update({ deleted_at: null } as never).eq('id', id)
-        if (error) throw error
+        const { error, status } = await supabase.from(name).update({ deleted_at: null } as never).eq('id', id)
+        throwPostgrestError(error, status)
       } catch (err) {
         if (!isNetworkError(err)) throw err
-        enqueue({ kind: 'restore', table: name, id })
+        await enqueue({ kind: 'restore', table: name, id })
       }
     },
     async purge(id) {
       try {
-        const { error } = await supabase.from(name).delete().eq('id', id)
-        if (error) throw error
+        const { error, status } = await supabase.from(name).delete().eq('id', id)
+        throwPostgrestError(error, status)
       } catch (err) {
         if (!isNetworkError(err)) throw err
-        enqueue({ kind: 'purge', table: name, id })
+        await enqueue({ kind: 'purge', table: name, id })
       }
     },
   }

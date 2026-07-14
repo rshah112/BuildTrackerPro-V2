@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Plus, Trash2, Receipt as ReceiptIcon, FileText } from 'lucide-react'
 import type { BudgetLineItem, Expense } from '../../domain/types'
-import { balanceDue, effectiveAmountPaid } from '../../lib/expenseMath'
+import {
+  balanceDue,
+  effectiveAmountPaid,
+  expensePaymentState,
+  payableBalance,
+  retainageHeld,
+} from '../../lib/expenseMath'
 import { fmt, sumBy } from '../../lib/money'
 import { fmtDate } from '../../lib/date'
 import { Button } from '../../components/ui/Button'
@@ -25,17 +31,18 @@ type Filter = 'all' | 'open' | 'paid'
 
 /** An expense is "open" if it still owes money, regardless of the isPaid flag — so a
  *  partial payment shows as Partial/open, not a misleading "Paid". */
-function payStatus(e: Expense): { label: string; tone: 'success' | 'warn'; open: boolean } {
-  const due = balanceDue(e)
-  if (due <= 0 && e.isPaid) return { label: 'Paid', tone: 'success', open: false }
-  if (effectiveAmountPaid(e) > 0) return { label: 'Partial', tone: 'warn', open: true }
-  return { label: 'Open', tone: 'warn', open: true }
+function payStatus(e: Expense): { label: string; tone: 'success' | 'warn' | 'info' } {
+  const state = expensePaymentState(e)
+  if (state === 'paid') return { label: 'Paid', tone: 'success' }
+  if (state === 'retainage') return { label: 'Retainage', tone: 'info' }
+  if (state === 'partial') return { label: 'Partial', tone: 'warn' }
+  return { label: 'Open', tone: 'warn' }
 }
 
 /** Due / overdue chip for an expense that still owes money, from its expected-payment or due
  *  date. Surfaces the dates that now live behind "More details" so cash flow is scannable. */
 function dueInfo(e: Expense): { label: string; overdue: boolean } | null {
-  if (balanceDue(e) <= 0) return null
+  if (payableBalance(e) <= 0) return null
   const iso = e.expectedPaymentDate || e.dueDate
   const [y, m, d] = (iso?.slice(0, 10) ?? '').split('-').map(Number)
   if (!y || !m || !d) return null
@@ -164,6 +171,7 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
                     </div>
                     <strong>{fmt(e.amount)}</strong>
                     {st.label === 'Partial' && <span className="expense-left">{fmt(balanceDue(e))} left</span>}
+                    {st.label === 'Retainage' && <span className="expense-left">{fmt(retainageHeld(e))} held</span>}
                   </div>
                 </button>
                 <button className="expense-row-del" onClick={() => removeAndSync(e)} aria-label="Delete expense">
@@ -185,6 +193,9 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
               await syncActuals({ expenses: upsertExpense(expenses, saved) })
               toast.success('Expense saved')
             }}
+            onPostSaveError={() =>
+              toast.error('Expense saved, but budget totals could not refresh. Reopen Budget to reconcile them.')
+            }
             onDone={editor.close}
           />
         )}

@@ -36,23 +36,43 @@ import { getStoredTheme, setTheme, type ThemePref } from '../../lib/theme'
 import { useInstallPrompt } from '../../lib/useInstallPrompt'
 import { useCurrentProject } from '../projects/currentProject'
 
-const PROJECT_LINKS: { to: string; label: string; icon: LucideIcon }[] = [
-  { to: '/project-info', label: 'Project info', icon: Info },
-  { to: '/phases', label: 'Build phases', icon: Activity },
-  { to: '/tasks', label: 'Tasks', icon: ListTodo },
-  { to: '/vendors', label: 'Vendors', icon: Contact },
-  { to: '/change-orders', label: 'Change orders', icon: FileEdit },
-  { to: '/allowances', label: 'Allowances', icon: Sparkles },
-  { to: '/loan', label: 'Construction loan', icon: Landmark },
-  { to: '/lien-waivers', label: 'Lien waivers', icon: ScrollText },
-  { to: '/bids', label: 'Bids', icon: FileStack },
-  { to: '/documents', label: 'Documents', icon: FolderOpen },
-  { to: '/receipts', label: 'Receipts', icon: Receipt },
-  { to: '/rooms', label: 'By room', icon: Grid2x2 },
-  { to: '/cashflow', label: 'Cash flow', icon: CalendarClock },
-  { to: '/export', label: 'Export & backup', icon: FileDown },
-  { to: '/tax-1099', label: 'Tax / 1099 prep', icon: Calculator },
-  { to: '/trash', label: 'Trash', icon: Trash2 },
+const PROJECT_GROUPS: { label: string; links: { to: string; label: string; icon: LucideIcon }[] }[] = [
+  {
+    label: 'Plan & build',
+    links: [
+      { to: '/project-info', label: 'Project details', icon: Info },
+      { to: '/phases', label: 'Build phases', icon: Activity },
+      { to: '/tasks', label: 'Tasks', icon: ListTodo },
+      { to: '/rooms', label: 'Spaces & rooms', icon: Grid2x2 },
+    ],
+  },
+  {
+    label: 'Money',
+    links: [
+      { to: '/change-orders', label: 'Change orders', icon: FileEdit },
+      { to: '/allowances', label: 'Allowances', icon: Sparkles },
+      { to: '/loan', label: 'Construction loan', icon: Landmark },
+      { to: '/cashflow', label: 'Cash flow', icon: CalendarClock },
+      { to: '/tax-1099', label: 'Tax / 1099 prep', icon: Calculator },
+    ],
+  },
+  {
+    label: 'People & records',
+    links: [
+      { to: '/vendors', label: 'Vendors', icon: Contact },
+      { to: '/bids', label: 'Bids', icon: FileStack },
+      { to: '/lien-waivers', label: 'Lien waivers', icon: ScrollText },
+      { to: '/documents', label: 'Documents', icon: FolderOpen },
+      { to: '/receipts', label: 'Receipts', icon: Receipt },
+    ],
+  },
+  {
+    label: 'Data & recovery',
+    links: [
+      { to: '/export', label: 'Recovery center', icon: FileDown },
+      { to: '/trash', label: 'Recently deleted', icon: Trash2 },
+    ],
+  },
 ]
 
 export function MoreScreen() {
@@ -70,19 +90,36 @@ export function MoreScreen() {
 
       {projectId && (
         <>
-          <h2 className="section-label">This project</h2>
-          <div className="list-group">
-            {PROJECT_LINKS.map(({ to, label, icon: Glyph }) => (
-              <Link key={to} to={to} className="list-row">
-                <Glyph className="list-row-icon" size={20} aria-hidden />
-                <span className="list-row-label">{label}</span>
-                <span className="list-row-chevron" aria-hidden>
-                  ›
-                </span>
-              </Link>
+          <div className="more-groups">
+            {PROJECT_GROUPS.map((group) => (
+              <section className="more-group" key={group.label}>
+                <h2 className="section-label">{group.label}</h2>
+                <div className="list-group">
+                  {group.links.map(({ to, label, icon: Glyph }) => (
+                    <Link key={to} to={to} className="list-row">
+                      <span className="list-row-icon-tile"><Glyph className="list-row-icon" size={18} aria-hidden /></span>
+                      <span className="list-row-label">{label}</span>
+                      <span className="list-row-chevron" aria-hidden>›</span>
+                    </Link>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         </>
+      )}
+
+      {!projectId && (
+        <section className="more-group">
+          <h2 className="section-label">Data &amp; recovery</h2>
+          <div className="list-group">
+            <Link to="/export" className="list-row">
+              <span className="list-row-icon-tile"><FileDown className="list-row-icon" size={18} aria-hidden /></span>
+              <span className="list-row-label">Recovery center</span>
+              <span className="list-row-chevron" aria-hidden>›</span>
+            </Link>
+          </div>
+        </section>
       )}
 
       <h2 className="section-label">App</h2>

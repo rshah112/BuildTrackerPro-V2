@@ -1,11 +1,10 @@
 # BuildTrackerPro PWA — Deployment Runbook
 
-> **Status (2026-05-30): LIVE.** Deployed at **https://buildtrackerpro.vercel.app**
-> (Vercel project `rshah112s-projects/buildtrackerpro`, root dir `web/`). Backend is the
-> shared `Smart_Home_Hub` Supabase project, `buildtracker` schema. Login `rajrulz@aol.com`
-> is created and confirmed. Core app (auth + budget loop) needs no Vercel env vars — the
-> public Supabase URL + anon key are baked into the build (`src/lib/supabase.ts`).
-> **Only remaining optional step:** Cloudflare R2 for receipt/photo uploads (§2 + §3 env).
+> **Status (2026-07-14): LIVE.** Deployed at **https://buildtrackerpro.vercel.app**
+> (Vercel project `rshah112s-projects/buildtrackerpro`; deploy from `web/`). Backend is the
+> shared `Smart_Home_Hub` Supabase project, using the dedicated `buildtracker` schema.
+> Production builds require explicit Vercel environment variables; no production
+> credentials or project URLs are baked into the client bundle.
 
 The sections below are the original one-time setup notes, kept for reference / re-deploys.
 
@@ -17,17 +16,19 @@ All BuildTracker tables live in a dedicated **`buildtracker` schema**, fully iso
 from Smart Home Hub's `public` schema. The client targets it via
 `createClient(..., { db: { schema: 'buildtracker' } })` in `src/lib/supabase.ts`.
 
-The schema is **already applied** to the remote project (migrations
-`0001_schema` / `0002_rls` / `0003_grants`) and exposed to the Data API via
-`ALTER ROLE authenticator SET pgrst.db_schemas = 'public, graphql_public, buildtracker'`.
-To re-apply or push future migrations from `web/`:
-   ```bash
-   cd web
-   supabase link --project-ref wzbtxwnvplpnwmavfdwx
-   supabase db push        # applies migrations/0001..0003
-   ```
-   If a future migration adds tables, run `notify pgrst, 'reload schema';` (SQL editor)
-   so PostgREST picks them up.
+The Data API exposes `buildtracker` alongside the other apps' schemas. Supabase migration
+history is project-wide, not schema-scoped, and production already uses timestamped version
+IDs shared with the other app. **Never run `supabase db push` from this repo's numeric
+`0001`–style history and never run `supabase config push` against this shared project.**
+
+For a release:
+
+1. Export roles, schema, data, migration history, Auth/Storage metadata, and object bytes.
+2. Pull the exact remote timestamped migration history into an isolated temporary workspace.
+3. Append only the reviewed new BuildTracker migrations with new unique timestamps.
+4. Run `supabase migration list --linked` and `supabase db push --dry-run` there.
+5. Apply from that isolated workspace during a quiet window, then compare BuildTracker
+   financial totals before and after. Do not push global project config.
 
 1. From **Project Settings → API** of the `Smart_Home_Hub` project, copy:
    - Project URL (`https://wzbtxwnvplpnwmavfdwx.supabase.co`) → `VITE_SUPABASE_URL`
@@ -66,19 +67,30 @@ Already deployed as `rshah112s-projects/buildtrackerpro`. To re-deploy from `web
 cd web
 npx vercel deploy --prod --scope rshah112s-projects
 ```
-`web/.vercelignore` keeps the local `.env` out of the upload so the build uses the
-baked-in production Supabase config. `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are
-**not** required as Vercel env vars (they're the build fallback).
-
-**Only needed for receipt/photo uploads (R2):** add these Vercel env vars, then redeploy:
+`web/.vercelignore` keeps the local `.env` out of the upload. Configure these in the
+BuildTracker Vercel project before deploying:
 | Key | Value |
 |---|---|
+| `VITE_SUPABASE_URL` | Smart_Home_Hub project URL (§1) |
+| `VITE_SUPABASE_ANON_KEY` | Smart_Home_Hub anon/publishable key (§1) |
+| `SUPABASE_URL` | Same project URL, for server functions |
+| `SUPABASE_ANON_KEY` | Same anon/publishable key, for server functions |
 | `SUPABASE_SERVICE_ROLE` | Smart_Home_Hub service_role key (§1) |
 | `R2_ACCOUNT_ID` | from §2 |
 | `R2_ACCESS_KEY_ID` | from §2 |
 | `R2_SECRET_ACCESS_KEY` | from §2 |
 | `R2_BUCKET` | from §2 |
+| `CF_AI_TOKEN` | Cloudflare Workers AI token for OCR |
+| `VITE_VAPID_PUBLIC_KEY` | Web Push public key |
+| `VAPID_PUBLIC_KEY` | Same Web Push public key, for the cron |
+| `VAPID_PRIVATE_KEY` | Matching Web Push private key |
+| `CRON_SECRET` | Strong secret used by Vercel Cron |
 Do **not** set `VITE_R2_LOCAL` in production (it forces the local stub).
+
+Vercel is currently deployed directly rather than from a connected Git repository. Preserve
+the source in Git first, then deploy from the linked `web/.vercel` project. A Vercel rollback
+restores the previous app build but does not undo Supabase migrations, database writes, or R2
+changes.
 
 ## 4. Install on iPhone
 

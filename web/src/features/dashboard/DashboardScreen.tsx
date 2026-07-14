@@ -23,6 +23,7 @@ import { Donut } from '../../components/charts/Donut'
 import { BarRow } from '../../components/charts/BarRow'
 import { Sparkline } from '../../components/charts/Sparkline'
 import { fmtDate } from '../../lib/date'
+import { balanceDue, retainageHeld } from '../../lib/expenseMath'
 import { useLineItems } from '../budget/useBudget'
 import { useCurrentProject } from '../projects/currentProject'
 import { useProjects } from '../projects/useProjects'
@@ -74,9 +75,9 @@ export function DashboardScreen() {
     const allInCost = project ? allInProjectCost(project) : budgetLimit
     const baseBudget = project?.constructionBudget ?? sumBy(lineItems, (i) => i.budget)
     const actual = actualSpend(lineItems, expenses, allowanceSelections, changeOrders)
-    const committed = committedSpend(lineItems, changeOrders)
+    const committed = committedSpend(lineItems, changeOrders, expenses)
     const paid = cashPaidTotal(expenses, changeOrders)
-    const pending = pendingExposure(changeOrders)
+    const pending = pendingExposure(changeOrders, expenses)
     const allowanceRisk = allowanceOverage(lineItems, allowanceSelections, expenses)
     const projected = actual + committed + pending
     const remaining = budgetLimit - projected
@@ -85,7 +86,7 @@ export function DashboardScreen() {
 
     const overBudgetItems = lineItems.filter((li) => lineItemHealth(li) === 'overBudget')
     const nearLimitItems = lineItems.filter((li) => lineItemHealth(li) === 'nearLimit')
-    const openExpenses = expenses.filter((e) => !e.isPaid)
+    const openExpenses = expenses.filter((e) => balanceDue(e) > 0)
     const pendingOrders = changeOrders.filter((c) => c.status === 'pending')
     const due14 = nextFourteenDaysDue(expenses, changeOrders, localToday())
     const recentExpenses = [...expenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
@@ -466,7 +467,7 @@ export function DashboardScreen() {
               <strong>{fmt(allowanceRisk)}</strong> allowance overage
             </li>
             <li>
-              <strong>{fmt(sumBy(expenses, (e) => e.retainageAmount ?? 0))}</strong> retainage held
+              <strong>{fmt(sumBy(expenses, retainageHeld))}</strong> retainage held
             </li>
           </ul>
         </SectionCard>

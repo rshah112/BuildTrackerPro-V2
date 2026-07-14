@@ -1,68 +1,206 @@
-// Durable write outbox: when a mutation can't reach Supabase (offline / dropped connection),
-// the data layer queues it here instead of throwing the user's entry away. On reconnect the
-// queue is replayed FIFO so causal order is preserved (a row is created before its own update).
-//
-// Safety guarantees this module is built to keep:
-//  - NO DATA LOSS: a queued op is only removed after the server confirms it (or confirms it was
-//    already applied). The queue is persisted to IndexedDB on every change, so it survives a
-//    reload/app-close.
-//  - NO DUPLICATES: offline-created rows carry a client-generated id, so replaying a create that
-//    actually succeeded the first time (but whose ack was lost) hits a PK conflict the apply()
-//    fn reports as 'already' — treated as success, never re-inserted.
-//  - ORDER PRESERVED: flush stops at the first transient failure rather than skipping ahead.
+// Durable, user-bound write outbox. A mutation is reported as saved offline only after
+// IndexedDB confirms the transaction. Rejected operations remain persisted in a visible
+// needs-attention state; they are never silently discarded.
 
-import { idbGet, idbSet } from './idbKv'
+import { idbDelete, idbGet, idbSet, idbUpdate } from './idbKv'
 
 export type OutboxKind = 'create' | 'update' | 'remove' | 'restore' | 'purge'
+export type OutboxState = 'pending' | 'needs_attention'
 
 export interface OutboxOp {
   opId: string
+  userId: string
   table: string
   kind: OutboxKind
-  /** Row id. Client-generated for offline creates so it's stable across replay. */
+  /** Row id. Client-generated for offline creates so replay is idempotent. */
   id: string
-  /** camelCase row (create) or patch (update). Absent for remove/restore/purge. */
   payload?: Record<string, unknown>
   createdAt: number
   tries: number
+  state: OutboxState
+  lastError?: string
+  lastAttemptAt?: number
 }
 
-/** How apply() reports the outcome of replaying one op. */
+export type ApplyStatus = 'done' | 'already' | 'retry' | 'rejected'
 export type ApplyResult =
-  | 'done' // server accepted it
-  | 'already' // server shows it's already applied (e.g. PK conflict on a create replay) — not a dup
-  | 'retry' // transient/offline failure: stop, keep the op + everything after it, preserve order
-  | 'fatal' // permanent rejection (RLS/constraint): drop this op so it can't block the queue forever
+  | ApplyStatus
+  | 'fatal' // legacy alias: now retained as needs_attention, never dropped
+  | { status: ApplyStatus; message?: string }
 
-// Very high cap: this is financial data, so we never silently discard a real entry — we warn.
 const MAX_OPS = 5000
-const STORAGE_KEY = 'outbox/v1'
+const STORAGE_PREFIX = 'outbox/v2/'
+const LEGACY_STORAGE_KEY = 'outbox/v1'
+
+const storageKey = (userId: string) => `${STORAGE_PREFIX}${encodeURIComponent(userId)}`
+
+function newId(): string {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
 
 export interface OutboxStore {
-  load(): Promise<OutboxOp[]>
-  save(ops: OutboxOp[]): Promise<void>
+  load(userId: string): Promise<OutboxOp[]>
+  save(userId: string, next: OutboxOp[]): Promise<void>
+  /** Optional atomic read-modify-write for multi-tab safety. */
+  update?(userId: string, updater: (current: OutboxOp[]) => OutboxOp[]): Promise<OutboxOp[]>
+  clear?(userId: string): Promise<void>
 }
 
 const idbStore: OutboxStore = {
-  async load() {
-    return (await idbGet<OutboxOp[]>(STORAGE_KEY)) ?? []
+  async load(userId) {
+    return (await idbGet<OutboxOp[]>(storageKey(userId))) ?? []
   },
-  async save(ops) {
-    await idbSet(STORAGE_KEY, ops)
+  async save(userId, next) {
+    await idbSet(storageKey(userId), next)
+  },
+  async update(userId, updater) {
+    return idbUpdate<OutboxOp[]>(storageKey(userId), (current) => updater(current ?? []))
+  },
+  async clear(userId) {
+    await idbDelete(storageKey(userId))
   },
 }
 
 let store: OutboxStore = idbStore
 let ops: OutboxOp[] = []
+let boundUserId: string | null = null
 let hydrated = false
 let flushing = false
+let legacyChecked = false
 const listeners = new Set<() => void>()
+const sourceId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Math.random())
 
-/** Swap the durable store (used by unit tests to inject an in-memory store). Resets state. */
-export function setOutboxStore(s: OutboxStore): void {
-  store = s
+const channel =
+  typeof window !== 'undefined' && 'BroadcastChannel' in window
+    ? new BroadcastChannel('buildtracker-outbox-v2')
+    : null
+
+if (channel) {
+  channel.onmessage = (event: MessageEvent<{ sourceId?: string; userId?: string }>) => {
+    const changedUser = event.data?.userId
+    if (!changedUser || event.data?.sourceId === sourceId || changedUser !== boundUserId || flushing) return
+    void reloadBoundOutbox()
+  }
+}
+
+function normalizeOp(op: Partial<OutboxOp>, userId: string): OutboxOp {
+  return {
+    opId: op.opId ?? newId(),
+    userId,
+    table: op.table ?? '',
+    kind: op.kind ?? 'update',
+    id: op.id ?? '',
+    payload: op.payload,
+    createdAt: op.createdAt ?? Date.now(),
+    tries: op.tries ?? 0,
+    state: op.state === 'needs_attention' ? 'needs_attention' : 'pending',
+    lastError: op.lastError,
+    lastAttemptAt: op.lastAttemptAt,
+  }
+}
+
+function emit(): void {
+  for (const listener of listeners) listener()
+}
+
+function broadcastChange(userId: string): void {
+  channel?.postMessage({ sourceId, userId })
+}
+
+async function migrateLegacyOps(userId: string): Promise<void> {
+  if (store !== idbStore || legacyChecked) return
+  let legacy: Array<Partial<OutboxOp>> | null
+  try {
+    legacy = await idbGet<Array<Partial<OutboxOp>>>(LEGACY_STORAGE_KEY)
+  } catch {
+    // IndexedDB can be temporarily blocked during startup. Leave migration eligible
+    // for a later bind rather than making a legacy queue disappear from view.
+    return
+  }
+  if (!legacy?.length) {
+    legacyChecked = true
+    return
+  }
+
+  // V1 did not record an owner. Preserve every operation but require explicit retry so an
+  // old account's payload can never be replayed automatically into the current account.
+  const migrated = legacy.map((op) => ({
+    ...normalizeOp(op, userId),
+    state: 'needs_attention' as const,
+    lastError: 'This change predates account-bound sync. Review and retry it while signed into the original account.',
+  }))
+  if (store.update) {
+    await store.update(userId, (current) => {
+      const existing = new Set(current.map((op) => op.opId))
+      return [...current, ...migrated.filter((op) => !existing.has(op.opId))]
+    })
+  } else {
+    const current = await store.load(userId)
+    const existing = new Set(current.map((op) => op.opId))
+    await store.save(userId, [...current, ...migrated.filter((op) => !existing.has(op.opId))])
+  }
+  // V2 is already durable at this point. Failure to remove the old key must not make
+  // hydration fail; opId de-duplication above makes a later migration safe.
+  await idbDelete(LEGACY_STORAGE_KEY).catch(() => undefined)
+  legacyChecked = true
+}
+
+async function reloadBoundOutbox(): Promise<void> {
+  const userId = boundUserId
+  if (!userId) return
+  const loaded = await store.load(userId)
+  if (boundUserId !== userId) return
+  ops = loaded.map((op) => normalizeOp(op, userId))
+  hydrated = true
+  emit()
+}
+
+async function mutateBound(updater: (current: OutboxOp[]) => OutboxOp[]): Promise<OutboxOp[]> {
+  const userId = boundUserId
+  if (!userId) throw new Error('Sign in before saving offline changes.')
+  let next: OutboxOp[]
+  if (store.update) next = await store.update(userId, (current) => updater(current.map((op) => normalizeOp(op, userId))))
+  else {
+    const current = await store.load(userId)
+    next = updater(current.map((op) => normalizeOp(op, userId)))
+    await store.save(userId, next)
+  }
+  if (boundUserId === userId) {
+    ops = next
+    hydrated = true
+    emit()
+  }
+  broadcastChange(userId)
+  return next
+}
+
+/** Bind all durable state to the authenticated user. Passing null unloads it. */
+export async function bindOutboxUser(userId: string | null): Promise<void> {
+  if (userId === boundUserId && hydrated) return
+  boundUserId = userId
   ops = []
+  hydrated = userId === null
+  emit()
+  if (!userId) return
+  await migrateLegacyOps(userId)
+  await reloadBoundOutbox()
+}
+
+export function outboxUserId(): string | null {
+  return boundUserId
+}
+
+/** Test seam. Resets in-memory state and disables legacy migration for the injected store. */
+export function setOutboxStore(nextStore: OutboxStore): void {
+  store = nextStore
+  ops = []
+  boundUserId = null
   hydrated = false
+  flushing = false
+  legacyChecked = true
+  emit()
 }
 
 export function subscribeOutbox(cb: () => void): () => void {
@@ -71,82 +209,163 @@ export function subscribeOutbox(cb: () => void): () => void {
 }
 
 export function pendingCount(): number {
+  return ops.filter((op) => op.state === 'pending').length
+}
+
+export function needsAttentionCount(): number {
+  return ops.filter((op) => op.state === 'needs_attention').length
+}
+
+export function needsAttentionMessage(): string | null {
+  return ops.find((op) => op.state === 'needs_attention')?.lastError ?? null
+}
+
+export function unresolvedCount(): number {
   return ops.length
 }
 
-/** Pending ops for one table, FIFO — used to build the optimistic read overlay. */
+/** Includes needs-attention operations so optimistic rows remain visible for review. */
 export function pendingForTable(table: string): OutboxOp[] {
-  return ops.filter((o) => o.table === table)
-}
-
-function emit(): void {
-  for (const l of listeners) l()
-}
-
-async function persist(): Promise<void> {
-  try {
-    await store.save(ops)
-  } catch {
-    // durability is best-effort; the in-memory queue is still authoritative this session
-  }
-  emit()
+  return ops.filter((op) => op.table === table)
 }
 
 export async function hydrateOutbox(): Promise<void> {
-  if (hydrated) return
-  try {
-    ops = await store.load()
-  } catch {
-    ops = []
-  }
-  hydrated = true
-  emit()
+  if (hydrated || !boundUserId) return
+  await reloadBoundOutbox()
 }
 
-export function enqueue(op: Omit<OutboxOp, 'opId' | 'createdAt' | 'tries'>): OutboxOp {
-  const full: OutboxOp = { ...op, opId: crypto.randomUUID(), createdAt: Date.now(), tries: 0 }
-  ops.push(full)
-  if (ops.length > MAX_OPS) {
-    // Never drop financial data silently — surface it instead.
-    console.warn(`[outbox] queue is large (${ops.length} ops); something is preventing sync`)
+export async function enqueue(
+  op: Omit<OutboxOp, 'opId' | 'userId' | 'createdAt' | 'tries' | 'state'>,
+): Promise<OutboxOp> {
+  const userId = boundUserId
+  if (!userId) throw new Error('Offline storage is not ready for this account. Reopen the app and try again.')
+  await hydrateOutbox()
+  const full: OutboxOp = {
+    ...op,
+    opId: newId(),
+    userId,
+    createdAt: Date.now(),
+    tries: 0,
+    state: 'pending',
   }
-  void persist()
+  const next = await mutateBound((current) => [...current, full])
+  if (next.length > MAX_OPS) console.warn(`[outbox] queue is large (${next.length} ops); sync needs attention`)
   return full
 }
 
-/**
- * Replay the queue FIFO. `apply` performs the real mutation and classifies the outcome.
- * Stops at the first 'retry' so order is preserved; drops 'done'/'already'/'fatal' and continues.
- * Re-entrancy guarded so overlapping triggers (reconnect + app-load) don't double-send.
- */
-export async function flush(apply: (op: OutboxOp) => Promise<ApplyResult>): Promise<{ flushed: number; remaining: number }> {
+function normalizeResult(result: ApplyResult): { status: ApplyStatus; message?: string } {
+  if (typeof result === 'object') return result
+  if (result === 'fatal') return { status: 'rejected', message: 'The server rejected this change.' }
+  return { status: result }
+}
+
+async function doFlush(
+  apply: (op: OutboxOp) => Promise<ApplyResult>,
+  expectedUserId: string,
+): Promise<{ flushed: number; remaining: number; needsAttention: number }> {
   await hydrateOutbox()
-  if (flushing) return { flushed: 0, remaining: ops.length }
+  if (boundUserId !== expectedUserId || flushing) {
+    return { flushed: 0, remaining: ops.length, needsAttention: needsAttentionCount() }
+  }
   flushing = true
   let flushed = 0
   try {
-    while (ops.length) {
+    while (true) {
+      await reloadBoundOutbox()
+      if (boundUserId !== expectedUserId) break
       const op = ops[0]
-      let result: ApplyResult
+      if (!op || op.state === 'needs_attention') break
+
+      let result: { status: ApplyStatus; message?: string }
       try {
-        result = await apply(op)
-      } catch {
-        result = 'retry'
+        result = normalizeResult(await apply(op))
+      } catch (error) {
+        result = { status: 'retry', message: error instanceof Error ? error.message : 'Network request failed.' }
       }
-      if (result === 'retry') {
-        op.tries++
-        await persist()
+
+      // Auth may change while a network request is in flight. Leave the original op
+      // untouched; idempotency makes replay safe when that account signs in again.
+      if (boundUserId !== expectedUserId) break
+
+      if (result.status === 'done' || result.status === 'already') {
+        await mutateBound((current) => current.filter((candidate) => candidate.opId !== op.opId))
+        flushed++
+        continue
+      }
+
+      if (result.status === 'retry') {
+        await mutateBound((current) =>
+          current.map((candidate) =>
+            candidate.opId === op.opId
+              ? {
+                  ...candidate,
+                  tries: candidate.tries + 1,
+                  lastAttemptAt: Date.now(),
+                  lastError: result.message || 'Temporary sync failure. The app will retry.',
+                }
+              : candidate,
+          ),
+        )
         break
       }
-      if (result === 'fatal') {
-        console.error('[outbox] dropping permanently-rejected op', { table: op.table, kind: op.kind, id: op.id })
-      }
-      ops.shift()
-      flushed++
-      await persist()
+
+      // Permanent/authorization/validation rejection: retain it and stop FIFO replay.
+      await mutateBound((current) =>
+        current.map((candidate) =>
+          candidate.opId === op.opId
+            ? {
+                ...candidate,
+                state: 'needs_attention',
+                tries: candidate.tries + 1,
+                lastAttemptAt: Date.now(),
+                lastError: result.message || 'The server rejected this change. Review it before retrying.',
+              }
+            : candidate,
+        ),
+      )
+      break
     }
   } finally {
     flushing = false
   }
-  return { flushed, remaining: ops.length }
+  return { flushed, remaining: ops.length, needsAttention: needsAttentionCount() }
+}
+
+/** Replay FIFO. Web Locks prevents two tabs from sending the same head operation at once. */
+export async function flush(
+  apply: (op: OutboxOp) => Promise<ApplyResult>,
+): Promise<{ flushed: number; remaining: number; needsAttention: number }> {
+  const userId = boundUserId
+  if (!userId) return { flushed: 0, remaining: 0, needsAttention: 0 }
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined
+  if (locks) return locks.request(`buildtracker-outbox/${userId}`, () => doFlush(apply, userId))
+  return doFlush(apply, userId)
+}
+
+/** Explicit user action from the sync indicator. Operations remain persisted if rejected again. */
+export async function retryNeedsAttention(): Promise<void> {
+  await mutateBound((current) =>
+    current.map((op) => (op.state === 'needs_attention' ? { ...op, state: 'pending' as const } : op)),
+  )
+}
+
+/** Explicit discard, intended for logout/recovery UI only. */
+export async function discardAllOutboxChanges(): Promise<void> {
+  const userId = boundUserId
+  if (!userId) return
+  if (store.clear) await store.clear(userId)
+  else await store.save(userId, [])
+  ops = []
+  hydrated = true
+  emit()
+  broadcastChange(userId)
+}
+
+/** Drop only in-memory references after logout; persistent cleanup is handled by idbClear(). */
+export function resetOutboxMemory(): void {
+  boundUserId = null
+  ops = []
+  hydrated = true
+  flushing = false
+  emit()
 }

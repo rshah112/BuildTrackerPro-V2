@@ -8,7 +8,7 @@
 // api/ dir at runtime → ERR_MODULE_NOT_FOUND. The src copy stays the unit-tested
 // source of truth for the client; keep these two in sync (they're trivial + stable).
 
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { createClient } from '@supabase/supabase-js'
 
@@ -38,17 +38,12 @@ function r2Client(): S3Client {
 async function userIdFromRequest(req: Request): Promise<string | null> {
   const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '')
   if (!token) return null
-  // getUser(jwt) validates the caller's login token; the public anon key suffices —
-  // no secret service-role key needed. Falls back to the baked prod Supabase config
-  // (mirrors src/lib/supabase.ts), so uploads work with only the 4 R2_* vars set.
-  const url =
-    process.env.SUPABASE_URL ??
-    process.env.VITE_SUPABASE_URL ??
-    'https://wzbtxwnvplpnwmavfdwx.supabase.co'
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE ??
-    process.env.SUPABASE_ANON_KEY ??
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6YnR4d252cGxwbndtYXZmZHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1Njk2MzEsImV4cCI6MjA5NTE0NTYzMX0.P1BlgrtVK3CpRLjcZsZugB-78_HO4GFSUXplCtbbBAY'
+  // getUser(jwt) validates the caller's login token; the public anon key suffices.
+  // Configuration is deliberately fail-closed so a preview can never silently use
+  // the production tenant. A service-role credential is neither needed nor accepted.
+  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL
+  const key = process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !key) return null
   const supa = createClient(url, key)
   const { data, error } = await supa.auth.getUser(token)
   if (error || !data.user) return null
@@ -69,21 +64,40 @@ export default async function handler(req: Request): Promise<Response> {
   if (!userId) return json({ error: 'unauthorized' }, 401)
 
   const body = (await req.json().catch(() => null)) as {
-    op?: 'put' | 'get'
+    op?: 'put' | 'get' | 'delete'
     entity?: string
     key?: string
     contentType?: string
+    contentLength?: number
   } | null
   if (!body?.op) return json({ error: 'bad request' }, 400)
 
   const bucket = process.env.R2_BUCKET ?? ''
+  if (
+    !bucket ||
+    !process.env.R2_ACCOUNT_ID ||
+    !process.env.R2_ACCESS_KEY_ID ||
+    !process.env.R2_SECRET_ACCESS_KEY
+  ) {
+    return json({ error: 'object storage is not configured' }, 503)
+  }
   const s3 = r2Client()
 
   if (body.op === 'put') {
-    const key = objectKeyFor(userId, body.entity ?? 'misc', crypto.randomUUID())
+    const entity = body.entity ?? 'misc'
+    if (!/^[a-z][a-z0-9_-]{0,31}$/.test(entity)) return json({ error: 'invalid entity' }, 400)
+    if (!Number.isSafeInteger(body.contentLength) || (body.contentLength ?? 0) < 1 || (body.contentLength ?? 0) > 50 * 1024 * 1024) {
+      return json({ error: 'invalid content length' }, 400)
+    }
+    const key = objectKeyFor(userId, entity, crypto.randomUUID())
     const url = await getSignedUrl(
       s3,
-      new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: body.contentType }),
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        ContentType: body.contentType,
+        ContentLength: body.contentLength,
+      }),
       { expiresIn: 300 },
     )
     return json({ url, key })
@@ -97,6 +111,12 @@ export default async function handler(req: Request): Promise<Response> {
       expiresIn: 3600,
     })
     return json({ url })
+  }
+
+  if (body.op === 'delete') {
+    if (!body.key || !keyBelongsToUser(body.key, userId)) return json({ error: 'forbidden' }, 403)
+    await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: body.key }))
+    return json({ ok: true })
   }
 
   return json({ error: 'unknown op' }, 400)
