@@ -85,9 +85,9 @@ export function TaxReportScreen() {
             >
               <ul className="plain-list">
                 {rows.map((row) => (
-                  <li key={row.key} className="kv-row">
+                  <li key={row.key} className="kv-row kv-row-stack">
                     <span>
-                      {row.vendor}{' '}
+                      <span className="kv-row-title">{row.vendor}</span>
                       <span className="muted">
                         · {row.paymentCount} eligible payment{row.paymentCount === 1 ? '' : 's'}
                         {row.excludedNetworkCount > 0 ? ` · ${fmt(row.excludedNetworkPaid)} card/network excluded` : ''}

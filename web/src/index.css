@@ -785,6 +785,11 @@ textarea {
   display: grid;
   gap: 0.55rem;
 }
+/* Grid items default to min-width:auto, so a row holding nowrap text refuses to shrink
+   below that text and overflows the card. Let the rows shrink so their own ellipsis wins. */
+.plain-list > * {
+  min-width: 0;
+}
 .progress {
   height: 0.55rem;
   overflow: hidden;

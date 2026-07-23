@@ -4,11 +4,12 @@ import { render, screen, within } from '@testing-library/react'
 import { BenchmarkPanel } from './BenchmarkPanel'
 import type { BudgetLineItem, Project } from '../../domain/types'
 
-// The real seeded "New Home Construction" allocation: 20 categories summing to $1.3M.
-// Keeping the actual numbers here means the assertions below check the panel against a
-// production-shaped budget, not a toy one.
-const CATEGORY_BUDGETS: [string, number][] = [
-  ['General Requirements & Soft Costs', 58_000],
+// The real seeded "New Home Construction" allocation, summing to $1.3M. Categories are
+// condensed to a single representative line except the two that genuinely mix stages —
+// those keep their real lines so the title-level classification is actually exercised.
+const CATEGORY_BUDGETS: [string, number, string?][] = [
+  ['General Requirements & Soft Costs', 50_000, 'Building permits & fees'],
+  ['General Requirements & Soft Costs', 8_000, "Builder's risk insurance"],
   ['Site Work & Excavation', 78_000],
   ['Foundation & Concrete', 115_000],
   ['Framing & Structural', 185_000],
@@ -27,12 +28,13 @@ const CATEGORY_BUDGETS: [string, number][] = [
   ['Appliances', 34_000],
   ['Interior Specialties', 36_000],
   ['Landscaping & Hardscape', 56_000],
-  ['Final, Cleanup & Supervision', 58_000],
+  ['Final, Cleanup & Supervision', 40_000, 'General supervision & overhead'],
+  ['Final, Cleanup & Supervision', 18_000, 'Final cleaning, waste removal & punch list'],
 ]
 
 const lineItems = CATEGORY_BUDGETS.map(
-  ([categoryName, budget], i) =>
-    ({ id: `li${i}`, categoryName, budget, actual: 0, committed: 0 }) as BudgetLineItem,
+  ([categoryName, budget, title], i) =>
+    ({ id: `li${i}`, categoryName, budget, title: title ?? categoryName, actual: 0, committed: 0 }) as BudgetLineItem,
 )
 
 const project = {
@@ -93,6 +95,17 @@ describe('BenchmarkPanel', () => {
   it('classifies every seeded category so nothing lands in the unmapped bucket', () => {
     renderPanel()
     expect(screen.queryByText(/Not classified into a stage/)).not.toBeInTheDocument()
+  })
+
+  it('splits the mixed supervision/cleanup category across Other and Final steps', () => {
+    renderPanel()
+    // Supervision ($40k) + builder's risk ($8k) are general conditions...
+    expect(within(stageRow('Other')).getByText('$48,000')).toBeInTheDocument()
+    // ...while cleaning/waste/punch ($18k) join landscaping ($56k) in final steps.
+    expect(within(stageRow('Final steps')).getByText('$74,000')).toBeInTheDocument()
+    // Both then sit inside tolerance, so only 4 stages are genuinely off benchmark.
+    expect(within(stageRow('Other')).getByText('On track')).toBeInTheDocument()
+    expect(within(stageRow('Final steps')).getByText('On track')).toBeInTheDocument()
   })
 
   it('names the biggest shortfall in the callout', () => {

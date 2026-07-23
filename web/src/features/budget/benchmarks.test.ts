@@ -3,9 +3,12 @@ import {
   benchmarkStages,
   contingencyHealth,
   costPerSqft,
+  rebalanceToBenchmark,
   stageForCategory,
+  stageForLineItem,
   STAGE_BENCHMARK,
   STAGE_ORDER,
+  type RebalanceItem,
 } from './benchmarks'
 
 describe('stageForCategory', () => {
@@ -99,6 +102,118 @@ describe('benchmarkStages', () => {
     const report = benchmarkStages([])
     expect(report.classified).toBe(0)
     expect(report.stages.every((s) => s.actualPercent === 0)).toBe(true)
+  })
+})
+
+describe('stageForLineItem', () => {
+  it('splits a mixed category by line-item title', () => {
+    // "Final, Cleanup & Supervision" holds both final-steps work and a supervision line.
+    const cat = 'Final, Cleanup & Supervision'
+    expect(stageForLineItem(cat, 'Final cleaning')).toBe('finalSteps')
+    expect(stageForLineItem(cat, 'Waste removal & dumpsters')).toBe('finalSteps')
+    expect(stageForLineItem(cat, 'Punch list & misc')).toBe('finalSteps')
+    expect(stageForLineItem(cat, 'General supervision & overhead')).toBe('other')
+  })
+
+  it('pulls carrying costs out of the soft-costs category', () => {
+    const cat = 'General Requirements & Soft Costs'
+    expect(stageForLineItem(cat, "Builder's risk insurance")).toBe('other')
+    expect(stageForLineItem(cat, 'Construction loan interest')).toBe('other')
+    // Genuine site-work soft costs stay put.
+    expect(stageForLineItem(cat, 'Building permits & fees')).toBe('siteWork')
+    expect(stageForLineItem(cat, 'Architectural & engineering')).toBe('siteWork')
+  })
+
+  it('falls back to the category when the title says nothing special', () => {
+    expect(stageForLineItem('Plumbing', 'Plumbing rough-in')).toBe('majorSystems')
+    expect(stageForLineItem('Flooring', 'Carpet')).toBe('interiorFinishes')
+  })
+})
+
+describe('rebalanceToBenchmark', () => {
+  const item = (id: string, categoryName: string, title: string, budget: number): RebalanceItem => ({
+    id,
+    categoryName,
+    title,
+    budget,
+  })
+
+  it('conserves the grand total exactly', () => {
+    const items = [
+      item('1', 'Framing & Structural', 'Lumber', 185_000),
+      item('2', 'Plumbing', 'Rough-in', 66_000),
+      item('3', 'Drywall', 'Hang & finish', 46_000),
+      item('4', 'Foundation & Concrete', 'Footings', 115_000),
+    ]
+    const before = items.reduce((a, i) => a + i.budget, 0)
+    const changes = rebalanceToBenchmark(items)
+    const byId = new Map(changes.map((c) => [c.id, c.to]))
+    const after = items.reduce((a, i) => a + (byId.get(i.id) ?? i.budget), 0)
+    expect(after).toBe(before)
+  })
+
+  it('moves money toward the under-allocated stage', () => {
+    const items = [
+      item('1', 'Framing & Structural', 'Lumber', 100_000),
+      item('2', 'Plumbing', 'Rough-in', 100_000),
+    ]
+    const changes = rebalanceToBenchmark(items)
+    // Framing 16.6 vs major systems 19.2 → plumbing should end up the larger of the two.
+    const plumbing = changes.find((c) => c.id === '2')!
+    const framing = changes.find((c) => c.id === '1')!
+    expect(plumbing.to).toBeGreaterThan(framing.to)
+    expect(plumbing.delta).toBeGreaterThan(0)
+    expect(framing.delta).toBeLessThan(0)
+  })
+
+  it('splits a stage pro-rata so existing weighting survives', () => {
+    const items = [
+      item('1', 'Plumbing', 'Rough-in', 75_000),
+      item('2', 'HVAC', 'Equipment', 25_000),
+      item('3', 'Framing & Structural', 'Lumber', 100_000),
+    ]
+    const changes = rebalanceToBenchmark(items)
+    const to = new Map(changes.map((c) => [c.id, c.to]))
+    const plumbing = to.get('1') ?? 75_000
+    const hvac = to.get('2') ?? 25_000
+    // The 3:1 split within major systems is preserved.
+    expect(plumbing / hvac).toBeCloseTo(3, 1)
+  })
+
+  it('leaves an unpriced $0 line at $0 rather than inventing a number', () => {
+    const items = [
+      item('1', 'Plumbing', 'Rough-in', 100_000),
+      item('2', 'Fire Protection', 'Fire sprinkler system', 0),
+      item('3', 'Framing & Structural', 'Lumber', 100_000),
+    ]
+    const changes = rebalanceToBenchmark(items)
+    expect(changes.find((c) => c.id === '2')).toBeUndefined()
+  })
+
+  it('does not strand dollars in a stage the project has no line items for', () => {
+    // No foundation/exterior/etc. at all — the two funded stages must still absorb it all.
+    const items = [
+      item('1', 'Framing & Structural', 'Lumber', 60_000),
+      item('2', 'Plumbing', 'Rough-in', 40_000),
+    ]
+    const changes = rebalanceToBenchmark(items)
+    const byId = new Map(changes.map((c) => [c.id, c.to]))
+    expect((byId.get('1') ?? 60_000) + (byId.get('2') ?? 40_000)).toBe(100_000)
+  })
+
+  it('reports no changes for an already-balanced budget', () => {
+    const items = [
+      item('1', 'Framing & Structural', 'Lumber', 16_600),
+      item('2', 'Plumbing', 'Rough-in', 19_200),
+    ]
+    // Renormalized over just these two stages they are already at their relative shares.
+    const changes = rebalanceToBenchmark(items)
+    expect(changes).toEqual([])
+  })
+
+  it('returns nothing for an empty or unbudgeted project', () => {
+    expect(rebalanceToBenchmark([])).toEqual([])
+    expect(rebalanceToBenchmark([item('1', 'Plumbing', 'Rough-in', 0)])).toEqual([])
   })
 })
 

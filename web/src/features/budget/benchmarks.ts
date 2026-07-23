@@ -102,26 +102,49 @@ const STAGE_KEYWORDS: [string, Stage][] = [
   ['deck', 'finalSteps'],
   ['final & site', 'finalSteps'],
   ['final site', 'finalSteps'],
+  ['final step', 'finalSteps'],
+  ['cleanup', 'finalSteps'],
+  ['clean up', 'finalSteps'],
   ['punch', 'finalSteps'],
   ['closeout', 'finalSteps'],
   ['close out', 'finalSteps'],
   ['walkthrough', 'finalSteps'],
 
-  ['supervision', 'other'],
-  ['overhead', 'other'],
   ['general condition', 'other'],
   ['contingency', 'other'],
-  ['insurance', 'other'],
-  ['loan interest', 'other'],
-  ['financing', 'other'],
   ['other', 'other'],
 ].sort((a, b) => b[0].length - a[0].length) as [string, Stage][]
+
+// Titles that belong to NAHB's "other" bucket (general conditions / carrying costs) even
+// though they sit inside a trade category. Without this, a mixed category like
+// "Final, Cleanup & Supervision" would drag its cleanup and punch-list work into "other"
+// on the strength of one supervision line — or vice versa.
+const SOFT_COST_TITLES = [
+  'supervision',
+  'overhead',
+  'general condition',
+  'builder’s risk',
+  "builder's risk",
+  'builders risk',
+  'insurance',
+  'loan interest',
+  'construction loan',
+  'financing',
+]
 
 /** Classify a budget category name into a NAHB stage, or null when nothing matches. */
 export function stageForCategory(name: string): Stage | null {
   const key = name.toLowerCase()
   for (const [needle, stage] of STAGE_KEYWORDS) if (key.includes(needle)) return stage
   return null
+}
+
+/** Classify a single line item: an unambiguous soft-cost title wins over its category,
+ *  otherwise the category decides. */
+export function stageForLineItem(categoryName: string, title = ''): Stage | null {
+  const key = title.toLowerCase()
+  if (SOFT_COST_TITLES.some((needle) => key.includes(needle))) return 'other'
+  return stageForCategory(categoryName)
 }
 
 export interface StageRow {
@@ -148,14 +171,18 @@ export interface BenchmarkReport {
 /** A stage within this many percentage points of the benchmark reads as on-track. */
 const TOLERANCE_POINTS = 2
 
-export function benchmarkStages(
-  items: { categoryName: string; budget: number }[],
-): BenchmarkReport {
+export interface BenchmarkInput {
+  categoryName: string
+  title?: string
+  budget: number
+}
+
+export function benchmarkStages(items: BenchmarkInput[]): BenchmarkReport {
   const byStage = new Map<Stage, { budget: number; categories: Set<string> }>()
   const unmappedByName = new Map<string, number>()
 
   for (const item of items) {
-    const stage = stageForCategory(item.categoryName)
+    const stage = stageForLineItem(item.categoryName, item.title)
     if (!stage) {
       unmappedByName.set(item.categoryName, sum([unmappedByName.get(item.categoryName) ?? 0, item.budget]))
       continue
@@ -197,6 +224,96 @@ export function benchmarkStages(
       .map(([name, budget]) => ({ name, budget }))
       .sort((a, b) => b.budget - a.budget),
   }
+}
+
+// --- Rebalancing to the benchmark ----------------------------------------------------
+
+export interface RebalanceItem extends BenchmarkInput {
+  id: string
+}
+
+export interface RebalanceChange {
+  id: string
+  categoryName: string
+  title: string
+  stage: Stage
+  from: number
+  to: number
+  delta: number
+}
+
+/**
+ * Re-cuts every line item so each NAHB stage lands on its benchmark share, keeping the
+ * grand total identical to the pound.
+ *
+ * Rules that matter:
+ * - Only stages that already hold money take part; their benchmark percentages are
+ *   renormalized over that subset, so a project with no landscaping doesn't lose dollars
+ *   into a stage with nowhere to put them.
+ * - Within a stage, the target is split pro-rata across that stage's line items, so the
+ *   relative weighting a builder already set survives.
+ * - A $0 line stays $0. It has no pro-rata weight, and inventing a number for a line
+ *   nobody has priced (a sprinkler system, say) would be a guess dressed as an estimate.
+ * - Rounding remainders land on the largest line in the stage, so the totals reconcile
+ *   exactly rather than drifting by a few dollars per stage.
+ */
+export function rebalanceToBenchmark(items: RebalanceItem[]): RebalanceChange[] {
+  const total = sumBy(items, (i) => i.budget)
+  if (total <= 0) return []
+
+  const byStage = new Map<Stage, RebalanceItem[]>()
+  for (const item of items) {
+    const stage = stageForLineItem(item.categoryName, item.title)
+    if (!stage) continue
+    const bucket = byStage.get(stage)
+    if (bucket) bucket.push(item)
+    else byStage.set(stage, [item])
+  }
+
+  // Only stages holding money can absorb a target; renormalize the benchmark over them.
+  const funded = [...byStage.entries()].filter(([, list]) => sumBy(list, (i) => i.budget) > 0)
+  const pctTotal = funded.reduce((acc, [stage]) => acc + STAGE_BENCHMARK[stage].percent, 0)
+  if (pctTotal <= 0) return []
+
+  // Stage targets in whole dollars, with the rounding remainder on the largest stage.
+  const stageTargets = funded.map(([stage, list]) => ({
+    stage,
+    list,
+    stageTotal: sumBy(list, (i) => i.budget),
+    target: Math.round((total * STAGE_BENCHMARK[stage].percent) / pctTotal),
+  }))
+  const targetSum = stageTargets.reduce((acc, s) => acc + s.target, 0)
+  if (targetSum !== Math.round(total)) {
+    const largest = stageTargets.reduce((a, b) => (b.target > a.target ? b : a))
+    largest.target += Math.round(total) - targetSum
+  }
+
+  const changes: RebalanceChange[] = []
+  for (const { stage, list, stageTotal, target } of stageTargets) {
+    const priced = list.filter((item) => item.budget > 0)
+    const allocations = priced.map((item) => ({
+      item,
+      to: Math.round((target * item.budget) / stageTotal),
+    }))
+    const allocated = allocations.reduce((acc, a) => acc + a.to, 0)
+    if (allocated !== target && allocations.length > 0) {
+      const largest = allocations.reduce((a, b) => (b.to > a.to ? b : a))
+      largest.to += target - allocated
+    }
+    for (const { item, to } of allocations) {
+      if (to === item.budget) continue
+      changes.push({
+        id: item.id,
+        categoryName: item.categoryName,
+        title: item.title ?? '',
+        stage,
+        from: item.budget,
+        to,
+        delta: to - item.budget,
+      })
+    }
+  }
+  return changes
 }
 
 // --- Cost per square foot ------------------------------------------------------------

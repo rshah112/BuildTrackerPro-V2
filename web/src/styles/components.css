@@ -1939,6 +1939,31 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Opt-in variant: the vendor name keeps its single-line ellipsis, but the meta line
+   below it wraps instead of truncating — on a phone the detail is the actionable part
+   ("tax details to review"), so hiding it behind an ellipsis defeats the row. */
+.kv-row-stack {
+  align-items: flex-start;
+}
+
+.kv-row-stack > span:first-child {
+  display: grid;
+  gap: 0.1rem;
+  overflow: visible;
+  white-space: normal;
+}
+
+.kv-row-stack .kv-row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kv-row-stack .muted {
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
 /* ---- Stat list (Attention) — lead figure emphasized ---- */
 .stat-list {
   list-style: none;

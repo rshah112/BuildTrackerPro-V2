@@ -40,7 +40,10 @@ export function BenchmarkPanel({
   lineItems: BudgetLineItem[]
 }) {
   const report = useMemo(
-    () => benchmarkStages(lineItems.map((li) => ({ categoryName: li.categoryName, budget: li.budget }))),
+    () =>
+      benchmarkStages(
+        lineItems.map((li) => ({ categoryName: li.categoryName, title: li.title, budget: li.budget })),
+      ),
     [lineItems],
   )
 
