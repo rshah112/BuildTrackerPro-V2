@@ -226,6 +226,20 @@
   font-size: var(--text-xs);
 }
 
+.budget-cat-seq {
+  display: inline-block;
+  margin-right: 0.5rem;
+  padding: 0.08rem 0.32rem;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  vertical-align: 0.1em;
+}
+
 .budget-used-cell {
   min-width: 105px;
 }

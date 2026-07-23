@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown, Plus, FolderPlus, MoreHorizontal } from 'lucide-react'
+import { ChevronDown, ChevronsDownUp, ChevronsUpDown, Plus, FolderPlus, MoreHorizontal } from 'lucide-react'
 import type { BudgetCategory, BudgetLineItem } from '../../domain/types'
 import { diff, fmt, sumBy } from '../../lib/money'
 import { openCommitment, spentAndCommitted } from '../../lib/budgetMath'
@@ -19,7 +19,7 @@ import { useToast } from '../../components/ui/Toast'
 import { useRestoreRow } from '../../data/hooks'
 import { useCurrentProject } from '../projects/currentProject'
 import { useProjects } from '../projects/useProjects'
-import { useCategories, useRemoveCategory, useLineItems, useRemoveLineItem, useCreateLineItem } from './useBudget'
+import { useCategories, useRemoveCategory, useUpdateCategory, useLineItems, useRemoveLineItem, useCreateLineItem } from './useBudget'
 
 /** Allowance items measure against their allowance amount; others against budget. */
 function lineLimit(li: BudgetLineItem): number {
@@ -84,6 +84,7 @@ export function BudgetScreen() {
   const { data: categories = [], isLoading: catsLoading, error: catsError } = useCategories(projectId!)
   const { data: lineItems = [], isLoading: itemsLoading, error: itemsError } = useLineItems(projectId!)
   const removeCategory = useRemoveCategory()
+  const updateCategory = useUpdateCategory()
   const removeLineItem = useRemoveLineItem()
   const createLineItem = useCreateLineItem()
   const restoreCategory = useRestoreRow('budget_categories')
@@ -95,6 +96,11 @@ export function BudgetScreen() {
   const orderedCategories = useMemo(
     () => [...categories].sort(compareCategories),
     [categories],
+  )
+  // Construction-sequence number (01, 02, …) for each category, from the persisted sortOrder.
+  const categorySeq = useMemo(
+    () => new Map(orderedCategories.map((category, index) => [category.id, String(index + 1).padStart(2, '0')])),
+    [orderedCategories],
   )
 
   // Group line items by category once (with cent-exact budget/actual totals) instead of
@@ -147,6 +153,22 @@ export function BudgetScreen() {
       used: authorized > 0 ? exposure / authorized : 0,
     }
   }, [lineItems, projects, projectId])
+
+  // Swap a category with its neighbor in the construction sequence, then persist a clean
+  // 0..n-1 numbering for every row whose position changed (also normalizes legacy duplicates).
+  const moveCategory = async (cat: BudgetCategory, delta: -1 | 1) => {
+    const index = orderedCategories.findIndex((candidate) => candidate.id === cat.id)
+    const target = index + delta
+    if (index < 0 || target < 0 || target >= orderedCategories.length) return
+    const next = [...orderedCategories]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    await Promise.all(
+      next
+        .map((category, sortOrder) => ({ category, sortOrder }))
+        .filter(({ category, sortOrder }) => category.sortOrder !== sortOrder)
+        .map(({ category, sortOrder }) => updateCategory.mutateAsync({ id: category.id, patch: { sortOrder } })),
+    )
+  }
 
   const deleteCategory = async (cat: BudgetCategory, itemCount: number) => {
     if (itemCount > 0) {
@@ -253,8 +275,11 @@ export function BudgetScreen() {
         const rank = { overBudget: 2, nearLimit: 1, healthy: 0 }
         return (rank[a.stat.health] - rank[b.stat.health]) * direction
       }
-      return a.category.name.localeCompare(b.category.name) * direction
+      // Default: construction sequence (persisted sortOrder), not alphabetical.
+      return compareCategories(a.category, b.category) * direction
     })
+
+  const allExpanded = shownRows.length > 0 && shownRows.every((row) => expanded.has(row.category.id))
 
   const categoryColumns: DataColumn<CategoryRow>[] = [
     {
@@ -273,7 +298,10 @@ export function BudgetScreen() {
           >
             <ChevronDown className={`budget-cat-caret${open ? ' is-open' : ''}`} size={18} aria-hidden />
             <span>
-              <strong>{category.name}</strong>
+              <strong>
+                <span className="budget-cat-seq" aria-hidden>{categorySeq.get(category.id)}</span>
+                {category.name}
+              </strong>
               <small>
                 {stat.items.length} line item{stat.items.length === 1 ? '' : 's'}
                 {category.targetBudget > 0 ? ` · ${fmt(category.targetBudget)} target` : ''}
@@ -331,6 +359,12 @@ export function BudgetScreen() {
           <div className="row-menu-popover">
             <button type="button" onClick={() => setEditing({ kind: 'newLineItem', categoryName: category.name })}>Add line item</button>
             <button type="button" onClick={() => setEditing({ kind: 'editCategory', cat: category })}>Edit category</button>
+            {sort.key === 'category' && sort.direction === 'asc' && !searching && healthFilter === 'all' && (
+              <>
+                <button type="button" onClick={() => moveCategory(category, -1)}>Move up</button>
+                <button type="button" onClick={() => moveCategory(category, 1)}>Move down</button>
+              </>
+            )}
             <button type="button" className="danger-text" onClick={() => deleteCategory(category, stat.items.length)}>Delete category</button>
           </div>
         </details>
@@ -415,6 +449,16 @@ export function BudgetScreen() {
                 <span className="result-count" aria-live="polite">
                   {shownRows.length} of {categories.length} categories
                 </span>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  leadingIcon={allExpanded ? <ChevronsDownUp size={15} /> : <ChevronsUpDown size={15} />}
+                  onClick={() =>
+                    setExpanded(allExpanded ? new Set() : new Set(shownRows.map((row) => row.category.id)))
+                  }
+                >
+                  {allExpanded ? 'Collapse all' : 'Expand all'}
+                </Button>
               </div>
 
               {shownRows.length === 0 ? (
