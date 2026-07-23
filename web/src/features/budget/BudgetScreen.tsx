@@ -29,11 +29,12 @@ import { CategoryForm } from './CategoryForm'
 import { LineItemForm } from './LineItemForm'
 import { LineItemDetailSheet } from './LineItemDetailSheet'
 import { HealthPill } from './HealthPill'
+import { BenchmarkPanel } from './BenchmarkPanel'
 import { ExpenseList } from '../expenses/ExpenseList'
 import { useSyncActuals } from './useSyncActuals'
 import { compareCategories, nextCategorySortOrder } from './categoryOrder'
 
-type Tab = 'budget' | 'expenses'
+type Tab = 'budget' | 'benchmark' | 'expenses'
 type HealthFilter = 'all' | 'healthy' | 'nearLimit' | 'overBudget'
 type CategoryHealth = Exclude<HealthFilter, 'all'>
 type CategoryStat = {
@@ -142,8 +143,10 @@ export function BudgetScreen() {
     const exposure = sumBy(lineItems, spentAndCommitted)
     const project = projects.find((candidate) => candidate.id === projectId)
     const authorized = project?.constructionBudget ?? planned
+    const contingency = project?.contingencyBudget ?? 0
     return {
       authorized,
+      contingency,
       planned,
       actual,
       committed,
@@ -395,6 +398,7 @@ export function BudgetScreen() {
         onChange={setTab}
         segments={[
           { value: 'budget', label: 'Categories' },
+          { value: 'benchmark', label: 'Benchmark' },
           { value: 'expenses', label: 'Expenses' },
         ]}
       />
@@ -422,6 +426,11 @@ export function BudgetScreen() {
                     value: fmt(summary.authorized),
                     detail: `${fmt(summary.unallocated)} unallocated`,
                     tone: summary.unallocated < 0 ? 'warn' : 'default',
+                  },
+                  {
+                    label: 'Contingency reserve',
+                    value: fmt(summary.contingency),
+                    detail: 'Held outside the category budgets',
                   },
                   { label: 'Incurred', value: fmt(summary.actual), detail: 'Recorded actual cost' },
                   { label: 'Open commitments', value: fmt(summary.committed), detail: 'Committed, not yet incurred' },
@@ -570,6 +579,15 @@ export function BudgetScreen() {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {tab === 'benchmark' && (
+        <div className="tab-panel">
+          <BenchmarkPanel
+            project={projects.find((candidate) => candidate.id === projectId)}
+            lineItems={lineItems}
+          />
         </div>
       )}
 
