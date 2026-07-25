@@ -14,18 +14,19 @@ type Draft = Partial<Omit<ConstructionLoan, 'id' | 'owner' | 'createdAt'>>
 
 const dateValue = (v?: string | null) => (v ? v.slice(0, 10) : '')
 
-// Raj's baseline while the loan is still being negotiated: $1.5M at 6%, 15-month
-// interest-only, ~$7k closing costs, no lender-held interest reserve. Every field stays
-// editable so the terms can be trued up at closing.
+// Amounts and rate start empty — they're deal-specific and must be entered, not guessed at.
+// Only the structural defaults are pre-set: a 15-month interest-only term is the common
+// shape for a construction loan, and actual/365 is the usual day-count convention. With no
+// start date there's no maturity, so an unclosed loan simply shows no countdown.
 const blank = (projectId: string): Draft => ({
   projectId,
   lender: '',
-  totalAmount: 1_500_000,
-  interestRate: 6,
+  totalAmount: 0,
+  interestRate: 0,
   startDate: null,
   termMonths: 15,
   maturityDate: null,
-  originationFee: 7_000,
+  originationFee: 0,
   interestReserveAmount: 0,
   interestBasis: 'actual/365',
   notes: '',

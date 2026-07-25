@@ -1,13 +1,16 @@
 import { test, expect } from '@playwright/test'
 
-// Construction-loan flow against the local Supabase stack: sign in → create project →
-// set up a loan → add a draw → the drawn/available figures update. Guards the loan
-// feature + its math. Requires `supabase start` + the seeded test user.
+// Construction-loan flow against the local Supabase stack. Two things are guarded here:
+//   1. the draw lifecycle — only a FUNDED draw moves money, so a requested draw must not
+//      touch the balance, available credit, or interest;
+//   2. the accounting rule the whole feature rests on — reimbursing yourself out of a draw
+//      is a CASH movement, so the budget's incurred cost must NOT change.
+// Requires `supabase start` + the seeded test user.
 
 const EMAIL = process.env.E2E_EMAIL ?? 'raj@local.test'
 const PASSWORD = process.env.E2E_PASSWORD ?? 'localtest123'
 
-test('loan: set up facility → add draw → drawn/available update', async ({ page }) => {
+test('loan: lifecycle → draw funds → reimbursement leaves the budget untouched', async ({ page }) => {
   const suffix = Date.now().toString().slice(-6)
   const projectName = `E2E Loan ${suffix}`
 
@@ -19,32 +22,75 @@ test('loan: set up facility → add draw → drawn/available update', async ({ p
 
   await page.getByRole('button', { name: 'New project' }).click()
   await page.getByLabel('Name', { exact: true }).fill(projectName)
+  await page.getByLabel('Construction budget').fill('100000')
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(page).toHaveURL(/\/$/)
 
-  // More → Construction loan
+  // --- A soft cost fronted from personal funds — the thing draw #1 will repay ---
+  await page.getByRole('link', { name: 'Expenses' }).click()
+  await page.getByRole('button', { name: 'Add expense' }).click()
+  await page.getByLabel('Vendor', { exact: true }).fill('Lorenzo Franchina')
+  await page.getByLabel('Amount', { exact: true }).fill('5000')
+  await page.getByRole('radio', { name: 'Paid', exact: true }).click()
+  await page.getByRole('button', { name: 'Save expense' }).click()
+  await expect(page.getByText('Lorenzo Franchina')).toBeVisible()
+
+  // --- Set up the facility on the baseline terms ---
   await page.getByRole('link', { name: 'More' }).click()
   await page.getByRole('link', { name: 'Construction loan' }).click()
   await expect(page.getByRole('heading', { name: 'Construction loan', exact: true })).toBeVisible()
 
-  // Set up the facility
   await page.getByRole('button', { name: 'Set up loan' }).click()
   await expect(page.getByRole('dialog', { name: 'Set up loan' })).toBeVisible()
-  await page.getByLabel('Lender').fill('First National')
-  await page.getByLabel('Total loan amount').fill('1300000')
-  await page.getByLabel('Interest rate').fill('8.5')
+  await page.getByRole('textbox', { name: 'Lender', exact: true }).fill('First National')
+  await page.getByLabel('Total loan amount').fill('1500000')
+  await page.getByLabel('Interest rate').fill('6')
+  await page.getByLabel('Term (months)').fill('15')
+  await page.getByLabel('Closing / start date').fill('2026-09-01')
   await page.getByRole('button', { name: 'Save loan' }).click()
 
   // Facility shows; nothing drawn yet.
-  await expect(page.locator('.metric-card', { hasText: 'Available' })).toContainText('$1,300,000')
+  await expect(page.locator('.metric-card', { hasText: 'Available' })).toContainText('$1,500,000')
 
-  // Add a draw of $200,000
+  // --- A REQUESTED draw is pipeline, not money ---
   await page.getByRole('button', { name: 'Add draw' }).click()
   await expect(page.getByRole('dialog', { name: 'Add draw' })).toBeVisible()
-  await page.getByLabel('Draw amount').fill('200000')
+  await page.getByLabel('Draw amount').fill('250000')
+  await page.getByLabel('Description').fill('Draw 1 — soft costs')
   await page.getByRole('button', { name: 'Save draw' }).click()
 
-  // Drawn and available reflect the draw.
-  await expect(page.locator('.metric-card', { hasText: 'Drawn' })).toContainText('$200,000')
-  await expect(page.locator('.metric-card', { hasText: 'Available' })).toContainText('$1,100,000')
+  await expect(page.locator('.metric-card', { hasText: 'Drawn' })).toContainText('$0')
+  await expect(page.locator('.metric-card', { hasText: 'Available' })).toContainText('$1,500,000')
+  await expect(page.getByText(/requested or approved but not yet funded/)).toBeVisible()
+
+  // --- Fund it, with $2,500 of lender fees netted out of the wire ---
+  await page.getByRole('button', { name: /Draw 1 — soft costs/ }).click()
+  await expect(page.getByRole('dialog', { name: 'Edit draw' })).toBeVisible()
+  await page.getByRole('radio', { name: 'Funded', exact: true }).click()
+  await page.getByLabel('Fees netted from this draw').fill('2500')
+  await page.getByRole('button', { name: 'Save draw' }).click()
+
+  // Principal counts in full against the facility; cash on hand is net of fees.
+  await expect(page.locator('.metric-card', { hasText: 'Drawn' })).toContainText('$250,000')
+  await expect(page.locator('.metric-card', { hasText: 'Available' })).toContainText('$1,250,000')
+  await expect(page.locator('.metric-card', { hasText: 'Cash on hand' })).toContainText('$247,500')
+
+  // The $5,000 fronted personally is owed back to you.
+  await expect(page.locator('.panel', { hasText: 'Who is owed right now' })).toContainText('$5,000')
+
+  // --- Reimburse yourself out of the draw ---
+  await page.getByRole('button', { name: 'Pay from a draw' }).first().click()
+  await expect(page.getByRole('dialog', { name: 'Pay from a draw' })).toBeVisible()
+  await page.getByRole('button', { name: /Apply all outstanding/ }).click()
+  await page.getByRole('button', { name: 'Record payment' }).click()
+
+  // Cash moved: the draw has $5,000 less sitting in the account.
+  await expect(page.locator('.metric-card', { hasText: 'Cash on hand' })).toContainText('$242,500')
+
+  // --- THE POINT: the budget did not move. $5,000 spent, not $10,000. ---
+  await page.getByRole('link', { name: 'Overview', exact: true }).click()
+  const financialSummary = page.getByRole('region', { name: 'Project financial summary' })
+  await expect(
+    financialSummary.locator('.summary-metric').filter({ hasText: 'Incurred cost' }),
+  ).toContainText('$5,000')
 })
