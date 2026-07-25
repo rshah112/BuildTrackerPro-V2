@@ -27,6 +27,11 @@ import { useSyncActuals } from '../budget/useSyncActuals'
 import { ExpenseForm } from './ExpenseForm'
 import { upsertExpense } from './recalculateLineItemActuals'
 import { useExpenses, useRemoveExpense } from './useExpenses'
+import { Sheet } from '../../components/ui/Sheet'
+import { useLoan, useLoanDraws } from '../loan/useLoan'
+import { useAllocations, useDisbursements } from '../loan/useTreasury'
+import { activeAllocations, expenseSettlements } from '../loan/treasury'
+import { ReimburseSheet } from '../loan/ReimburseSheet'
 
 type Filter = 'all' | 'open' | 'paid' | 'unassigned'
 
@@ -63,6 +68,35 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
   const toast = useToast()
   const confirm = useConfirm()
   const editor = useEditor<Expense>()
+  // Reimbursement tracking only appears once the project is actually financed.
+  const { data: loans = [] } = useLoan(projectId)
+  const { data: allDraws = [] } = useLoanDraws(projectId)
+  const { data: allDisbursements = [] } = useDisbursements(projectId)
+  const { data: rawAllocations = [] } = useAllocations(projectId)
+  const hasLoan = loans.length > 0
+  const [reimbursing, setReimbursing] = useState<Expense | null>(null)
+  const draws = useMemo(() => allDraws.filter((d) => d.loanId === loans[0]?.id), [allDraws, loans])
+  const drawIds = useMemo(() => new Set(draws.map((d) => d.id)), [draws])
+  const disbursements = useMemo(
+    () => allDisbursements.filter((db) => drawIds.has(db.drawId)),
+    [allDisbursements, drawIds],
+  )
+  // Allocation rows outlive a trashed payment, so scope them to live disbursements.
+  const allocations = useMemo(
+    () => activeAllocations(rawAllocations, disbursements),
+    [rawAllocations, disbursements],
+  )
+  const settlements = useMemo(() => expenseSettlements(expenses, allocations), [expenses, allocations])
+  /** Which draw settled an expense, for the row subtitle. */
+  const drawLabelFor = (expenseId: string): string => {
+    const ids = new Set(
+      allocations.filter((a) => a.expenseId === expenseId).map((a) => a.disbursementId),
+    )
+    const names = draws
+      .filter((d) => disbursements.some((db) => ids.has(db.id) && db.drawId === d.id))
+      .map((d) => d.description || `Draw ${fmtDate(d.drawDate)}`)
+    return names.join(', ')
+  }
   const [filter, setFilter] = useState<Filter>('all')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<SortState>({ key: 'date', direction: 'desc' })
@@ -189,6 +223,43 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
       align: 'center',
       cell: (expense) => expense.receiptObjectKey ? <FileText size={17} className="muted" role="img" aria-label="Receipt attached" /> : <span className="muted" aria-label="No receipt">—</span>,
     },
+    // Only meaningful once the project is financed: whose cash is still tied up in this cost.
+    ...(hasLoan
+      ? ([
+          {
+            key: 'reimbursed',
+            header: 'Reimbursed',
+            mobileLabel: 'Reimbursed',
+            cell: (expense: Expense) => {
+              const s = settlements.get(expense.id)
+              if (!s || s.state === 'not_applicable') {
+                return <span className="muted" aria-label="Not reimbursable">—</span>
+              }
+              // The badge keeps a short word so it can't wrap inside the pill on a phone;
+              // the amount and the settling draw go on the detail line beneath it.
+              const tone = s.state === 'reimbursed' ? 'success' : s.state === 'partial' ? 'warn' : 'info'
+              const label = s.state === 'reimbursed' ? 'Reimbursed' : s.state === 'partial' ? 'Part repaid' : 'Owed'
+              const drawNames = drawLabelFor(expense.id)
+              const detail =
+                s.state === 'reimbursed'
+                  ? drawNames
+                  : [`${fmt(s.outstanding)} owed`, drawNames].filter(Boolean).join(' · ')
+              return (
+                <button
+                  type="button"
+                  className="expense-status-cell"
+                  style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'inherit' }}
+                  onClick={() => setReimbursing(expense)}
+                  aria-label={`Reimbursement for ${expense.vendorName || 'expense'}: ${label}${detail ? `, ${detail}` : ''}`}
+                >
+                  <Badge tone={tone}>{label}</Badge>
+                  {detail && <span className="expense-due">{detail}</span>}
+                </button>
+              )
+            },
+          },
+        ] as DataColumn<Expense>[])
+      : []),
     {
       key: 'actions',
       header: <span className="sr-only">Actions</span>,
@@ -283,6 +354,23 @@ export function ExpenseList({ projectId, lineItems }: { projectId: string; lineI
           />
         )}
       </EditorSheet>
+
+      <Sheet
+        open={reimbursing !== null}
+        onClose={() => setReimbursing(null)}
+        title={`Reimburse ${reimbursing?.vendorName || 'expense'}`}
+      >
+        {reimbursing && (
+          <ReimburseSheet
+            projectId={projectId}
+            expense={reimbursing}
+            draws={draws}
+            disbursements={disbursements}
+            allocations={allocations}
+            onDone={() => setReimbursing(null)}
+          />
+        )}
+      </Sheet>
     </>
   )
 }

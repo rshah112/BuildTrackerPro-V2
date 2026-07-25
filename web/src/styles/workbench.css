@@ -841,11 +841,19 @@
     content: none;
   }
 
+  /* Anchor the row action to the card's top-right corner. Without explicit insets an
+     absolutely-positioned grid item falls back to its STATIC position, which lands it on
+     top of the first money cell — the delete icon sat over the invoiced amount. */
   .data-table > tbody > tr:not(.data-table-expansion) > .table-actions-cell {
     position: absolute;
-    justify-self: end;
-    width: 52px;
-    padding: 0.18rem;
+    top: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
     border: 0;
   }
 
