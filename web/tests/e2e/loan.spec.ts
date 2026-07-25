@@ -78,16 +78,20 @@ test('loan: lifecycle → draw funds → reimbursement leaves the budget untouch
   // The $5,000 fronted personally is owed back to you.
   await expect(page.locator('.panel', { hasText: 'Who is owed right now' })).toContainText('$5,000')
 
-  // --- Reimburse yourself out of the draw ---
+  // --- Reimburse yourself out of the draw, but only PARTIALLY ($3,000 of the $5,000) ---
   await page.getByRole('button', { name: 'Pay from a draw' }).first().click()
   await expect(page.getByRole('dialog', { name: 'Pay from a draw' })).toBeVisible()
   await page.getByRole('button', { name: /Apply all outstanding/ }).click()
+  // Tagging every receipt sets the cheque to $5,000; dial one row back to a part payment.
+  await page.getByLabel('Amount applied to Lorenzo Franchina').fill('3000')
   await page.getByRole('button', { name: 'Record payment' }).click()
 
-  // Cash moved: the draw has $5,000 less sitting in the account.
-  await expect(page.locator('.metric-card', { hasText: 'Cash on hand' })).toContainText('$242,500')
+  // Cash moved by exactly the part payment.
+  await expect(page.locator('.metric-card', { hasText: 'Cash on hand' })).toContainText('$244,500')
+  // …and the remaining $2,000 is still owed to you.
+  await expect(page.locator('.panel', { hasText: 'Who is owed right now' })).toContainText('$2,000')
 
-  // --- THE POINT: the budget did not move. $5,000 spent, not $10,000. ---
+  // --- THE POINT: the budget did not move. $5,000 spent, not $8,000. ---
   await page.getByRole('link', { name: 'Overview', exact: true }).click()
   const financialSummary = page.getByRole('region', { name: 'Project financial summary' })
   await expect(

@@ -192,14 +192,18 @@ const EMPTY_PROJECTION: InterestProjection = {
  * Month-by-month interest over the interest-only term, so the real carrying cost of the
  * facility is visible rather than just today's payment.
  *
- * Draw assumption, stated plainly because it drives the number: recorded funded draws are
- * used for months that have already happened, and whatever facility remains undrawn is
- * assumed to be drawn EVENLY across the remaining months of the term. Interest for a month
- * is charged on the average of its opening and closing balance, which is the standard
- * approximation for a balance that steps up mid-month.
+ * Draw assumption, stated plainly because it drives the number: whatever facility remains
+ * undrawn is assumed to be drawn EVENLY across the remaining months of the term.
  *
- * `interestToDate` is NOT taken from this schedule — it comes from interestAccruedToDate,
- * which counts real days against real draw dates. The schedule is the forward-looking view.
+ * Interest is computed two different ways on purpose, because only one of them is a guess:
+ *  - RECORDED draws accrue day-exactly from their own draw date to the end of the month,
+ *    matching interestAccruedToDate. A facility drawn in full on day one is charged for the
+ *    whole first month, not half of it.
+ *  - ASSUMED future draws have no known date, so they use the average of the month's opening
+ *    and closing assumed balance — the standard approximation for a mid-month step-up.
+ *
+ * Averaging the recorded draws too (the obvious shortcut) understates the first month of
+ * every real draw by half, and makes the schedule disagree with `interestToDate`.
  */
 export function projectInterest(
   loan: LoanTermsLike,
@@ -245,6 +249,12 @@ export function projectInterest(
       (total, d) => (d.drawDate.slice(0, 10) < nextStart ? total + cents(d.amount) : total),
       0,
     )
+    // Recorded balance already standing when the month opened — used to separate the recorded
+    // part of the balance (charged day-exactly) from the assumed part (charged on average).
+    const recordedOpeningCents = draws.reduce(
+      (total, d) => (d.drawDate.slice(0, 10) < monthStart ? total + cents(d.amount) : total),
+      0,
+    )
     const projectedCents =
       i > currentIndex && futureMonths > 0
         ? Math.round((assumedRemainingCents * Math.min(i - currentIndex, futureMonths)) / futureMonths)
@@ -252,8 +262,21 @@ export function projectInterest(
     const closingCents = Math.min(facilityCents, recordedCents + projectedCents)
 
     const fraction = dayCountFraction(monthStart, nextStart, basis)
-    const averageCents = (openingCents + closingCents) / 2
-    const interestCents = Math.round(averageCents * (loan.interestRate / 100) * fraction)
+    // Recorded draws: day-exact from the later of the draw date and the month start, so a
+    // draw taken on day one is charged for the full month and the schedule agrees with
+    // interestAccruedToDate.
+    let interest = 0
+    for (const d of draws) {
+      const drawDay = d.drawDate.slice(0, 10)
+      if (drawDay >= nextStart) continue
+      const from = drawDay > monthStart ? drawDay : monthStart
+      interest += cents(d.amount) * (loan.interestRate / 100) * dayCountFraction(from, nextStart, basis)
+    }
+    // Assumed future draws have no date, so the mid-month average is the best available.
+    const assumedOpening = Math.max(0, openingCents - Math.min(openingCents, recordedOpeningCents))
+    const assumedClosing = Math.max(0, closingCents - Math.min(closingCents, recordedCents))
+    interest += ((assumedOpening + assumedClosing) / 2) * (loan.interestRate / 100) * fraction
+    const interestCents = Math.round(interest)
 
     months.push({
       index: i + 1,

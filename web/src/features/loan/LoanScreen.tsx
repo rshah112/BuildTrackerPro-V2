@@ -36,6 +36,7 @@ import {
   daysToMaturity,
 } from './loanMath'
 import {
+  activeAllocations,
   cashOnHand,
   disbursedFromDraw,
   disbursementSummary,
@@ -78,6 +79,9 @@ export function LoanScreen() {
   const confirm = useConfirm()
   const editor = useEditor<LoanDraw>()
   const disbursementEditor = useEditor<DrawDisbursement>()
+  // Which draw "Pay from this draw" was tapped on. Without it every payment would default
+  // to the first funded draw, so paying out of draw #2 would quietly debit draw #1.
+  const [payFromDrawId, setPayFromDrawId] = useState<string | undefined>(undefined)
   const [editingLoan, setEditingLoan] = useState(false)
 
   const loan = loans[0]
@@ -91,6 +95,12 @@ export function LoanScreen() {
   )
   // Only funded draws have moved money, so only they count toward balance and interest.
   const funded = useMemo(() => fundedDraws(draws), [draws])
+  // Allocation rows outlive a soft-deleted payment, so scope them to live disbursements —
+  // otherwise trashing a payment leaves the expenses it settled looking reimbursed.
+  const liveAllocations = useMemo(
+    () => activeAllocations(allocations, disbursements),
+    [allocations, disbursements],
+  )
 
   const m = useMemo(() => {
     if (!loan) return null
@@ -120,7 +130,7 @@ export function LoanScreen() {
     }
   }, [loan, draws, funded, disbursements])
 
-  const owed = useMemo(() => owedSummary(expenses, allocations), [expenses, allocations])
+  const owed = useMemo(() => owedSummary(expenses, liveAllocations), [expenses, liveAllocations])
 
   const sortedDraws = useMemo(
     () => [...draws].sort((a, b) => b.drawDate.localeCompare(a.drawDate)),
@@ -321,7 +331,10 @@ export function LoanScreen() {
                   <Button
                     size="sm"
                     leadingIcon={<HandCoins size={16} />}
-                    onClick={disbursementEditor.openNew}
+                    onClick={() => {
+                      setPayFromDrawId(undefined)
+                      disbursementEditor.openNew()
+                    }}
                     disabled={funded.length === 0}
                   >
                     Pay from a draw
@@ -386,7 +399,7 @@ export function LoanScreen() {
                             <strong className="tnum">{fmt(left)}</strong>
                           </div>
                           {drawDisbursements.map((db) => {
-                            const s = disbursementSummary(db, allocations)
+                            const s = disbursementSummary(db, liveAllocations)
                             return (
                               <div className="kv-row" key={db.id}>
                                 <button
@@ -415,7 +428,10 @@ export function LoanScreen() {
                             size="sm"
                             variant="ghost"
                             leadingIcon={<Plus size={15} />}
-                            onClick={() => disbursementEditor.openNew()}
+                            onClick={() => {
+                              setPayFromDrawId(dr.id)
+                              disbursementEditor.openNew()
+                            }}
                             disabled={left <= 0}
                           >
                             Pay from this draw
@@ -454,8 +470,9 @@ export function LoanScreen() {
                 disbursements={disbursements}
                 expenses={expenses}
                 vendors={vendors}
-                allocations={allocations}
+                allocations={liveAllocations}
                 initial={initial}
+                defaultDrawId={payFromDrawId}
                 onDone={disbursementEditor.close}
               />
             )}

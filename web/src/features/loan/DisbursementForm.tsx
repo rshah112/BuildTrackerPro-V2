@@ -118,16 +118,30 @@ export function DisbursementForm({
       partyName: next === 'self' ? 'You' : next === 'builder' ? p.partyName || 'Builder' : '',
     }))
 
-  const toggleExpense = (expense: Expense, on: boolean) => {
-    setApplied((prev) => {
-      const next = { ...prev }
-      if (!on) delete next[expense.id]
-      else next[expense.id] = settlements.get(expense.id)?.outstanding ?? 0
-      return next
-    })
+  /** Keep the cheque total in step with the tagged receipts while the two agree, so the
+   *  common case needs no arithmetic — but stop once the amount has been set by hand. */
+  const applyRows = (next: Record<string, number>) => {
+    const previousTotal = sumBy(Object.values(applied), (v) => v)
+    const nextTotal = sumBy(Object.values(next), (v) => v)
+    setApplied(next)
+    setD((p) => (cents(p.amount ?? 0) === cents(previousTotal) ? { ...p, amount: nextTotal } : p))
   }
 
-  /** Applying receipts is the normal way to arrive at the cheque amount, so keep them in sync. */
+  const toggleExpense = (expense: Expense, on: boolean) => {
+    const next = { ...applied }
+    if (!on) delete next[expense.id]
+    else next[expense.id] = settlements.get(expense.id)?.outstanding ?? 0
+    applyRows(next)
+  }
+
+  /** Partial reimbursement: repay part of an invoice now and the rest out of a later draw.
+   *  Clamped to what is still outstanding, which is also what the database enforces. */
+  const setRowAmount = (expense: Expense, raw: number) => {
+    const outstanding = settlements.get(expense.id)?.outstanding ?? 0
+    applyRows({ ...applied, [expense.id]: Math.min(Math.max(0, raw), outstanding) })
+  }
+
+  /** Applying every receipt is the common case, so it sets the cheque amount outright. */
   const applyAllOutstanding = () => {
     const next: Record<string, number> = {}
     for (const e of owedExpenses) next[e.id] = settlements.get(e.id)?.outstanding ?? 0
@@ -217,7 +231,22 @@ export function DisbursementForm({
                       <span className="muted"> · {fmtDate(e.date)} · {e.categoryName || 'Uncategorized'}</span>
                     </span>
                   </label>
-                  <span className="tnum">{fmt(outstanding)}</span>
+                  {on ? (
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.01"
+                      min="0"
+                      max={outstanding}
+                      className="tnum"
+                      style={{ maxWidth: '7.5rem' }}
+                      aria-label={`Amount applied to ${e.vendorName || 'this expense'}`}
+                      value={applied[e.id]}
+                      onChange={(ev) => setRowAmount(e, ev.target.value === '' ? 0 : Number(ev.target.value))}
+                    />
+                  ) : (
+                    <span className="tnum">{fmt(outstanding)}</span>
+                  )}
                 </li>
               )
             })}

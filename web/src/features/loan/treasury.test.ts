@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  activeAllocations,
   cashOnHand,
   disbursementSummary,
   drawNetFunded,
@@ -138,6 +139,29 @@ describe('disbursement allocation', () => {
   it('ignores allocations belonging to other disbursements', () => {
     const d: TreasuryDisbursement = { id: 'd1', drawId: 'x', partyType: 'self', partyName: 'You', amount: 1_000, disbursedDate: '2026-07-24' }
     expect(disbursementSummary(d, [{ disbursementId: 'other', expenseId: 'e1', amount: 900 }]).unallocated).toBe(1_000)
+  })
+})
+
+describe('deleted payments release what they settled', () => {
+  const expenses: TreasuryExpense[] = [exp({ id: 'e1', amount: 6_500, fundingSource: 'owner_personal' })]
+  const allocations: TreasuryAllocation[] = [{ disbursementId: 'gone', expenseId: 'e1', amount: 6_500 }]
+
+  it('ignores allocations whose disbursement no longer exists', () => {
+    // Trashing a payment must un-settle the expenses it paid for. Allocation rows survive the
+    // parent's soft delete, so the math has to scope them to live disbursements — otherwise
+    // the expense stays "reimbursed" and the money owed to you silently vanishes.
+    const live = activeAllocations(allocations, [])
+    expect(live).toEqual([])
+    expect(owedSummary(expenses, live).you.owed).toBe(6_500)
+    expect(expenseSettlement(expenses[0], live).state).toBe('unreimbursed')
+  })
+
+  it('keeps allocations whose disbursement is still live', () => {
+    const disb: TreasuryDisbursement[] = [
+      { id: 'gone', drawId: 'd1', partyType: 'self', partyName: 'You', amount: 6_500, disbursedDate: '2026-07-24' },
+    ]
+    expect(activeAllocations(allocations, disb)).toHaveLength(1)
+    expect(owedSummary(expenses, activeAllocations(allocations, disb)).you.owed).toBe(0)
   })
 })
 

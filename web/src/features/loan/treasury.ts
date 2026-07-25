@@ -42,6 +42,22 @@ export interface TreasuryAllocation {
   amount: number
 }
 
+/**
+ * Scope allocations to disbursements that still exist.
+ *
+ * Soft-deleting a disbursement does NOT delete its allocation rows — they are separate
+ * records with their own deleted_at. Without this filter, trashing a payment would leave
+ * the expenses it settled still marked reimbursed, so money genuinely owed back to you
+ * would silently disappear from "who is owed". Every treasury read goes through here.
+ */
+export function activeAllocations(
+  allocations: TreasuryAllocation[],
+  disbursements: TreasuryDisbursement[],
+): TreasuryAllocation[] {
+  const live = new Set(disbursements.map((d) => d.id))
+  return allocations.filter((a) => live.has(a.disbursementId))
+}
+
 export interface TreasuryDrawLike {
   id: string
   amount: number

@@ -77,7 +77,9 @@ try {
   // --- Child-row isolation: A's expense must be invisible/untouchable to B. ---
   const eIns = await a.client
     .from('expenses')
-    .insert({ project_id: projectId, owner: a.id, vendor_name: `RLS exp ${stamp}`, amount: 1234 })
+    // Paid in full, so it is reimbursable — the treasury guards below cap allocations at the
+    // cash actually laid out, and an unpaid bill has had none.
+    .insert({ project_id: projectId, owner: a.id, vendor_name: `RLS exp ${stamp}`, amount: 1234, amount_paid: 1234, is_paid: true })
     .select()
     .single()
   if (eIns.error) throw new Error(`A expense insert: ${eIns.error.message}`)
@@ -89,6 +91,64 @@ try {
   assert(!bExpUpd.error && bExpUpd.data.length === 0, 'B update of A’s expense must affect 0 rows')
   const bExpDel = await b.client.from('expenses').delete().eq('id', expenseId).select()
   assert(!bExpDel.error && bExpDel.data.length === 0, 'B delete of A’s expense must affect 0 rows')
+
+  // --- Treasury isolation: the loan ledger carries how much cash moved between you, the
+  // builder and the lender, so it must be scoped exactly as tightly as the budget is. ---
+  const loanIns = await a.client
+    .from('construction_loans')
+    .insert({ project_id: projectId, owner: a.id, lender: `RLS lender ${stamp}`, total_amount: 1_500_000, interest_rate: 6 })
+    .select()
+    .single()
+  if (loanIns.error) throw new Error(`A loan insert: ${loanIns.error.message}`)
+
+  const drawIns = await a.client
+    .from('loan_draws')
+    .insert({ project_id: projectId, owner: a.id, loan_id: loanIns.data.id, amount: 250_000, fees_amount: 2_500, status: 'funded' })
+    .select()
+    .single()
+  if (drawIns.error) throw new Error(`A draw insert: ${drawIns.error.message}`)
+
+  const disbIns = await a.client
+    .from('draw_disbursements')
+    .insert({ project_id: projectId, owner: a.id, draw_id: drawIns.data.id, party_type: 'self', party_name: 'You', amount: 1234 })
+    .select()
+    .single()
+  if (disbIns.error) throw new Error(`A disbursement insert: ${disbIns.error.message}`)
+
+  const allocIns = await a.client
+    .from('disbursement_allocations')
+    .insert({ project_id: projectId, owner: a.id, disbursement_id: disbIns.data.id, expense_id: expenseId, amount: 1234 })
+    .select()
+    .single()
+  if (allocIns.error) throw new Error(`A allocation insert: ${allocIns.error.message}`)
+
+  for (const [table, id] of [
+    ['draw_disbursements', disbIns.data.id],
+    ['disbursement_allocations', allocIns.data.id],
+  ]) {
+    const list = await b.client.from(table).select('id')
+    assert(!list.error && list.data.every((r) => r.id !== id), `B must not see A’s ${table} row`)
+    const upd = await b.client.from(table).update({ amount: 999_999 }).eq('id', id).select()
+    assert(!upd.error && upd.data.length === 0, `B update of A’s ${table} row must affect 0 rows`)
+    const del = await b.client.from(table).delete().eq('id', id).select()
+    assert(!del.error && del.data.length === 0, `B delete of A’s ${table} row must affect 0 rows`)
+    const forge = await b.client.from(table).insert({ project_id: projectId, owner: a.id, amount: 1 }).select()
+    assert(!!forge.error, `B must not insert a ${table} row owned by A (WITH CHECK)`)
+  }
+
+  // The guards must hold for the owner too: you cannot disburse cash the draw never delivered.
+  const overDisburse = await a.client
+    .from('draw_disbursements')
+    .insert({ project_id: projectId, owner: a.id, draw_id: drawIns.data.id, party_type: 'self', party_name: 'You', amount: 500_000 })
+    .select()
+  assert(!!overDisburse.error, 'over-disbursing a draw must be rejected')
+
+  // …and cannot reimburse more than was actually paid out for an expense.
+  const overAllocate = await a.client
+    .from('disbursement_allocations')
+    .insert({ project_id: projectId, owner: a.id, disbursement_id: disbIns.data.id, expense_id: expenseId, amount: 5_000 })
+    .select()
+  assert(!!overAllocate.error, 'over-allocating against an expense must be rejected')
 } catch (e) {
   failures.push(`threw: ${e.message}`)
 } finally {
