@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { ScanLine, Upload, ChevronDown, CircleCheck, TriangleAlert, Sparkles } from 'lucide-react'
 import type { BudgetLineItem, Expense } from '../../domain/types'
-import { PAYMENT_METHODS } from '../../domain/enums'
+import { FUNDING_SOURCES, FUNDING_SOURCE_LABEL, PAYMENT_METHODS, normalizeFundingSource } from '../../domain/enums'
 import { balanceDue } from '../../lib/expenseMath'
 import { fmt } from '../../lib/money'
 import { uploadBlob, signedDownloadUrl } from '../../lib/r2'
@@ -318,7 +318,7 @@ export function ExpenseForm({
         categoryName: selected?.categoryName ?? draft.categoryName ?? '',
         roomTag: selected?.roomTag ?? draft.roomTag ?? '',
         receiptObjectKey,
-        fundingSource: draft.fundingSource || 'personal',
+        fundingSource: normalizeFundingSource(draft.fundingSource),
       }
     },
   })
@@ -553,11 +553,17 @@ export function ExpenseForm({
         {/* Funding source matters even on unpaid bills (a loan-funded invoice), so it lives in
             the fast path when a loan exists — not behind the Paid state. */}
         {hasLoan && (
-          <Field label="Funding source" hint="Track personal funds vs construction-loan spend.">
+          <Field
+            label="Whose money paid this?"
+            hint="Drives who you owe. Money you or the builder front is reimbursed from a draw later — that reimbursement is cash only and never changes the budget."
+          >
             {(p) => (
-              <Select {...p} value={d.fundingSource || 'personal'} onChange={text('fundingSource')}>
-                <option value="personal">Personal (cash / credit card)</option>
-                <option value="loan">Construction loan</option>
+              <Select {...p} value={normalizeFundingSource(d.fundingSource)} onChange={text('fundingSource')}>
+                {FUNDING_SOURCES.map((source) => (
+                  <option key={source} value={source}>
+                    {FUNDING_SOURCE_LABEL[source]}
+                  </option>
+                ))}
               </Select>
             )}
           </Field>

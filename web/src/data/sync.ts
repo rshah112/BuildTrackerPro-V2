@@ -33,6 +33,8 @@ const ALLOWED_TABLES = new Set([
   'allowance_selections',
   'construction_loans',
   'loan_draws',
+  'draw_disbursements',
+  'disbursement_allocations',
   'phases',
   'lien_waivers',
   'push_subscriptions',

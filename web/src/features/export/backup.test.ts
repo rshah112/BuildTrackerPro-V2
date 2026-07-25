@@ -21,6 +21,8 @@ const sections = {
   documents: [],
   loans: [],
   loanDraws: [],
+  disbursements: [],
+  allocations: [],
   phases: [],
   lienWaivers: [],
 }

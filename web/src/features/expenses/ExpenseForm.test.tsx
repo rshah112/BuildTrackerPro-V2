@@ -156,16 +156,16 @@ describe('ExpenseForm redesign', () => {
     expect(screen.getByLabelText('Notes')).toBeInTheDocument()
   })
 
-  it('shows Funding source when a loan exists — even while Unpaid (not gated on Paid)', () => {
+  it('shows the funding-origin picker when a loan exists — even while Unpaid (not gated on Paid)', () => {
     h.loan = [{ id: 'loan1' }]
     renderForm()
     expect(screen.getByRole('radio', { name: 'Unpaid' })).toBeChecked()
-    expect(screen.getByLabelText('Funding source')).toBeInTheDocument()
+    expect(screen.getByLabelText('Whose money paid this?')).toBeInTheDocument()
   })
 
-  it('hides Funding source when there is no loan', () => {
+  it('hides the funding-origin picker when there is no loan', () => {
     renderForm()
-    expect(screen.queryByLabelText('Funding source')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Whose money paid this?')).not.toBeInTheDocument()
   })
 
   it('auto-fills only confident scan fields and classifies a reliable receipt as paid', async () => {

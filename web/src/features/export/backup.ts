@@ -3,7 +3,7 @@ import { isNetworkError, isRetryablePostgrestError } from '../../lib/netStatus'
 import { supabase } from '../../lib/supabase'
 import { loadProjectExport, downloadBlob, safeFileName, type ProjectExport } from './exportData'
 
-export const BACKUP_VERSION = 2
+export const BACKUP_VERSION = 3
 const MAX_BACKUP_CHARS = 50 * 1024 * 1024
 const MAX_BACKUP_ROWS = 100_000
 
@@ -25,6 +25,8 @@ const COLLECTIONS = [
   'documents',
   'loans',
   'loanDraws',
+  'disbursements',
+  'allocations',
   'phases',
   'lienWaivers',
 ] as const
@@ -48,6 +50,8 @@ export interface PreparedRestore {
   documents: Row[]
   loans: Row[]
   loanDraws: Row[]
+  disbursements: Row[]
+  allocations: Row[]
   phases: Row[]
   lienWaivers: Row[]
 }
@@ -55,8 +59,9 @@ export interface PreparedRestore {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-/** Validate and normalize a backup before any database write happens. Version 1
- *  files remain supported; they predate lien-waiver export, so that list is empty. */
+/** Validate and normalize a backup before any database write happens. Older files remain
+ *  supported: version 1 predates lien-waiver export and versions 1-2 predate the loan
+ *  treasury ledger, so those sections are back-filled empty rather than rejected. */
 export function parseBackup(json: string): BackupFile {
   if (json.length > MAX_BACKUP_CHARS) throw new Error('Backup is larger than the 50 MB restore limit')
 
@@ -68,7 +73,7 @@ export function parseBackup(json: string): BackupFile {
   }
   if (!isRecord(raw) || !isRecord(raw.project)) throw new Error('Not a valid project backup')
   const version = Number(raw.backupVersion)
-  if (version !== 1 && version !== BACKUP_VERSION) {
+  if (version !== 1 && version !== 2 && version !== BACKUP_VERSION) {
     throw new Error(`Backup version ${String(raw.backupVersion)} is not supported`)
   }
   if (typeof raw.project.id !== 'string' || typeof raw.project.name !== 'string') {
@@ -79,6 +84,10 @@ export function parseBackup(json: string): BackupFile {
   let rowCount = 0
   for (const name of COLLECTIONS) {
     if (name === 'lienWaivers' && version === 1 && raw[name] === undefined) raw[name] = []
+    // The treasury ledger arrived in version 3; earlier backups simply have none.
+    if ((name === 'disbursements' || name === 'allocations') && version < 3 && raw[name] === undefined) {
+      raw[name] = []
+    }
     if (!Array.isArray(raw[name])) throw new Error(`Backup section “${name}” is missing or invalid`)
     if (!(raw[name] as unknown[]).every(isRecord)) throw new Error(`Backup section “${name}” contains invalid rows`)
     rowCount += (raw[name] as unknown[]).length
@@ -165,6 +174,8 @@ export function prepareRestore(file: BackupFile): PreparedRestore {
   const documentIds = mapIds(file.documents, 'documents')
   const loanIds = mapIds(file.loans, 'loans')
   const drawIds = mapIds(file.loanDraws, 'loanDraws')
+  const disbursementIds = mapIds(file.disbursements, 'disbursements')
+  const allocationIds = mapIds(file.allocations, 'allocations')
   const phaseIds = mapIds(file.phases, 'phases')
   const waiverIds = mapIds(file.lienWaivers, 'lienWaivers')
 
@@ -241,11 +252,28 @@ export function prepareRestore(file: BackupFile): PreparedRestore {
       budgetLineItemTitle: '', uploadedAt: now, fileObjectKey: null, deletedAt: null,
     }, (row) => ({ budgetLineItemId: remapOptional(lineIds, row.budgetLineItemId) })),
     loans: preparedRows(file.loans, loanIds, projectId, {
-      lender: '', totalAmount: 0, interestRate: 0, notes: '', createdAt: now, deletedAt: null,
+      lender: '', totalAmount: 0, interestRate: 0, startDate: null, termMonths: 0, maturityDate: null,
+      originationFee: 0, interestReserveAmount: 0, interestBasis: 'actual/365', notes: '',
+      createdAt: now, deletedAt: null,
     }),
     loanDraws: preparedRows(file.loanDraws, drawIds, projectId, {
-      loanId: null, amount: 0, drawDate: now, description: '', notes: '', createdAt: now, deletedAt: null,
+      loanId: null, amount: 0, drawDate: now, status: 'funded', requestedDate: null, approvedDate: null,
+      feesAmount: 0, inspectionDate: null, inspectionStatus: '', inspectorName: '', description: '',
+      notes: '', createdAt: now, deletedAt: null,
     }, (row) => ({ loanId: remapRequired(loanIds, row.loanId, 'construction loan') })),
+    disbursements: preparedRows(file.disbursements, disbursementIds, projectId, {
+      drawId: null, partyType: 'self', vendorId: null, partyName: '', amount: 0, disbursedDate: now,
+      paymentMethod: '', paymentReference: '', notes: '', createdAt: now, deletedAt: null,
+    }, (row) => ({
+      drawId: remapRequired(drawIds, row.drawId, 'loan draw'),
+      vendorId: remapOptional(vendorIds, row.vendorId),
+    })),
+    allocations: preparedRows(file.allocations, allocationIds, projectId, {
+      disbursementId: null, expenseId: null, amount: 0, createdAt: now, deletedAt: null,
+    }, (row) => ({
+      disbursementId: remapRequired(disbursementIds, row.disbursementId, 'draw payment'),
+      expenseId: remapRequired(expenseIds, row.expenseId, 'reimbursed expense'),
+    })),
     phases: preparedRows(file.phases, phaseIds, projectId, {
       name: '', pctComplete: 0, sortOrder: 0, targetDate: null, notes: '', createdAt: now, deletedAt: null,
     }),

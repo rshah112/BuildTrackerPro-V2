@@ -10,6 +10,8 @@ import type {
   Expense,
   LienWaiver,
   LoanDraw,
+  DrawDisbursement,
+  DisbursementAllocation,
   Phase,
   PhotoAttachment,
   Project,
@@ -33,6 +35,8 @@ export interface ProjectExport {
   documents: ProjectDocument[]
   loans: ConstructionLoan[]
   loanDraws: LoanDraw[]
+  disbursements: DrawDisbursement[]
+  allocations: DisbursementAllocation[]
   phases: Phase[]
   lienWaivers: LienWaiver[]
   exportedAt: string
@@ -61,6 +65,8 @@ export async function loadProjectExport(
     documents,
     loans,
     loanDraws,
+    disbursements,
+    allocations,
     phases,
     lienWaivers,
   ] = await Promise.all([
@@ -78,6 +84,8 @@ export async function loadProjectExport(
     table<ProjectDocument>('project_documents').list(f, opts),
     table<ConstructionLoan>('construction_loans').list(f, opts),
     table<LoanDraw>('loan_draws').list(f, opts),
+    table<DrawDisbursement>('draw_disbursements').list(f, opts),
+    table<DisbursementAllocation>('disbursement_allocations').list(f, opts),
     table<Phase>('phases').list(f, opts),
     table<LienWaiver>('lien_waivers').list(f, opts),
   ])
@@ -99,6 +107,8 @@ export async function loadProjectExport(
     documents,
     loans,
     loanDraws,
+    disbursements,
+    allocations,
     phases,
     lienWaivers,
     exportedAt: new Date().toISOString(),

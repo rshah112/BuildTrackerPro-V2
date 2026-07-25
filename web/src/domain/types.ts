@@ -232,6 +232,18 @@ export interface ConstructionLoan {
   totalAmount: number
   /** Annual interest rate as a percent (interest-only). */
   interestRate: number
+  /** Closing / first-draw date. Null until the loan actually closes. */
+  startDate?: ISODateString | null
+  /** Interest-only term in months (0 = not set). */
+  termMonths?: number
+  /** Explicit maturity; falls back to startDate + termMonths when null. */
+  maturityDate?: ISODateString | null
+  /** Origination fee / points, in dollars. A soft cost — post it as an expense to count it. */
+  originationFee?: number
+  /** Lender-held interest reserve (0 = none, interest is paid from draw cash or personally). */
+  interestReserveAmount?: number
+  /** Day-count convention — see INTEREST_BASES. */
+  interestBasis?: string
   notes: string
   createdAt: ISODateString
   deletedAt?: ISODateString | null
@@ -243,9 +255,61 @@ export interface LoanDraw {
   projectId: UUID
   loanId: UUID
   amount: number
+  /** Date the draw was FUNDED. Interest accrues from here, not from the request. */
   drawDate: ISODateString
+  /** 'requested' | 'approved' | 'funded' — see DRAW_STATUSES. Only funded draws move money. */
+  status?: string
+  requestedDate?: ISODateString | null
+  approvedDate?: ISODateString | null
+  /** Lender fees netted out of the wire: cash landed = amount - feesAmount. */
+  feesAmount?: number
+  inspectionDate?: ISODateString | null
+  /** '' | 'not_required' | 'scheduled' | 'passed' | 'failed' — see DRAW_INSPECTION_STATUSES. */
+  inspectionStatus?: string
+  inspectorName?: string
   description: string
   notes: string
+  createdAt: ISODateString
+  deletedAt?: ISODateString | null
+}
+
+/**
+ * Cash leaving a funded draw toward one party. This is a TREASURY record, not a cost:
+ * it never reaches budget actuals, category spend, EAC, or cash flow. Reimbursing yourself
+ * $6,500 for the architect leaves the project's cost at $6,500, not $13,000.
+ */
+export interface DrawDisbursement {
+  id: UUID
+  owner: UUID
+  projectId: UUID
+  drawId: UUID
+  /** 'self' | 'builder' | 'vendor' — see DISBURSEMENT_PARTY_TYPES. */
+  partyType: string
+  /** Set only when partyType is 'vendor'. */
+  vendorId?: UUID | null
+  /** Display snapshot of who was paid, for all party types. */
+  partyName: string
+  amount: number
+  disbursedDate: ISODateString
+  paymentMethod: string
+  paymentReference: string
+  notes: string
+  createdAt: ISODateString
+  deletedAt?: ISODateString | null
+}
+
+/**
+ * Optional line-level tracing of a disbursement back to the expenses it settled. Carries no
+ * category and no line item — which is exactly why a reimbursement spanning several budget
+ * categories is arithmetically a non-event.
+ */
+export interface DisbursementAllocation {
+  id: UUID
+  owner: UUID
+  projectId: UUID
+  disbursementId: UUID
+  expenseId: UUID
+  amount: number
   createdAt: ISODateString
   deletedAt?: ISODateString | null
 }

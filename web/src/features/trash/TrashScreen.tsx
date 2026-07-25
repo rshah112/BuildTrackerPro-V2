@@ -38,6 +38,8 @@ export function TrashScreen() {
   const bids = useRows<TrashRow>('bids', f, only)
   const loans = useRows<TrashRow>('construction_loans', f, only)
   const draws = useRows<TrashRow>('loan_draws', f, only)
+  const disbursements = useRows<TrashRow>('draw_disbursements', f, only)
+  const allocations = useRows<TrashRow>('disbursement_allocations', f, only)
   const phases = useRows<TrashRow>('phases', f, only)
   const waivers = useRows<TrashRow>('lien_waivers', f, only)
 
@@ -79,6 +81,8 @@ export function TrashScreen() {
     { name: 'bids', label: 'Bids', rows: bids.data ?? [], title: (r) => str(r.vendorName) || 'Bid' },
     { name: 'construction_loans', label: 'Loans', rows: loans.data ?? [], title: (r) => str(r.lender) || 'Construction loan' },
     { name: 'loan_draws', label: 'Loan draws', rows: draws.data ?? [], title: (r) => str(r.description) || 'Draw' },
+    { name: 'draw_disbursements', label: 'Draw payments', rows: disbursements.data ?? [], title: (r) => str(r.partyName) || 'Draw payment' },
+    { name: 'disbursement_allocations', label: 'Payment allocations', rows: allocations.data ?? [], title: () => 'Reimbursement allocation' },
     { name: 'phases', label: 'Build phases', rows: phases.data ?? [], title: (r) => str(r.name) || 'Phase' },
     { name: 'lien_waivers', label: 'Lien waivers', rows: waivers.data ?? [], title: (r) => str(r.vendorName) || 'Lien waiver' },
   ]
@@ -97,6 +101,8 @@ export function TrashScreen() {
     bids,
     loans,
     draws,
+    disbursements,
+    allocations,
     phases,
     waivers,
     activeExpensesQuery,
